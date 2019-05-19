@@ -45967,7 +45967,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     char * FileName;
     char Command[1000];
     extern void Abc_BddNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nMemMax, int nType, int nIte, int nOpt, int nVerbose );
-    //    extern void Abc_DdNandGiaTest( Gia_Man_t * pGia, int nMem, int nVerbose, char * FileName, int nType, int nIte, int nOpt, int fDvr );
+    extern void Abc_DdNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nMemMax, int nType, int nIte, int nOpt, int fDvr, int nVerbose );
     Extra_UtilGetoptReset();
     while ( ( c = Extra_UtilGetopt( argc, argv, "GNOMUVcrh" ) ) != EOF )
     {
@@ -46063,17 +46063,12 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     // get the input file name
     FileName = argv[globalUtilOptind];
     if ( fCudd )
-      {
-	;
-	//	Abc_DdNandGiaTest( pAbc->pGia, nMem, nVerbose, FileName, nType, nIte, nOpt, fDvr );
-      }
+      Abc_DdNandGiaTest( pAbc->pGia, FileName, nMem, nMemMax, nType, nIte, nOpt, fDvr, nVerbose );
     else
-      {
-	Abc_BddNandGiaTest( pAbc->pGia, FileName, nMem, nMemMax, nType, nIte, nOpt, nVerbose );
-	// read the file just produced
-	sprintf(Command, "read %s; strash; &get", FileName );
-	Cmd_CommandExecute( pAbc, Command );
-      }
+      Abc_BddNandGiaTest( pAbc->pGia, FileName, nMem, nMemMax, nType, nIte, nOpt, nVerbose );
+    // read the file just produced
+    sprintf(Command, "read %s; strash; &get", FileName );
+    Cmd_CommandExecute( pAbc, Command );
     return 0;
     
 usage:

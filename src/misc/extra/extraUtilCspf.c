@@ -1163,7 +1163,7 @@ void Abc_BddNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nMemMa
       if ( t == nIte ) break;
     }    
   if ( nVerbose ) ABC_PRT( "total ", Abc_Clock() - clk0 );
-  if ( p->filename != 0 ) Abc_BddNandPrintNet( p );
+  Abc_BddNandPrintNet( p );
   Abc_BddNandManFree( p );
 }
 
