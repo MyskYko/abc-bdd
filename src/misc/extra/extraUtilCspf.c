@@ -471,7 +471,6 @@ static inline void Abc_BddNandSortFaninAll( Abc_NandMan * p )
     Abc_BddNandSortFanin( p, id );
 }
 
-
 /**Function*************************************************************
 
   Synopsis    []
@@ -483,39 +482,40 @@ static inline void Abc_BddNandSortFaninAll( Abc_NandMan * p )
   SeeAlso     []
 
 ***********************************************************************/
-static inline int Abc_BddNandBuild( Abc_NandMan * p )
+static inline int Abc_BddNandBuild( Abc_NandMan * p, int id )
 {
-  int id, idj;
-  int i, j;
-  Vec_IntForEachEntry( p->livingNodes, id, i )
+  int idj;
+  int j;
+  unsigned Value = 1;
+  Vec_IntForEachEntry( p->faninList[id], idj, j )
     {
-      unsigned Value = 1;
-      Vec_IntForEachEntry( p->faninList[id], idj, j )
-	{
-	  Value = Abc_BddAnd( p->pBdd, Value, Abc_BddNandObjValue( p, idj ) );
-	  if ( Abc_BddLitIsInvalid( Value ) ) return 1;
-	}
-      Abc_BddNandObjValueWrite( p, id, Abc_BddLitNot( Value ) );
+      Value = Abc_BddAnd( p->pBdd, Value, Abc_BddNandObjValue( p, idj ) );
+      if ( Abc_BddLitIsInvalid( Value ) ) return 1;
     }
+  Abc_BddNandObjValueWrite( p, id, Abc_BddLitNot( Value ) );
   return 0;
 }
-static inline int Abc_BddNandBuildFanouts( Abc_NandMan * p, int startId )
+static inline int Abc_BddNandBuildAll( Abc_NandMan * p )
 {
-  int id, idj;
-  int i, j;
+  int id;
+  int i;
+  Vec_IntForEachEntry( p->livingNodes, id, i )
+    if ( Abc_BddNandBuild( p, id ) ) return 1;
+  return 0;
+}
+static inline int Abc_BddNandBuildFanoutCone( Abc_NandMan * p, int startId )
+{ // including startId itself
+  int id;
+  int i;
   Vec_Int_t * targets = Vec_IntAlloc( 1 );
   Vec_IntPush( targets, startId );
   Abc_BddNandDescendantSortedList( p, p->fanoutList, targets, startId );
   Vec_IntForEachEntry( targets, id, i )
-    {
-      unsigned Value = 1;
-      Vec_IntForEachEntry( p->faninList[id], idj, j )
-	{
-	  Value = Abc_BddAnd( p->pBdd, Value, Abc_BddNandObjValue( p, idj ) );
-	  if ( Abc_BddLitIsInvalid( Value ) ) return 1;
-	}
-      Abc_BddNandObjValueWrite( p, id, Abc_BddLitNot( Value ) );
-    }
+    if ( Abc_BddNandBuild( p, id ) )
+      {
+	Vec_IntFree( targets );
+	return 1;
+      }
   Vec_IntFree( targets );
   return 0;
 }
@@ -529,7 +529,11 @@ static inline int Abc_BddNandCheck( Abc_NandMan * p )
       Vec_IntForEachEntry( p->faninList[id], idj, j )
 	Value = Abc_BddAnd( p->pBdd, Value, Abc_BddNandObjValue( p, idj ) );
       unsigned old = Abc_BddNandObjValue( p, id );
-      if ( old != ( Abc_BddLitNot( Value ) ) ) return 1;
+      if ( old != ( Abc_BddLitNot( Value ) ) )
+	{
+	  printf( "error : different at %d %10u %10u\n", id, old, Value );
+	  return 1;
+	}
     }
   return 0;
 }
@@ -619,19 +623,17 @@ static inline int Abc_BddNandCspf( Abc_NandMan * p )
       if ( Abc_BddNandCspfG( p, id ) ) return 1;
       if ( Abc_BddNandCspfC( p, id ) ) return 1;
     }
-  return Abc_BddNandBuild( p );
+  return Abc_BddNandBuildAll( p );
 }
-static inline int Abc_BddNandCspfFanins( Abc_NandMan * p, int startId )
+static inline int Abc_BddNandCspfFaninCone( Abc_NandMan * p, int startId )
 {
   int id;
   int i;
   Vec_Int_t * targets = Vec_IntAlloc( 1 );
   Abc_BddNandDescendantSortedList( p, p->faninList, targets, startId );
-  Vec_IntPush( targets, startId );
+  //  Vec_IntPush( targets, startId );
   Vec_IntForEachEntryReverse( targets, id, i )
     {
-      assert( p->faninList[id] != 0 );
-      assert( p->fanoutList[id] != 0 );
       if ( Vec_IntSize( p->fanoutList[id] ) == 0 )
 	{ // remove the node
 	  Abc_BddNandRemoveNode( p, id );
@@ -641,7 +643,7 @@ static inline int Abc_BddNandCspfFanins( Abc_NandMan * p, int startId )
       if ( Abc_BddNandCspfC( p, id ) ) return 1;
     }
   Vec_IntFree( targets );
-  return Abc_BddNandBuild( p );
+  return 0;
 }
 
 /**Function*************************************************************
@@ -670,7 +672,7 @@ static inline void Abc_BddNandRefresh( Abc_NandMan * p )
       Abc_BddManFree( p->pBdd );
       if ( p->nVerbose >= 2 ) printf( "Allocate nodes by 2^%d\n", p->nMem );
       p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->pis ), 1 << p->nMem, (int)( p->nVerbose >= 3 ) );
-      int out = Abc_BddNandBuild( p );
+      int out = Abc_BddNandBuildAll( p );
       out += Abc_BddNandCspf( p );
       if ( out == 0 ) break;
       if ( p->nMem == p->nMemMax )
@@ -688,16 +690,12 @@ static inline void Abc_BddNandRefreshIfNeeded( Abc_NandMan * p )
   if ( Abc_BddIsLimit( p->pBdd ) )
     Abc_BddNandRefresh( p );
 }
-static inline void Abc_BddNandCspfRefresh( Abc_NandMan * p )
-{
-  if ( Abc_BddNandCspf( p ) )
-    Abc_BddNandRefresh( p );
-}
-static inline void Abc_BddNandCspfFaninsRefresh( Abc_NandMan * p, int startId )
-{
-  if ( Abc_BddNandCspfFanins( p, startId ) )
-    Abc_BddNandRefresh( p );
-}
+static inline void Abc_BddNandBuildRefresh( Abc_NandMan * p, int id ) { if ( Abc_BddNandBuild( p, id ) ) Abc_BddNandRefresh( p ); }
+static inline void Abc_BddNandBuildAllRefresh( Abc_NandMan * p ) { if ( Abc_BddNandBuildAll( p ) ) Abc_BddNandRefresh( p ); }
+static inline void Abc_BddNandBuildFanoutConeRefresh( Abc_NandMan * p, int startId ) { if ( Abc_BddNandBuildFanoutCone( p, startId ) ) Abc_BddNandRefresh( p ); }
+static inline void Abc_BddNandCspfCRefresh( Abc_NandMan * p, int id ) { if ( Abc_BddNandCspfC( p, id ) ) Abc_BddNandRefresh( p ); }
+static inline void Abc_BddNandCspfRefresh( Abc_NandMan * p ) { if ( Abc_BddNandCspf( p ) ) Abc_BddNandRefresh( p ); }
+static inline void Abc_BddNandCspfFaninConeRefresh( Abc_NandMan * p, int startId ) { if ( Abc_BddNandCspfFaninCone( p, startId ) ) Abc_BddNandRefresh( p ); }
 
 /**Function*************************************************************
 
@@ -740,7 +738,7 @@ static inline int Abc_BddNandTryConnect( Abc_NandMan * p, int fanin, int fanout 
   unsigned ffanout = Abc_BddNandObjValue( p, fanout );
   unsigned gfanout = p->G[fanout];
   unsigned connectable = Abc_BddOr( p->pBdd, ffanout, gfanout );
-  if( Abc_BddLitIsInvalid( connectable ) ) return 0;
+  if( Abc_BddLitIsInvalid( connectable ) ) return -1;
   connectable = Abc_BddOr( p->pBdd, ffanin, connectable );
   if ( connectable == 1 )
     {
@@ -748,6 +746,18 @@ static inline int Abc_BddNandTryConnect( Abc_NandMan * p, int fanin, int fanout 
       return 1;
     }
   return 0;
+}
+static inline int Abc_BddNandTryConnectRefreshing( Abc_NandMan * p, int fanin, int fanout )
+{
+  int c = Abc_BddNandTryConnect( p, fanin, fanout );
+  if ( c == -1 )
+    {
+      Abc_BddNandRefresh( p );
+      if ( Abc_BddNandIsEmptyOrDeadNode( p, fanin ) ) return 0;
+      if ( Abc_BddNandIsEmptyOrDeadNode( p, fanout ) ) return 0;
+      c = Abc_BddNandTryConnect( p, fanin, fanout );
+    }
+  return c;
 }
 
 /**Function*************************************************************
@@ -764,38 +774,41 @@ static inline int Abc_BddNandTryConnect( Abc_NandMan * p, int fanin, int fanout 
 static inline void Abc_BddNandG1EagerReduce( Abc_NandMan * p, int id, int idj )
 {
   int wire =  Abc_BddNandCountWire( p );
-  Abc_BddNandCspfFaninsRefresh( p, id );
+  Abc_BddNandCspfCRefresh( p, id );
+  if ( Abc_BddNandIsEmptyOrDeadNode( p, id ) ) return;
+  Abc_BddNandCspfFaninConeRefresh( p, id );
   if ( wire == Abc_BddNandCountWire( p ) )
     {
       Abc_BddNandDisconnect( p, idj, id );
-      if ( Abc_BddNandBuildFanouts( p, id ) ) Abc_BddNandRefresh( p );
-      else Abc_BddNandCspfFaninsRefresh( p, id );
+      Abc_BddNandBuildFanoutConeRefresh( p, id );
+      if ( Abc_BddNandIsEmptyOrDeadNode( p, id ) ) return;
+      Abc_BddNandCspfCRefresh( p, id );
+      if ( Abc_BddNandIsEmptyOrDeadNode( p, id ) ) return;
+      Abc_BddNandCspfFaninConeRefresh( p, id );
     }
   else
-    Abc_BddNandCspfEager( p );
+    {
+      Abc_BddNandBuildAllRefresh( p );
+      Abc_BddNandCspfEager( p );
+    }
 }
 static inline void Abc_BddNandG1WeakReduce( Abc_NandMan * p, int id, int idj )
 {
-  int wire =  Vec_IntSize( p->faninList[id] );
-  int out = Abc_BddNandCspfC( p, id );
-  if ( wire == Vec_IntSize( p->faninList[id] ) )
-    {
-      Abc_BddNandDisconnect( p, idj, id );
-      out += Abc_BddNandCspfC( p, id );
-    }
-  if ( out ) Abc_BddNandRefresh( p );
+  int wire =  Abc_BddNandCountWire( p );
+  Abc_BddNandCspfCRefresh( p, id );
+  if ( Abc_BddNandIsEmptyOrDeadNode( p, id ) ) return;
+  if ( Abc_BddNandIsEmptyOrDeadNode( p, idj ) ) return;
+  if ( wire == Abc_BddNandCountWire( p ) )
+    Abc_BddNandDisconnect( p, idj, id );
+  Abc_BddNandBuildRefresh( p, id );
 }
 static inline void Abc_BddNandG1( Abc_NandMan * p )
 {
   int i, j;
   int id, idj;
   Vec_Int_t * targets = Vec_IntDup( p->livingNodes );
-  // candidates
-  Vec_Int_t * targets2 = Vec_IntDup( p->livingNodes );
-  // optimize
   Vec_IntForEachEntryReverse( targets, id, i )
     {
-      Abc_BddNandRefreshIfNeeded( p );
       if ( Abc_BddNandIsEmptyOrDeadNode( p, id ) ) continue;
       if ( p->nVerbose >= 2 )
 	{
@@ -805,14 +818,13 @@ static inline void Abc_BddNandG1( Abc_NandMan * p )
       Vec_Int_t * fanouts = Vec_IntAlloc( 1 );
       Abc_BddNandDescendantList_rec( p->fanoutList, fanouts, id );
       // try connecting candidate
-      Vec_IntForEachEntry( targets2, idj, j )
+      Vec_IntForEachEntry( targets, idj, j )
 	{
-	  Abc_BddNandRefreshIfNeeded( p );
 	  if ( Abc_BddNandIsEmptyOrDeadNode( p, id ) ) break;
 	  if ( Abc_BddNandIsEmptyOrDeadNode( p, idj ) ) continue;
 	  if ( id == idj ) continue;
 	  if ( Vec_IntFind( fanouts, idj ) != -1 ) continue;
-	  if ( Abc_BddNandTryConnect( p, idj, id ) )
+	  if ( Abc_BddNandTryConnectRefreshing( p, idj, id ) == 1 )
 	    {
 	      if ( p->nOpt ) Abc_BddNandG1WeakReduce( p, id, idj );
 	      else Abc_BddNandG1EagerReduce( p, id, idj );
@@ -821,9 +833,8 @@ static inline void Abc_BddNandG1( Abc_NandMan * p )
       // try connecting pi
       Vec_IntForEachEntry( p->pis, idj, j )
 	{
-	  Abc_BddNandRefreshIfNeeded( p );
 	  if ( Abc_BddNandIsEmptyOrDeadNode( p, id ) ) break;
-	  if ( Abc_BddNandTryConnect( p, idj, id ) )
+	  if ( Abc_BddNandTryConnectRefreshing( p, idj, id ) == 1 )
 	    {
 	      if ( p->nOpt ) Abc_BddNandG1WeakReduce( p, id, idj );	
 	      else Abc_BddNandG1EagerReduce( p, id, idj );
@@ -832,13 +843,17 @@ static inline void Abc_BddNandG1( Abc_NandMan * p )
       // recalculate fanouts for option
       if ( p->nOpt )
 	{
-	  if ( Abc_BddNandBuildFanouts( p, id ) ) Abc_BddNandRefresh( p );
-	  else Abc_BddNandCspfRefresh( p );
+	  if ( Abc_BddNandIsEmptyOrDeadNode( p, id ) ) continue;
+	  Abc_BddNandCspfCRefresh( p, id );
+	  if ( Abc_BddNandIsEmptyOrDeadNode( p, id ) ) continue;
+	  Abc_BddNandCspfFaninConeRefresh( p, id );
+	  if ( Abc_BddNandIsEmptyOrDeadNode( p, id ) ) continue;
+	  Abc_BddNandBuildAllRefresh( p );
+	  //Abc_BddNandCspfRefresh( p );
 	}
       Vec_IntFree( fanouts );
     }
   Vec_IntFree( targets );
-  Vec_IntFree( targets2 );
 }
 
 /**Function*************************************************************
@@ -913,7 +928,7 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	  unsigned eq = Abc_BddOr( p->pBdd, Abc_BddLitNot( fx ), gx );
 	  unsigned Value = 1;
 	  Vec_IntForEachEntry( p->pis, idk, k ) 
-	    if ( Abc_BddNandTryConnect( p, idk, new_id ) )
+	    if ( Abc_BddNandTryConnect( p, idk, new_id ) == 1 )
 	      {
 		if ( eq == 1 ) break;
 		if ( Abc_BddLitIsInvalid( Value ) || Abc_BddLitIsInvalid( eq ) ) break;
@@ -924,7 +939,7 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	    {
 	      if ( Abc_BddNandIsEmptyOrDeadNode( p, idk ) ) continue;
 	      if ( Vec_IntFind( fanouts, idj ) != -1 ) continue;
-	      if ( Abc_BddNandTryConnect( p, idk, new_id ) )
+	      if ( Abc_BddNandTryConnect( p, idk, new_id ) == 1 )
 		{
 		  if ( eq == 1 ) break;
 		  if ( Abc_BddLitIsInvalid( Value ) || Abc_BddLitIsInvalid( eq ) ) break;
@@ -937,16 +952,15 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	      Abc_BddNandRemoveNode( p, new_id );
 	      continue;
 	    }
-	  assert( !Abc_BddNandCheck( p ) );
-	  assert( Abc_BddOr( p->pBdd, Abc_BddOr( p->pBdd, fx, gx ), Value ) == 1 );
+	  //	  assert( !Abc_BddNandCheck( p ) );
+	  //	  assert( Abc_BddOr( p->pBdd, Abc_BddOr( p->pBdd, fx, gx ), Value ) == 1 );
 	  // check the F of new node satisfies F and G.
 	  if ( eq != 1 ) {
 	    Abc_BddNandRemoveNode( p, new_id );
 	    continue;
 	  }
-	  assert( Abc_BddOr( p->pBdd, Abc_BddOr( p->pBdd, fx^1, gx ), Value^1 ) == 1 );
+	  //	  assert( Abc_BddOr( p->pBdd, Abc_BddOr( p->pBdd, fx^1, gx ), Value^1 ) == 1 );
 	  // reduce the inputs
-	  assert( Value != 0xffffffff );
 	  Abc_BddNandObjValueWrite( p, new_id, Abc_BddLitNot( Value ) );
 	  p->G[new_id] = Abc_BddAnd( p->pBdd, p->G[id] ,p->G[idj] );
 	  if ( Abc_BddLitIsInvalid( p->G[new_id] ) )
@@ -973,23 +987,8 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	  // remove merged (replaced) nodes
 	  Abc_BddNandRemoveNode( p, id );
 	  Abc_BddNandRemoveNode( p, idj );
-	  Value = 1;
 	  // calculate function of new node
-	  Vec_IntForEachEntry( p->faninList[new_id], idk, k )
-	    {
-	      Value = Abc_BddAnd( p->pBdd, Value, Abc_BddNandObjValue( p, idk ) );
-	      if ( Abc_BddLitIsInvalid( Value ) )
-		{
-		  out++;
-		  break;
-		}
-	    }
-	  if ( out )
-	    Abc_BddNandRefresh( p );
-	  Abc_BddNandObjValueWrite( p, new_id, Abc_BddLitNot( Value ) );
-	  if ( Abc_BddNandBuildFanouts( p, new_id ) )
-	    Abc_BddNandRefresh( p );
-	  assert( !Abc_BddNandCheck( p ) );
+	  Abc_BddNandBuildFanoutConeRefresh( p, new_id );
 	  Abc_BddNandCspfRefresh( p );
 	  while ( !Abc_BddNandIsEmptyNode( p, new_id ) )
 	    {
@@ -1024,7 +1023,6 @@ static inline void Abc_BddNandG1multi( Abc_NandMan * p )
     Abc_BddNandDescendantList_rec( p->faninList, targets2, id );
   Vec_IntForEachEntryReverse( targets, id, i )
     {
-      Abc_BddNandRefreshIfNeeded( p );
       if ( Abc_BddNandIsEmptyOrDeadNode( p, id ) ) continue;
       if ( p->nVerbose >= 2 )
 	{
@@ -1035,12 +1033,11 @@ static inline void Abc_BddNandG1multi( Abc_NandMan * p )
       Abc_BddNandDescendantList_rec( p->fanoutList, fanouts, id );
       Vec_IntForEachEntry( targets2, idj, j )
 	{
-	  Abc_BddNandRefreshIfNeeded( p );
 	  if ( Abc_BddNandIsEmptyOrDeadNode( p, id ) ) break;
 	  if ( Abc_BddNandIsEmptyOrDeadNode( p, idj ) ) continue;
 	  if ( id == idj ) continue;
 	  if ( Vec_IntFind( fanouts, idj ) != -1 ) continue;
-	  if ( Abc_BddNandTryConnect( p, idj, id ) )
+	  if ( Abc_BddNandTryConnectRefreshing( p, idj, id ) == 1 )
 	    {
 	      if ( p->nOpt ) Abc_BddNandG1WeakReduce( p, id, idj );
 	      else Abc_BddNandG1EagerReduce( p, id, idj );
@@ -1048,9 +1045,8 @@ static inline void Abc_BddNandG1multi( Abc_NandMan * p )
 	}
       Vec_IntForEachEntry( p->pis, idj, j )
 	{
-	  Abc_BddNandRefreshIfNeeded( p );
 	  if ( Abc_BddNandIsEmptyOrDeadNode( p, id ) ) break;
-	  if ( Abc_BddNandTryConnect( p, idj, id ) )
+	  if ( Abc_BddNandTryConnectRefreshing( p, idj, id ) == 1 )
 	    {
 	      if ( p->nOpt ) Abc_BddNandG1WeakReduce( p, id, idj );	
 	      else Abc_BddNandG1EagerReduce( p, id, idj );
@@ -1058,8 +1054,12 @@ static inline void Abc_BddNandG1multi( Abc_NandMan * p )
 	}
       if ( p->nOpt )
 	{
-	  if ( Abc_BddNandBuildFanouts( p, id ) ) Abc_BddNandRefresh( p );
-	  else Abc_BddNandCspfRefresh( p );
+	  if ( Abc_BddNandIsEmptyOrDeadNode( p, id ) ) continue;
+	  Abc_BddNandCspfCRefresh( p, id );
+	  if ( Abc_BddNandIsEmptyOrDeadNode( p, id ) ) continue;
+	  Abc_BddNandCspfFaninConeRefresh( p, id );
+	  if ( Abc_BddNandIsEmptyOrDeadNode( p, id ) ) continue;
+	  Abc_BddNandBuildAllRefresh( p );
 	}
       Vec_IntFree( fanouts );
     }
@@ -1103,14 +1103,14 @@ void Abc_BddNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nMemMa
 {
   Abc_NandMan * p = Abc_BddNandManAlloc( pGia, FileName, nMem, nMemMax, nOpt, nVerbose );
   Abc_BddNandGenNet( p, pGia );
-  while ( ( 1 << p->nMem ) < Vec_IntSize( p->pis ) + 2 ) {
+  while ( ( 1u << p->nMem ) < Vec_IntSize( p->pis ) + 2 ) {
     p->nMem += 1;
     assert( p->nMem <= nMemMax );
   }
   if ( nVerbose >= 2 ) printf( "Allocate nodes by 2^%d\n", p->nMem );
   p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->pis ), 1 << p->nMem, (int)( nVerbose >= 3 ) );
   abctime clk0 = Abc_Clock();
-  while ( Abc_BddNandBuild( p ) )
+  while ( Abc_BddNandBuildAll( p ) )
     {
       Abc_BddManFree( p->pBdd );
       if ( p->nMem == nMemMax )
