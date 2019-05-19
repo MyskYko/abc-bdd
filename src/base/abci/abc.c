@@ -538,6 +538,7 @@ static int Abc_CommandAbc9Gla2Fla            ( Abc_Frame_t * pAbc, int argc, cha
 
 static int Abc_CommandAbc9Gen                ( Abc_Frame_t * pAbc, int argc, char ** argv );
 static int Abc_CommandAbc9Cfs                ( Abc_Frame_t * pAbc, int argc, char ** argv );
+static int Abc_CommandAbc9Bdd               ( Abc_Frame_t * pAbc, int argc, char ** argv );
 
 static int Abc_CommandAbc9Test               ( Abc_Frame_t * pAbc, int argc, char ** argv );
 
@@ -1241,7 +1242,8 @@ void Abc_Init( Abc_Frame_t * pAbc )
 
     Cmd_CommandAdd( pAbc, "ABC9",         "&gen",          Abc_CommandAbc9Gen,                    0 );
     Cmd_CommandAdd( pAbc, "ABC9",         "&cfs",          Abc_CommandAbc9Cfs,                    0 );
-
+    Cmd_CommandAdd( pAbc, "ABC9",         "&bdd",          Abc_CommandAbc9Bdd,                    0 );
+    
     Cmd_CommandAdd( pAbc, "ABC9",         "&test",         Abc_CommandAbc9Test,         0 );
     {
 //        extern Mf_ManTruthCount();
@@ -45868,6 +45870,75 @@ usage:
     return 1;
 }
 
+/**Function*************************************************************
+
+  Synopsis    []
+
+  Description []
+
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
+{
+    int c, fVerbose = 0;
+    int nMem = 21;
+    int nJump = 0;
+    Extra_UtilGetoptReset();
+    while ( ( c = Extra_UtilGetopt( argc, argv, "JMvh" ) ) != EOF )
+    {
+        switch ( c )
+        {
+        case 'J':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-J\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nJump = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nJump < 0 )
+                goto usage;
+            break;
+        case 'M':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-M\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nMem = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nMem < 0 )
+                goto usage;
+            break;
+        case 'v':
+            fVerbose ^= 1;
+            break;
+        case 'h':
+            goto usage;
+        default:
+            goto usage;
+        }
+    }
+    if ( pAbc->pGia == NULL )
+    {
+        Abc_Print( -1, "Abc_CommandAbc9Test(): There is no AIG.\n" );
+        return 1;
+    }
+    Abc_BddGiaTest( pAbc->pGia, fVerbose, nMem, nJump );
+    return 0;
+    
+usage:
+    Abc_Print( -2, "usage: &bdd [-JM num] [-vh]\n" );
+    Abc_Print( -2, "\t        simple bdd construction with garbage collection\n" );
+    Abc_Print( -2, "\t-J num: memory reallocation jump to 2^num, 0 is incremental reallocation [default = %d]\n", nJump );
+    Abc_Print( -2, "\t-M num: memory size to allocate 2^? BDD varialbe [default = %d]\n", nMem );
+    Abc_Print( -2, "\t-v    : toggle printing verbose information [default = %s]\n", fVerbose? "yes": "no" );
+    Abc_Print( -2, "\t-h    : print the command usage\n");
+    return 1;
+}
 
 /**Function*************************************************************
 

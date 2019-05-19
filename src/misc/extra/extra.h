@@ -44,6 +44,7 @@
 #include <assert.h>
 
 #include "misc/st/st.h"
+#include "aig/gia/gia.h"
 
 ABC_NAMESPACE_HEADER_START
 
@@ -407,6 +408,11 @@ extern void          (*Extra_UtilMMoutOfMemory)( long size );
 
 extern const char *  globalUtilOptarg;
 extern int           globalUtilOptind;
+
+/*=== extraUtilMult.c ================================================================*/
+
+typedef struct Abc_BddMan_ Abc_BddMan;
+extern void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump );
 
 /**AutomaticEnd***************************************************************/
 
