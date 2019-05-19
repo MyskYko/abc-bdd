@@ -538,7 +538,8 @@ static int Abc_CommandAbc9Gla2Fla            ( Abc_Frame_t * pAbc, int argc, cha
 
 static int Abc_CommandAbc9Gen                ( Abc_Frame_t * pAbc, int argc, char ** argv );
 static int Abc_CommandAbc9Cfs                ( Abc_Frame_t * pAbc, int argc, char ** argv );
-static int Abc_CommandAbc9Bdd               ( Abc_Frame_t * pAbc, int argc, char ** argv );
+static int Abc_CommandAbc9Bdd                ( Abc_Frame_t * pAbc, int argc, char ** argv );
+static int Abc_CommandAbc9Cspf               ( Abc_Frame_t * pAbc, int argc, char ** argv );
 
 static int Abc_CommandAbc9Test               ( Abc_Frame_t * pAbc, int argc, char ** argv );
 
@@ -1243,6 +1244,7 @@ void Abc_Init( Abc_Frame_t * pAbc )
     Cmd_CommandAdd( pAbc, "ABC9",         "&gen",          Abc_CommandAbc9Gen,                    0 );
     Cmd_CommandAdd( pAbc, "ABC9",         "&cfs",          Abc_CommandAbc9Cfs,                    0 );
     Cmd_CommandAdd( pAbc, "ABC9",         "&bdd",          Abc_CommandAbc9Bdd,                    0 );
+    Cmd_CommandAdd( pAbc, "ABC9",         "&cspf",         Abc_CommandAbc9Cspf,                   0 );
     
     Cmd_CommandAdd( pAbc, "ABC9",         "&test",         Abc_CommandAbc9Test,         0 );
     {
@@ -45884,7 +45886,7 @@ usage:
 int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
 {
     int c, fVerbose = 0;
-    int nMem = 21;
+    int nMem = 0;
     int nJump = 0;
     Extra_UtilGetoptReset();
     while ( ( c = Extra_UtilGetopt( argc, argv, "JMvh" ) ) != EOF )
@@ -45937,6 +45939,156 @@ usage:
     Abc_Print( -2, "\t-M num: memory size to allocate 2^? BDD varialbe [default = %d]\n", nMem );
     Abc_Print( -2, "\t-v    : toggle printing verbose information [default = %s]\n", fVerbose? "yes": "no" );
     Abc_Print( -2, "\t-h    : print the command usage\n");
+    return 1;
+}
+
+/**Function*************************************************************
+
+  Synopsis    []
+
+  Description []
+
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
+{
+    int c = 0;
+    int nVerbose = 0;
+    int nType = 0;
+    int nIte = 1;
+    int nOpt = 0;
+    int nMem = 21;
+    int nMemMax = 31;
+    int fDvr = 0;
+    int fCudd = 0;
+    char * FileName;
+    char Command[1000];
+    extern void Abc_BddNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nMemMax, int nType, int nIte, int nOpt, int nVerbose );
+    //    extern void Abc_DdNandGiaTest( Gia_Man_t * pGia, int nMem, int nVerbose, char * FileName, int nType, int nIte, int nOpt, int fDvr );
+    Extra_UtilGetoptReset();
+    while ( ( c = Extra_UtilGetopt( argc, argv, "GNOMUVcrh" ) ) != EOF )
+    {
+        switch ( c )
+        {
+	case 'c':
+            fCudd ^= 1;
+            break;
+	case 'r':
+            fDvr ^= 1;
+            break;
+        case 'G':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-G\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nType = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nType < 0 )
+                goto usage;
+            break;
+        case 'N':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-N\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nIte = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nIte < 0 )
+                goto usage;
+            break;
+        case 'O':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-O\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nOpt = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nOpt < 0 )
+                goto usage;
+            break;
+        case 'M':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-M\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nMem = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nMem < 0 )
+                goto usage;
+            break;
+        case 'U':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-U\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nMemMax = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nMemMax < 0 )
+                goto usage;
+            break;
+        case 'V':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-V\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nVerbose = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nVerbose < 0 )
+                goto usage;
+            break;
+        case 'h':
+            goto usage;
+        default:
+            goto usage;
+        }
+    }
+    if ( pAbc->pGia == NULL )
+    {
+        Abc_Print( -1, "Abc_CommandAbc9Test(): There is no AIG.\n" );
+        return 1;
+    }
+    if ( argc != globalUtilOptind + 1 )
+    {
+        goto usage;
+    }
+    // get the input file name
+    FileName = argv[globalUtilOptind];
+    if ( fCudd )
+      {
+	;
+	//	Abc_DdNandGiaTest( pAbc->pGia, nMem, nVerbose, FileName, nType, nIte, nOpt, fDvr );
+      }
+    else
+      {
+	Abc_BddNandGiaTest( pAbc->pGia, FileName, nMem, nMemMax, nType, nIte, nOpt, nVerbose );
+	// read the file just produced
+	sprintf(Command, "read %s; strash; &get", FileName );
+	Cmd_CommandExecute( pAbc, Command );
+      }
+    return 0;
+    
+usage:
+    Abc_Print( -2, "usage: &cspf [-GNOMUV num] [-crh] <file>\n" );
+    Abc_Print( -2, "\t        nand circuit minimization by permissible function using simple bdd\n" );
+    Abc_Print( -2, "\t-c    : toggle CUDD not simple BDD [default = %s]\n", fCudd? "yes": "no" );
+    Abc_Print( -2, "\t-r    : toggle dynamic variable reoredering only in CUDD [default = %s]\n", fDvr? "yes": "no" );
+    Abc_Print( -2, "\t-G num: optimization type [default = %d]\n", nType );
+    Abc_Print( -2, "\t-N num: max iteration (0 is no limit) [default = %d]\n", nIte );
+    Abc_Print( -2, "\t-O num: option to minimization [default = %d]\n", nOpt );
+    Abc_Print( -2, "\t-M num: number of BDD nodes to allocate initially 2^? (not for CUDD) [default = %d]\n", nMem );
+    Abc_Print( -2, "\t-U num: maximum number of BDD nodes to allocate 2^? [default = %d]\n", nMemMax );
+    Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
+    Abc_Print( -2, "\t-h    : print the command usage\n");
+    Abc_Print( -2, "\t<file> : output file name\n");
     return 1;
 }
 

@@ -22,6 +22,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include "extra.h"
 #include "misc/vec/vec.h"
 #include "aig/gia/gia.h"
 
@@ -37,36 +38,11 @@ ABC_NAMESPACE_IMPL_START
 #define REMOVED_VAR 0xff
 #define MAX_NUM_FRONTIERS 10000
 
-typedef struct Abc_BddMan_ Abc_BddMan;
-struct Abc_BddMan_ 
-{
-  int                nVars;         // the number of variables
-  unsigned           nObjs;         // the number of nodes used
-  unsigned           nObjsAlloc;    // the number of nodes allocated
-  int *              pUnique;       // unique table for nodes
-  int *              pNexts;        // next pointer for nodes
-  unsigned *         pCache;        // array of triples <arg0, arg1, AND(arg0, arg1)>
-  unsigned *         pObjs;         // array of pairs cof0 for each node
-  unsigned char *    pVars;         // array of variables for each node
-  unsigned char *    pMark;         // array of marks for each BDD node
-  unsigned           nUniqueMask;   // selection mask for unique table
-  unsigned           nCacheMask;    // selection mask for computed table
-  int                nCacheLookups; // the number of computed table lookups
-  int                nCacheMisses;  // the number of computed table misses
-  long long          nMemory;       // total amount of memory used (in bytes)
-  unsigned           nRemoved;      // the minimum int of removed node
-  int *              pFanouts;
-  int                fVerbose;
-};
-
-static inline unsigned Abc_BddVar2Lit( int i, int c )                { return i + i + (int)( c > 0 );                               }
 static inline int      Abc_BddLit2Var( unsigned i )                  { return i >> 1;                                               }
 static inline unsigned Abc_BddLitRegular( unsigned i )               { return i & ~01;                                              }
 static inline int      Abc_BddLitIsCompl( unsigned i )               { return i & 1;                                                }
-static inline int      Abc_BddLitNot( unsigned i )                   { return i ^ 1;                                                }
 static inline unsigned Abc_BddLitNotCond( unsigned i, int c )        { return i ^ (int)( c > 0 );                                   }
 
-static inline unsigned Abc_BddIthVar( int i )                        { return Abc_BddVar2Lit( i + 1, 0 );                           }
 static inline unsigned Abc_BddHash( int Arg0, int Arg1, int Arg2 )   { return 12582917 * Arg0 + 4256249 * Arg1 + 741457 * Arg2;     }
 
 static inline int      Abc_BddVar( Abc_BddMan * p, unsigned i )      { return (int)p->pVars[Abc_BddLit2Var( i )];                   }
@@ -78,7 +54,7 @@ static inline void     Abc_BddSetMark( Abc_BddMan * p, unsigned i, int m ) { p->
 static inline void     Abc_BddIncMark( Abc_BddMan * p, unsigned i )  { assert( ++p->pMark[Abc_BddLit2Var( i )] != INVALID_MARK );   }
 static inline void     Abc_BddDecMark( Abc_BddMan * p, unsigned i )  { assert( --p->pMark[Abc_BddLit2Var( i )] != INVALID_MARK );   }
 
-static inline int      Abc_BddLitIsInvalid( unsigned i )             { return (int)( i == INVALID_LIT );                            }
+int                    Abc_BddLitIsInvalid( unsigned i )             { return (int)( i == INVALID_LIT );                            }
 static inline void     Abc_BddSetVarRemoved( Abc_BddMan * p, unsigned i ) { p->pVars[Abc_BddLit2Var( i )] = REMOVED_VAR;            }
 
 ////////////////////////////////////////////////////////////////////////
@@ -104,7 +80,7 @@ static inline unsigned Abc_BddUniqueCreateInt( Abc_BddMan * p, int Var, unsigned
       return Abc_BddVar2Lit( *q, 0 );
   q = p->pUnique + ( Abc_BddHash( Var, Then, Else ) & p->nUniqueMask );
   int head = *q;
-  if ( p->nObjs == p->nObjsAlloc - 1 )
+  if ( Abc_BddIsLimit( p ) )
     {
       for ( ; p->nRemoved < p->nObjs; p->nRemoved++ )
 	if ( p->pVars[p->nRemoved] == REMOVED_VAR ) break;
@@ -179,7 +155,7 @@ static inline void Abc_BddCacheRemove( Abc_BddMan * p ) {
    SeeAlso     []
 
 ***********************************************************************/
-static inline Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int nGiaObjs, int fVerbose )
+Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int fVerbose )
 {
   Abc_BddMan * p; int i;
   p = ABC_CALLOC( Abc_BddMan, 1 );
@@ -190,8 +166,6 @@ static inline Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int nGiaO
   p->nCacheMask  = ( 1 << Abc_Base2Log( nObjs ) ) - 1;
   p->nRemoved    = nObjs - 1;
   p->fVerbose    = 0;
-  p->pFanouts    = ABC_CALLOC( int, nGiaObjs );
-  assert( p->pFanouts );
   p->pUnique     = ABC_CALLOC( int, p->nUniqueMask + 1 );
   assert( p->pUnique );
   p->pNexts      = ABC_CALLOC( int, p->nUniqueMask + 1 );
@@ -217,7 +191,7 @@ static inline Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int nGiaO
     (long long)p->nObjsAlloc * 3 * sizeof(char);
   return p;
 }
-static inline void Abc_BddManFree( Abc_BddMan * p )
+void Abc_BddManFree( Abc_BddMan * p )
 {
   if ( p->fVerbose )
     {
@@ -229,7 +203,6 @@ static inline void Abc_BddManFree( Abc_BddMan * p )
   ABC_FREE( p->pCache );
   ABC_FREE( p->pObjs );
   ABC_FREE( p->pVars );
-  ABC_FREE( p->pFanouts );
   ABC_FREE( p );
 }
 static inline void Abc_BddRehash( Abc_BddMan * p )
@@ -512,7 +485,7 @@ static inline void Abc_BddRefresh( Abc_BddMan * p )
 {
   if ( p->fVerbose )
     {
-      printf( "\nrefresh\n" );
+      printf( "\nRefresh\n" );
       fflush( stdout );
     }
   unsigned i;
@@ -549,12 +522,12 @@ static inline void Abc_BddRefresh( Abc_BddMan * p )
    SeeAlso     []
 
 ***********************************************************************/
-static inline void Abc_BddGiaCountFanout( Gia_Man_t * pGia, Abc_BddMan * p )
+static inline void Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts )
 {
   Gia_Obj_t * pObj; int i;
   Gia_ManStaticFanoutStart( pGia );
   Gia_ManForEachAnd( pGia, pObj, i )
-    p->pFanouts[Gia_ObjId( pGia, pObj )] = Gia_ObjFanoutNum( pGia, pObj );
+    pFanouts[Gia_ObjId( pGia, pObj )] = Gia_ObjFanoutNum( pGia, pObj );
   Gia_ManStaticFanoutStop( pGia );
 }
 
@@ -583,9 +556,11 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump )
       nObjsAllocInit = nObjsAllocInit << 1;
       assert( nObjsAllocInit != 0 );
     }
-  if ( fVerbose ) printf( "Allocated node to 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
-  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, pGia->nObjs, fVerbose );
-  Abc_BddGiaCountFanout( pGia, p );
+  if ( fVerbose ) printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
+  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, fVerbose );
+  int * pFanouts = ABC_CALLOC( int, pGia->nObjs );
+  assert( pFanouts );
+  Abc_BddGiaCountFanout( pGia, pFanouts );
   Gia_ManFillValue( pGia );
   Gia_ManConst0( pGia )->Value = 0;
   Gia_ManForEachCi( pGia, pObj, i )
@@ -607,7 +582,7 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump )
 		  printf( "The number of nodes exceeds the limit 2^31\n" );
 		  assert(0);
 		}
-	      else if ( nJump > 0 )
+	      if ( nJump > 0 )
 		{
 		  if ( p->nObjsAlloc >= 1 << nJump )
 		    {
@@ -616,8 +591,8 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump )
 		    }
 		  Abc_BddManFree( p );
 		  if ( fVerbose ) printf( "Reallocate nodes jump to 2^%d\n", nJump );
-		  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), 1 << nJump, pGia->nObjs, fVerbose );
-		  Abc_BddGiaCountFanout( pGia, p );
+		  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), 1 << nJump, fVerbose );
+		  Abc_BddGiaCountFanout( pGia, pFanouts );
 		  Gia_ManFillValue( pGia );
 		  Gia_ManConst0( pGia )->Value = 0;
 		  Gia_ManForEachCi( pGia, pObj, i )
@@ -625,13 +600,15 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump )
 		  i = -1;
 		  continue;
 		}
-	      else if ( Abc_BddManRealloc( p ) )
+	      else 
 		{
-		  printf( "error : reallocation failed\n" );
-		  assert(0);
+		  if( fVerbose ) printf( "\nReallocate nodes by 2^%d\n", Abc_Base2Log( p->nObjsAlloc << 1 ) );
+		  if ( Abc_BddManRealloc( p ) )
+		    {
+		      printf( "error : reallocation failed\n" );
+		      assert(0);
+		    }
 		}
-	      else if( fVerbose )
-		printf( "\nReallocated node to 2^%d\n", Abc_Base2Log( p->nObjsAlloc ) );
 	    }
 	  else
 	    {
@@ -643,11 +620,11 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump )
 	}
       fRefresh = 0;
       Abc_BddIncMark( p, pObj->Value );
-      p->pFanouts[Gia_ObjId( pGia, pObj0 )] -= 1;
-      if ( p->pFanouts[Gia_ObjId( pGia, pObj0 )] == 0 )
+      pFanouts[Gia_ObjId( pGia, pObj0 )] -= 1;
+      if ( pFanouts[Gia_ObjId( pGia, pObj0 )] == 0 )
 	Abc_BddDecMark( p, pObj0->Value );
-      p->pFanouts[Gia_ObjId( pGia, pObj1 )] -= 1;
-      if ( p->pFanouts[Gia_ObjId( pGia, pObj1 )] == 0 )
+      pFanouts[Gia_ObjId( pGia, pObj1 )] -= 1;
+      if ( pFanouts[Gia_ObjId( pGia, pObj1 )] == 0 )
 	Abc_BddDecMark( p, pObj1->Value );
     }
   Gia_ManForEachCo( pGia, pObj, i )
@@ -668,7 +645,29 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump )
   ABC_PRT( "BDD construction time", clk2 - clk );
   printf( "Shared nodes = %d Allocated nodes = %u\n", Abc_BddCountNodesArray2( p, vNodes ), p->nObjsAlloc );
   Vec_IntFree( vNodes );
+  ABC_FREE( pFanouts );
   Abc_BddManFree( p );
+}
+
+/**Function*************************************************************
+
+   Synopsis    []
+
+   Description []
+               
+   SideEffects []
+
+   SeeAlso     []
+
+***********************************************************************/
+int Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth )
+{
+  if ( p->nVars - depth < 0 ) return 0;
+  if ( a == 0 ) 
+    return 1 << ( p->nVars - depth );
+  if ( a == 1 )
+    return 0;
+  return Abc_BddCount0s( p, Abc_BddElse( p, a ), depth + 1 ) + Abc_BddCount0s( p, Abc_BddThen( p, a ), depth + 1 );
 }
 
 ////////////////////////////////////////////////////////////////////////

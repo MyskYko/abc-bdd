@@ -412,7 +412,38 @@ extern int           globalUtilOptind;
 /*=== extraUtilMult.c ================================================================*/
 
 typedef struct Abc_BddMan_ Abc_BddMan;
+struct Abc_BddMan_ 
+{
+  int                nVars;         // the number of variables
+  unsigned           nObjs;         // the number of nodes used
+  unsigned           nObjsAlloc;    // the number of nodes allocated
+  int *              pUnique;       // unique table for nodes
+  int *              pNexts;        // next pointer for nodes
+  unsigned *         pCache;        // array of triples <arg0, arg1, AND(arg0, arg1)>
+  unsigned *         pObjs;         // array of pairs cof0 for each node
+  unsigned char *    pVars;         // array of variables for each node
+  unsigned char *    pMark;         // array of marks for each BDD node
+  unsigned           nUniqueMask;   // selection mask for unique table
+  unsigned           nCacheMask;    // selection mask for computed table
+  int                nCacheLookups; // the number of computed table lookups
+  int                nCacheMisses;  // the number of computed table misses
+  long long          nMemory;       // total amount of memory used (in bytes)
+  unsigned           nRemoved;      // the minimum int of removed node
+  int                fVerbose;
+};
+
+static inline unsigned Abc_BddVar2Lit( int i, int c )   { return i + i + (int)( c > 0 );                 }
+static inline int      Abc_BddLitNot( unsigned i )      { return i ^ 1;                                  }
+static inline unsigned Abc_BddIthVar( int i )           { return Abc_BddVar2Lit( i + 1, 0 );             }
+static inline int      Abc_BddIsLimit( Abc_BddMan * p ) { return (int)( p->nObjs == p->nObjsAlloc - 1 ); }
+
+extern int Abc_BddLitIsInvalid( unsigned i );
+extern Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int fVerbose );
+extern void Abc_BddManFree( Abc_BddMan * p );
+extern unsigned Abc_BddAnd( Abc_BddMan * p, unsigned a, unsigned b );
+extern unsigned Abc_BddOr( Abc_BddMan * p, unsigned a, unsigned b );
 extern void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump );
+extern int Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth );
 
 /**AutomaticEnd***************************************************************/
 
