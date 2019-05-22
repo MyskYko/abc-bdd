@@ -1,5 +1,6 @@
-[![Build Status](https://travis-ci.org/berkeley-abc/abc.svg?branch=master)](https://travis-ci.org/berkeley-abc/abc)
-[![Build status](https://ci.appveyor.com/api/projects/status/7q8gopidgvyos00d?svg=true)](https://ci.appveyor.com/project/berkeley-abc/abc)
+ - The command for bdd construction using the simple BDD package is "&bdd".
+ - The command for CSPF-based optimization (transduction method) is "&cspf". Weak-reduce is "&cspf -G 1 -N 0 -O 1 <file.blif>" and Eager-reduce is "&cspf -G 1 -N 0 <file.blif>".
+ - Both commands are applicable to a strashed combinational circuit. Please read the circuit by "&read".
 
 # ABC: System for Sequential Logic Synthesis and Formal Verification
 
