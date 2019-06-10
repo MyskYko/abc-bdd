@@ -32,30 +32,7 @@ ABC_NAMESPACE_IMPL_START
 ///                        DECLARATIONS                              ///
 ////////////////////////////////////////////////////////////////////////
 
-#define INVALID_LIT 0xffffffff
-#define INVALID_MARK 0xff
-#define CONST_VAR 0xff
-#define REMOVED_VAR 0xff
 #define MAX_NUM_FRONTIERS 10000
-
-static inline int      Abc_BddLit2Var( unsigned i )                  { return i >> 1;                                               }
-static inline unsigned Abc_BddLitRegular( unsigned i )               { return i & ~01;                                              }
-static inline int      Abc_BddLitIsCompl( unsigned i )               { return i & 1;                                                }
-static inline unsigned Abc_BddLitNotCond( unsigned i, int c )        { return i ^ (int)( c > 0 );                                   }
-
-static inline unsigned Abc_BddHash( int Arg0, int Arg1, int Arg2 )   { return 12582917 * Arg0 + 4256249 * Arg1 + 741457 * Arg2;     }
-
-static inline int      Abc_BddVar( Abc_BddMan * p, unsigned i )      { return (int)p->pVars[Abc_BddLit2Var( i )];                   }
-static inline unsigned Abc_BddThen( Abc_BddMan * p, unsigned i )     { return Abc_BddLitNotCond( p->pObjs[Abc_BddLitRegular( i )], Abc_BddLitIsCompl( i ) ); }
-static inline unsigned Abc_BddElse( Abc_BddMan * p, unsigned i )     { return Abc_BddLitNotCond( p->pObjs[Abc_BddLitRegular( i ) + 1], Abc_BddLitIsCompl( i ) ); }
-
-static inline int      Abc_BddMark( Abc_BddMan * p, unsigned i )     { return (int)p->pMark[Abc_BddLit2Var( i )];                   }
-static inline void     Abc_BddSetMark( Abc_BddMan * p, unsigned i, int m ) { p->pMark[Abc_BddLit2Var( i )] = m;                     }
-static inline void     Abc_BddIncMark( Abc_BddMan * p, unsigned i )  { assert( ++p->pMark[Abc_BddLit2Var( i )] != INVALID_MARK );   }
-static inline void     Abc_BddDecMark( Abc_BddMan * p, unsigned i )  { assert( --p->pMark[Abc_BddLit2Var( i )] != INVALID_MARK );   }
-
-int                    Abc_BddLitIsInvalid( unsigned i )             { return (int)( i == INVALID_LIT );                            }
-static inline void     Abc_BddSetVarRemoved( Abc_BddMan * p, unsigned i ) { p->pVars[Abc_BddLit2Var( i )] = REMOVED_VAR;            }
 
 ////////////////////////////////////////////////////////////////////////
 ///                     FUNCTION DEFINITIONS                         ///
@@ -83,9 +60,9 @@ static inline unsigned Abc_BddUniqueCreateInt( Abc_BddMan * p, int Var, unsigned
   if ( Abc_BddIsLimit( p ) )
     {
       for ( ; p->nRemoved < p->nObjs; p->nRemoved++ )
-	if ( p->pVars[p->nRemoved] == REMOVED_VAR ) break;
+	if ( Abc_BddVarIsRemoved( p, Abc_BddVar2Lit( p->nRemoved, 0 ) ) ) break;
       if ( p->nRemoved == p->nObjs ) 
-	return INVALID_LIT;
+	return Abc_BddInvalidLit();
       *q = p->nRemoved++;
     }
   else
@@ -103,15 +80,15 @@ static inline unsigned Abc_BddUniqueCreateInt( Abc_BddMan * p, int Var, unsigned
 }
 static inline unsigned Abc_BddUniqueCreate( Abc_BddMan * p, int Var, unsigned Then, unsigned Else )
 {
-  if ( Var < 0 || Var >= p->nVars )   return INVALID_LIT;
-  if ( Var >= Abc_BddVar( p, Then ) ) return INVALID_LIT;
-  if ( Var >= Abc_BddVar( p, Else ) ) return INVALID_LIT;
+  if ( Var < 0 || Var >= p->nVars )   return Abc_BddInvalidLit();
+  if ( Var >= Abc_BddVar( p, Then ) ) return Abc_BddInvalidLit();
+  if ( Var >= Abc_BddVar( p, Else ) ) return Abc_BddInvalidLit();
   if ( Then == Else )
     return Else;
   if ( !Abc_BddLitIsCompl( Else ) )
     return Abc_BddUniqueCreateInt( p, Var, Then, Else );
   unsigned r = Abc_BddUniqueCreateInt( p, Var, Abc_BddLitNot( Then ), Abc_BddLitNot( Else ) );
-  return ( Abc_BddLitIsInvalid( r ) ) ? INVALID_LIT : Abc_BddLitNot( r );
+  return ( Abc_BddLitIsInvalid( r ) ) ? Abc_BddInvalidLit() : Abc_BddLitNot( r );
 }
 
 /**Function*************************************************************
@@ -129,7 +106,7 @@ static inline unsigned Abc_BddCacheLookup( Abc_BddMan * p, unsigned Arg1, unsign
 {
   unsigned * pEnt = p->pCache + 3*(long long)( Abc_BddHash( 0, Arg1, Arg2 ) & p->nCacheMask );
   p->nCacheLookups++;
-  return ( pEnt[0] == Arg1 && pEnt[1] == Arg2 ) ? pEnt[2] : INVALID_LIT;
+  return ( pEnt[0] == Arg1 && pEnt[1] == Arg2 ) ? pEnt[2] : Abc_BddInvalidLit();
 }
 static inline unsigned Abc_BddCacheInsert( Abc_BddMan * p, unsigned Arg1, unsigned Arg2, unsigned Res )
 {
@@ -160,7 +137,7 @@ Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int fVerbose )
   Abc_BddMan * p; int i;
   p = ABC_CALLOC( Abc_BddMan, 1 );
   p->nVars       = nVars;
-  assert( nVars <= (int)CONST_VAR );
+  assert( nVars <= (int)Abc_BddConstVar() );
   p->nObjsAlloc  = nObjs;
   p->nUniqueMask = ( 1 << Abc_Base2Log( nObjs ) ) - 1;
   p->nCacheMask  = ( 1 << Abc_Base2Log( nObjs ) ) - 1;
@@ -179,7 +156,7 @@ Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int fVerbose )
   p->pVars       = ABC_CALLOC( unsigned char, p->nObjsAlloc );
   assert( p->pVars );
   p->fVerbose    = fVerbose;
-  p->pVars[0]    = CONST_VAR;
+  p->pVars[0]    = Abc_BddConstVar();
   p->nObjs       = 1;
   for ( i = 0; i < nVars; i++ )
     Abc_BddUniqueCreate( p, i, 1, 0 );
@@ -288,7 +265,7 @@ static inline int Abc_BddManRealloc( Abc_BddMan * p )
 ***********************************************************************/
 unsigned Abc_BddAnd( Abc_BddMan * p, unsigned a, unsigned b )
 {
-  if ( Abc_BddLitIsInvalid( a ) || Abc_BddLitIsInvalid( b ) ) return INVALID_LIT;
+  if ( Abc_BddLitIsInvalid( a ) || Abc_BddLitIsInvalid( b ) ) return Abc_BddInvalidLit();
   unsigned r0, r1, r;
   if ( a == 0 ) return 0;
   if ( b == 0 ) return 0;
@@ -308,15 +285,15 @@ unsigned Abc_BddAnd( Abc_BddMan * p, unsigned a, unsigned b )
   else // if ( Abc_BddVar( p, a ) == Abc_BddVar( p, b ) )
     r0 = Abc_BddAnd( p, Abc_BddElse( p, a ), Abc_BddElse( p, b ) ), 
       r1 = Abc_BddAnd( p, Abc_BddThen( p, a ), Abc_BddThen( p, b ) );
-  if ( Abc_BddLitIsInvalid( r0 ) || Abc_BddLitIsInvalid( r1 ) ) return INVALID_LIT;
+  if ( Abc_BddLitIsInvalid( r0 ) || Abc_BddLitIsInvalid( r1 ) ) return Abc_BddInvalidLit();
   r = Abc_BddUniqueCreate( p, Abc_MinInt( Abc_BddVar( p, a ), Abc_BddVar( p, b ) ), r1, r0 );
-  if ( Abc_BddLitIsInvalid( r ) ) return INVALID_LIT;
+  if ( Abc_BddLitIsInvalid( r ) ) return Abc_BddInvalidLit();
   return Abc_BddCacheInsert( p, a, b, r );
 }
 unsigned Abc_BddOr( Abc_BddMan * p, unsigned a, unsigned b )
 {
   unsigned r = Abc_BddAnd( p, Abc_BddLitNot( a ), Abc_BddLitNot( b ) );
-  return ( Abc_BddLitIsInvalid( r ) ) ? INVALID_LIT : Abc_BddLitNot( r );
+  return ( Abc_BddLitIsInvalid( r ) ) ? Abc_BddInvalidLit() : Abc_BddLitNot( r );
 }
 
 /**Function*************************************************************
@@ -443,12 +420,12 @@ void Abc_BddMarkChildren ( Abc_BddMan * p, unsigned i )
   unsigned Else = Abc_BddElse( p, i );
   if ( Abc_BddMark( p, Then ) == 0 )
     {
-      Abc_BddSetMark( p, Then, INVALID_MARK );
+      Abc_BddSetMarkInvalid( p, Then );
       Abc_BddMarkChildren( p, Then );
     }
   if ( Abc_BddMark( p, Else ) == 0 )
     {
-      Abc_BddSetMark( p, Else, INVALID_MARK );
+      Abc_BddSetMarkInvalid( p, Else );
       Abc_BddMarkChildren( p, Else );
     }
 }
@@ -456,12 +433,12 @@ void Abc_BddUnmarkChildren ( Abc_BddMan * p, unsigned i )
 {
   unsigned Then = Abc_BddThen( p, i );
   unsigned Else = Abc_BddElse( p, i );
-  if ( Abc_BddMark( p, Then ) == INVALID_MARK )
+  if ( Abc_BddMarkIsInvalid( p, Then ) )
     {
       Abc_BddSetMark( p, Then, 0 );
       Abc_BddUnmarkChildren( p, Then );
     }
-  if ( Abc_BddMark( p, Else ) == INVALID_MARK )
+  if ( Abc_BddMarkIsInvalid( p, Else ) )
     {
       Abc_BddSetMark( p, Else , 0 );
       Abc_BddUnmarkChildren( p, Else );
@@ -501,7 +478,7 @@ static inline void Abc_BddRefresh( Abc_BddMan * p )
   for ( i = 0; i < nFrontiers; i++ )
     Abc_BddMarkChildren ( p, Abc_Var2Lit( pFrontiers[i], 0 ) );
   for ( i = p->nVars + 1; i < p->nObjs; i++ ) 
-    if ( p->pMark[i] == 0 && p->pVars[i] != REMOVED_VAR )
+    if ( p->pMark[i] == 0 && !Abc_BddVarIsRemoved( p, Abc_BddVar2Lit( (int)i, 0 ) ) )
       {
 	if ( p->nRemoved > i ) p->nRemoved = i;
 	Abc_BddRemoveNode( p, Abc_BddVar2Lit( (int)i, 0 ) );
