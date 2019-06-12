@@ -93,8 +93,10 @@ void Abc_WriteMultiAdderTree( FILE * pFile, int nVars )
     fprintf( pFile, ".model Multi%d\n", nVars );
 
     fprintf( pFile, ".inputs" );
-    for ( i = 0; i < 2 * nVars; i++ )
-        for ( k = 0; k < nVars; k++ )
+    //    for ( i = 0; i < 2 * nVars; i++ )
+    //        for ( k = 0; k < nVars; k++ )
+    for ( i = 2 * nVars - 1; i >= 0; i-- )
+        for ( k = nVars - 1; k >= 0; k-- )
 	    if ( i >= k && k > i - nVars )
 	        fprintf( pFile, " y%0*d_%0*d", nDigits, k, nDigits2, i );
     fprintf( pFile, "\n" );
@@ -164,8 +166,10 @@ void Abc_BddMulti( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump, int nSiz
   p = Abc_BddManAlloc( Gia_ManCiNum( pGia ) + nSize + nSize, nObjsAllocInit, fVerbose );
   Abc_BddGia( pGia, fVerbose, nJump, p );
   Vec_Int_t * products = Vec_IntAlloc( nSize * nSize );
-  for ( i = 0; i < nSize + nSize; i++ )
-    for ( k = 0; k < nSize; k++ )
+  //  for ( i = 0; i < nSize + nSize; i++ )
+  //    for ( k = 0; k < nSize; k++ )
+  for ( i = nSize + nSize - 1; i >= 0; i-- )
+    for ( k = nSize - 1; k >= 0; k-- )
       if ( i >= k && k > i - nSize )
 	{
 	  unsigned a = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) );
