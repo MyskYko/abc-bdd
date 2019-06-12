@@ -458,6 +458,7 @@ static inline void     Abc_BddSetVarRemoved( Abc_BddMan * p, unsigned i ) { p->p
 static inline int      Abc_BddVarIsRemoved( Abc_BddMan * p, unsigned i ) { return (int)( p->pVars[Abc_BddLit2Var( i )] == Abc_BddRemovedVar() ); }
 static inline int      Abc_BddIsLimit( Abc_BddMan * p )              { return (int)( p->nObjs == p->nObjsAlloc - 1 );               }
 
+extern unsigned        Abc_BddUniqueCreate( Abc_BddMan * p, int Var, unsigned Then, unsigned Else );
 extern Abc_BddMan *    Abc_BddManAlloc( int nVars, unsigned nObjs, int fVerbose );
 extern void            Abc_BddManFree( Abc_BddMan * p );
 extern unsigned        Abc_BddAnd( Abc_BddMan * p, unsigned a, unsigned b );

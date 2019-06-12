@@ -46,13 +46,53 @@ ABC_NAMESPACE_IMPL_START
   SeeAlso     []
 
 ***********************************************************************/
+static inline unsigned Abc_BddIteCacheLookup( Abc_BddMan * p, unsigned Arg1, unsigned Arg2, unsigned Arg3 )
+{
+  unsigned * pEnt = p->pCache + 4 * (long long)( Abc_BddHash( Arg1, Arg2, Arg3 ) & p->nCacheMask );
+  p->nCacheLookups++;
+  return ( pEnt[0] == Arg1 && pEnt[1] == Arg2 && pEnt[2] == Arg3 ) ? pEnt[3] : Abc_BddInvalidLit();
+}
+static inline unsigned Abc_BddIteCacheInsert( Abc_BddMan * p, unsigned Arg1, unsigned Arg2, unsigned Arg3, unsigned Res )
+{
+  unsigned * pEnt = p->pCache + 4 * (long long)( Abc_BddHash( Arg1, Arg2, Arg3 ) & p->nCacheMask );
+  pEnt[0] = Arg1; pEnt[1] = Arg2; pEnt[2] = Arg3; pEnt[3] = Res;
+  p->nCacheMisses++;
+  return Res;
+}
 unsigned Abc_BddIte( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 )
 {
+  /*
   unsigned r1 = Abc_BddAnd( p, c, d1 );
   if ( Abc_BddLitIsInvalid( r1 ) ) return Abc_BddInvalidLit();
   unsigned r0 = Abc_BddAnd( p, Abc_BddLitNot( c ), d0 );
   if ( Abc_BddLitIsInvalid( r0 ) ) return Abc_BddInvalidLit();
   return Abc_BddOr( p, r1, r0 );
+  */
+  if ( c == 0 ) return d0;
+  if ( c == 1 ) return d1;
+  if ( Abc_BddLitIsCompl( c ) ) return Abc_BddIte( p, Abc_BddLitNot( c ), d0, d1 );
+  unsigned r, r0, r1;
+  r = Abc_BddIteCacheLookup( p, c, d1, d0 );
+  if ( !Abc_BddLitIsInvalid( r ) ) return r;
+  int cV = Abc_BddVar( p, c );
+  int d1V = Abc_BddVar( p, d1 );
+  int d0V = Abc_BddVar( p, d0 );
+  int minV = cV;
+  if ( minV > d1V ) minV = d1V;
+  if ( minV > d0V ) minV = d0V;
+  unsigned cThen = ( cV == minV ) ? Abc_BddThen( p, c ): c;
+  unsigned cElse = ( cV == minV ) ? Abc_BddElse( p, c ): c;
+  unsigned d1Then = ( d1V == minV ) ? Abc_BddThen( p, d1 ): d1;
+  unsigned d1Else = ( d1V == minV ) ? Abc_BddElse( p, d1 ): d1;
+  unsigned d0Then = ( d0V == minV ) ? Abc_BddThen( p, d0 ): d0;
+  unsigned d0Else = ( d0V == minV ) ? Abc_BddElse( p, d0 ): d0;
+  r0 = Abc_BddIte( p, cElse, d1Else, d0Else );
+  if ( Abc_BddLitIsInvalid( r0 ) ) return Abc_BddInvalidLit();
+  r1 = Abc_BddIte( p, cThen, d1Then, d0Then );
+  if ( Abc_BddLitIsInvalid( r1 ) ) return Abc_BddInvalidLit();
+  r = Abc_BddUniqueCreate( p, minV, r1, r0 );
+  if ( Abc_BddLitIsInvalid( r ) ) return Abc_BddInvalidLit();
+  return Abc_BddIteCacheInsert( p, c, d1, d0, r );
 }
 unsigned Abc_BddVectorCompose( Abc_BddMan * p, unsigned F,  Vec_Int_t * Vars, unsigned * cache )
 {
@@ -181,6 +221,10 @@ void Abc_BddMulti( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump, int nSiz
 	  Vec_IntPush( products, product );
 	}
   unsigned * cache = ABC_CALLOC( unsigned, (long long)p->nObjsAlloc );
+  p->nCacheMask = ( 1 << Abc_Base2Log( p->nObjsAlloc ) ) - 1;
+  ABC_FREE( p->pCache );
+  p->pCache = ABC_CALLOC( unsigned, 4 * (long long)( p->nCacheMask + 1 ) );
+  assert( p->pCache );
   vNodes = Vec_IntAlloc( Gia_ManCoNum( pGia ) );
   Gia_ManForEachCo( pGia, pObj, i )
     {

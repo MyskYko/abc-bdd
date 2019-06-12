@@ -78,7 +78,7 @@ static inline unsigned Abc_BddUniqueCreateInt( Abc_BddMan * p, int Var, unsigned
     }
   return Abc_BddVar2Lit( *q, 0 );
 }
-static inline unsigned Abc_BddUniqueCreate( Abc_BddMan * p, int Var, unsigned Then, unsigned Else )
+unsigned Abc_BddUniqueCreate( Abc_BddMan * p, int Var, unsigned Then, unsigned Else )
 {
   if ( Var < 0 || Var >= p->nVars )   return Abc_BddInvalidLit();
   if ( Var >= Abc_BddVar( p, Then ) ) return Abc_BddInvalidLit();
