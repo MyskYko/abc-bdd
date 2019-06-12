@@ -540,6 +540,7 @@ static int Abc_CommandAbc9Gen                ( Abc_Frame_t * pAbc, int argc, cha
 static int Abc_CommandAbc9Cfs                ( Abc_Frame_t * pAbc, int argc, char ** argv );
 static int Abc_CommandAbc9Bdd                ( Abc_Frame_t * pAbc, int argc, char ** argv );
 static int Abc_CommandAbc9Cspf               ( Abc_Frame_t * pAbc, int argc, char ** argv );
+static int Abc_CommandAbc9BddMulti           ( Abc_Frame_t * pAbc, int argc, char ** argv );
 
 static int Abc_CommandAbc9Test               ( Abc_Frame_t * pAbc, int argc, char ** argv );
 
@@ -1245,6 +1246,7 @@ void Abc_Init( Abc_Frame_t * pAbc )
     Cmd_CommandAdd( pAbc, "ABC9",         "&cfs",          Abc_CommandAbc9Cfs,                    0 );
     Cmd_CommandAdd( pAbc, "ABC9",         "&bdd",          Abc_CommandAbc9Bdd,                    0 );
     Cmd_CommandAdd( pAbc, "ABC9",         "&cspf",         Abc_CommandAbc9Cspf,                   0 );
+    Cmd_CommandAdd( pAbc, "ABC9",         "&bddm",         Abc_CommandAbc9BddMulti,               0 );
     
     Cmd_CommandAdd( pAbc, "ABC9",         "&test",         Abc_CommandAbc9Test,         0 );
     {
@@ -45888,6 +45890,7 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
     int c, fVerbose = 0;
     int nMem = 0;
     int nJump = 0;
+    extern void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump );
     Extra_UtilGetoptReset();
     while ( ( c = Extra_UtilGetopt( argc, argv, "JMvh" ) ) != EOF )
     {
@@ -46084,6 +46087,98 @@ usage:
     Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
     Abc_Print( -2, "\t-h    : print the command usage\n");
     Abc_Print( -2, "\t<file> : output file name\n");
+    return 1;
+}
+
+/**Function*************************************************************
+
+  Synopsis    []
+
+  Description []
+
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+int Abc_CommandAbc9BddMulti( Abc_Frame_t * pAbc, int argc, char ** argv )
+{
+    int c, fVerbose = 0;
+    int nMem = 0;
+    int nJump = 0;
+    int nSize = 4;
+    char * FileName;
+    char Command[1000];
+    extern void Abc_GenMultiAdderTree( char * pFileName, int nVars );
+    extern void Abc_BddMulti( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump, int nSize );
+    Extra_UtilGetoptReset();
+    while ( ( c = Extra_UtilGetopt( argc, argv, "JMNvh" ) ) != EOF )
+    {
+        switch ( c )
+        {
+        case 'J':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-J\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nJump = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nJump < 0 )
+                goto usage;
+            break;
+        case 'M':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-M\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nMem = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nMem < 0 )
+                goto usage;
+            break;
+	case 'N':
+	    if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-N\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nSize = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nSize <= 0 )
+                goto usage;
+            break;
+        case 'v':
+            fVerbose ^= 1;
+            break;
+        case 'h':
+            goto usage;
+        default:
+            goto usage;
+        }
+    }
+    if ( argc != globalUtilOptind + 1 )
+    {
+        goto usage;
+    }
+    // get the input file name
+    FileName = argv[globalUtilOptind];
+    Abc_GenMultiAdderTree( FileName, nSize );
+    sprintf(Command, "read %s; st; &get", FileName );
+    Cmd_CommandExecute( pAbc, Command );
+    Abc_BddMulti( pAbc->pGia, fVerbose, nMem, nJump, nSize );
+    return 0;
+    
+usage:
+    Abc_Print( -2, "usage: &bdd [-JMN num] [-vh] <file>\n" );
+    Abc_Print( -2, "\t        simple bdd construction with garbage collection\n" );
+    Abc_Print( -2, "\t-J num: memory reallocation jump to 2^num, 0 is incremental reallocation [default = %d]\n", nJump );
+    Abc_Print( -2, "\t-M num: memory size to allocate 2^? BDD varialbe [default = %d]\n", nMem );
+    Abc_Print( -2, "\t-N num: size of multiplier NxN bit [default = %d]\n", nSize );
+    Abc_Print( -2, "\t-v    : toggle printing verbose information [default = %s]\n", fVerbose? "yes": "no" );
+    Abc_Print( -2, "\t-h    : print the command usage\n");
+    Abc_Print( -2, "\t<file> : intermediate file name for adder tree\n");
     return 1;
 }
 

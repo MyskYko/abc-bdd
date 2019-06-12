@@ -274,18 +274,26 @@ unsigned Abc_BddAnd( Abc_BddMan * p, unsigned a, unsigned b )
   if ( a == b ) return a;
   if ( a > b )  return Abc_BddAnd( p, b, a );
   r = Abc_BddCacheLookup( p, a, b );
-  if ( !Abc_BddLitIsInvalid( r ) )
-    return r;
+  if ( !Abc_BddLitIsInvalid( r ) ) return r;
   if ( Abc_BddVar( p, a ) < Abc_BddVar( p, b ) )
-    r0 = Abc_BddAnd( p, Abc_BddElse( p, a ), b ), 
+    {
+      r0 = Abc_BddAnd( p, Abc_BddElse( p, a ), b );
+      if ( Abc_BddLitIsInvalid( r0 ) ) return Abc_BddInvalidLit();
       r1 = Abc_BddAnd( p, Abc_BddThen( p, a ), b );
+    }
   else if ( Abc_BddVar( p, a ) > Abc_BddVar( p, b ) )
-    r0 = Abc_BddAnd( p, a, Abc_BddElse( p, b ) ), 
+    {
+      r0 = Abc_BddAnd( p, a, Abc_BddElse( p, b ) );
+      if ( Abc_BddLitIsInvalid( r0 ) ) return Abc_BddInvalidLit();
       r1 = Abc_BddAnd( p, a, Abc_BddThen( p, b ) );
+    }
   else // if ( Abc_BddVar( p, a ) == Abc_BddVar( p, b ) )
-    r0 = Abc_BddAnd( p, Abc_BddElse( p, a ), Abc_BddElse( p, b ) ), 
+    {
+      r0 = Abc_BddAnd( p, Abc_BddElse( p, a ), Abc_BddElse( p, b ) );
+      if ( Abc_BddLitIsInvalid( r0 ) ) return Abc_BddInvalidLit();
       r1 = Abc_BddAnd( p, Abc_BddThen( p, a ), Abc_BddThen( p, b ) );
-  if ( Abc_BddLitIsInvalid( r0 ) || Abc_BddLitIsInvalid( r1 ) ) return Abc_BddInvalidLit();
+    }
+  if ( Abc_BddLitIsInvalid( r1 ) ) return Abc_BddInvalidLit();
   r = Abc_BddUniqueCreate( p, Abc_MinInt( Abc_BddVar( p, a ), Abc_BddVar( p, b ) ), r1, r0 );
   if ( Abc_BddLitIsInvalid( r ) ) return Abc_BddInvalidLit();
   return Abc_BddCacheInsert( p, a, b, r );
@@ -519,22 +527,11 @@ static inline void Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts )
    SeeAlso     []
 
 ***********************************************************************/
-void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump )
+void Abc_BddGia( Gia_Man_t * pGia, int fVerbose, int nJump, Abc_BddMan * p )
 {
-  abctime clk = Abc_Clock();
-  Abc_BddMan * p;
-  Vec_Int_t * vNodes;
   Gia_Obj_t * pObj;
   int i;
   int fRefresh = 0;
-  unsigned nObjsAllocInit = 1 << nMem;
-  while ( nObjsAllocInit < Gia_ManCiNum( pGia ) + 2 )
-    {
-      nObjsAllocInit = nObjsAllocInit << 1;
-      assert( nObjsAllocInit != 0 );
-    }
-  if ( fVerbose ) printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
-  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, fVerbose );
   int * pFanouts = ABC_CALLOC( int, pGia->nObjs );
   assert( pFanouts );
   Abc_BddGiaCountFanout( pGia, pFanouts );
@@ -542,7 +539,6 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump )
   Gia_ManConst0( pGia )->Value = 0;
   Gia_ManForEachCi( pGia, pObj, i )
     pObj->Value = Abc_BddIthVar( i );
-  vNodes = Vec_IntAlloc( Gia_ManAndNum( pGia ) );
   Gia_ManForEachAnd( pGia, pObj, i )
     {
       Gia_Obj_t * pObj0 = Gia_ObjFanin0( pObj );
@@ -606,23 +602,41 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump )
     }
   Gia_ManForEachCo( pGia, pObj, i )
     pObj->Value = Abc_BddLitNotCond( Gia_ObjFanin0( pObj )->Value, Gia_ObjFaninC0( pObj ) );
+  Gia_ManForEachCo( pGia, pObj, i )
+    if ( Abc_BddLit2Var( pObj->Value ) > p->nVars && Abc_BddMark( p, pObj->Value ) != 0 )
+      Abc_BddDecMark( p, pObj->Value );
+  ABC_FREE( pFanouts );
+}
+
+void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump )
+{
+  abctime clk = Abc_Clock();
+  Abc_BddMan * p;
+  Vec_Int_t * vNodes;
+  Gia_Obj_t * pObj;
+  int i;
+  unsigned nObjsAllocInit = 1 << nMem;
+  while ( nObjsAllocInit < Gia_ManCiNum( pGia ) + 2 )
+    {
+      nObjsAllocInit = nObjsAllocInit << 1;
+      assert( nObjsAllocInit != 0 );
+    }
+  if ( fVerbose ) printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
+  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, fVerbose );
+  Abc_BddGia( pGia, fVerbose, nJump, p );
   abctime clk2 = Abc_Clock();
+  if( fVerbose ) printf( "\n" );
+  vNodes = Vec_IntAlloc( Gia_ManCoNum( pGia ) );
   Gia_ManForEachCo( pGia, pObj, i )
     {
       //      if ( fVerbose )
       //	Abc_BddPrint( p, pObj->Value );
       if ( Abc_BddLit2Var( pObj->Value ) > p->nVars )
-	{
-	  Vec_IntPush( vNodes, pObj->Value );
-	  if ( Abc_BddMark( p, pObj->Value ) != 0 )
-	    Abc_BddDecMark( p, pObj->Value );
-	}
-    }
-  if( fVerbose ) printf( "\n" );
+	Vec_IntPush( vNodes, pObj->Value );
+    }  
   ABC_PRT( "BDD construction time", clk2 - clk );
   printf( "Shared nodes = %d Allocated nodes = %u\n", Abc_BddCountNodesArray2( p, vNodes ), p->nObjsAlloc );
   Vec_IntFree( vNodes );
-  ABC_FREE( pFanouts );
   Abc_BddManFree( p );
 }
 

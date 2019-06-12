@@ -462,8 +462,9 @@ extern Abc_BddMan *    Abc_BddManAlloc( int nVars, unsigned nObjs, int fVerbose 
 extern void            Abc_BddManFree( Abc_BddMan * p );
 extern unsigned        Abc_BddAnd( Abc_BddMan * p, unsigned a, unsigned b );
 extern unsigned        Abc_BddOr( Abc_BddMan * p, unsigned a, unsigned b );
-extern void            Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump );
+extern void            Abc_BddGia( Gia_Man_t * pGia, int fVerbose, int nJump, Abc_BddMan * p );
 extern int             Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth );
+extern int             Abc_BddCountNodesArray2( Abc_BddMan * p, Vec_Int_t * vNodes );
 
 /**AutomaticEnd***************************************************************/
 
