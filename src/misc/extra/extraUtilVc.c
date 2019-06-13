@@ -139,6 +139,13 @@ void Abc_WriteMultiAdderTree( FILE * pFile, int nVars )
         for ( k = nVars - 1; k >= 0; k-- )
 	    if ( i >= k && k > i - nVars )
 	        fprintf( pFile, " y%0*d_%0*d", nDigits, k, nDigits2, i );
+    //    for ( i = 0; i < nVars; i++ )
+    //        for ( k = 0; k < nVars; k++ )
+    /*
+    for ( i = nVars - 1; i >= 0; i-- )
+        for ( k = nVars - 1; k >= 0; k-- )
+	    fprintf( pFile, " y%0*d_%0*d", nDigits, i, nDigits2, i + k );
+    */
     fprintf( pFile, "\n" );
 
     fprintf( pFile, ".outputs" );
@@ -205,6 +212,9 @@ void Abc_BddMulti( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump, int nSiz
   if ( fVerbose ) printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
   p = Abc_BddManAlloc( Gia_ManCiNum( pGia ) + nSize + nSize, nObjsAllocInit, fVerbose );
   Abc_BddGia( pGia, fVerbose, nJump, p );
+  abctime clk1 = Abc_Clock();
+  if( fVerbose ) printf( "\n" );
+  ABC_PRT( "BDD (adder tree) construction time", clk1 - clk );
   Vec_Int_t * products = Vec_IntAlloc( nSize * nSize );
   //  for ( i = 0; i < nSize + nSize; i++ )
   //    for ( k = 0; k < nSize; k++ )
@@ -220,6 +230,19 @@ void Abc_BddMulti( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump, int nSiz
 	  assert( !Abc_BddLitIsInvalid( product ) );
 	  Vec_IntPush( products, product );
 	}
+  //  for ( i = 0; i < nSize; i++ )
+  //    for ( k = 0; k < nSize; k++ )
+  /*
+  for ( i = nSize - 1; i >= 0; i-- )
+    for ( k = nSize - 1; k >= 0; k-- )
+      {
+	unsigned a = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i - 1 ) );
+	unsigned b = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) + 1);
+	unsigned product = Abc_BddAnd( p, a, b );
+	assert( !Abc_BddLitIsInvalid( product ) );
+	Vec_IntPush( products, product );
+      }
+  */
   unsigned * cache = ABC_CALLOC( unsigned, (long long)p->nObjsAlloc );
   p->nCacheMask = ( 1 << Abc_Base2Log( p->nObjsAlloc ) ) - 1;
   ABC_FREE( p->pCache );
@@ -228,16 +251,17 @@ void Abc_BddMulti( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump, int nSiz
   vNodes = Vec_IntAlloc( Gia_ManCoNum( pGia ) );
   Gia_ManForEachCo( pGia, pObj, i )
     {
-      printf( "%u\n", pObj->Value );
+      //      printf( "%u\n", pObj->Value );
       pObj->Value = Abc_BddVectorCompose( p, pObj->Value, products, cache );
       assert( !Abc_BddLitIsInvalid( pObj->Value ) );
-      printf( "%u\n", pObj->Value );
+      //      printf( "%u\n", pObj->Value );
       if ( Abc_BddLit2Var( pObj->Value ) > p->nVars )
 	Vec_IntPush( vNodes, pObj->Value );
     }
   abctime clk2 = Abc_Clock();
   if( fVerbose ) printf( "\n" );
-  ABC_PRT( "BDD construction time", clk2 - clk );
+  ABC_PRT( "BDD (vc) construction time", clk2 - clk1 );
+  ABC_PRT( "BDD (total) construction time", clk2 - clk );
   printf( "Shared nodes = %d Allocated nodes = %u\n", Abc_BddCountNodesArray2( p, vNodes ), p->nObjsAlloc );
   Vec_IntFree( vNodes );
   ABC_FREE( cache );
