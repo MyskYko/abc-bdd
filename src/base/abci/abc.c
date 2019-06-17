@@ -46107,12 +46107,15 @@ int Abc_CommandAbc9BddMulti( Abc_Frame_t * pAbc, int argc, char ** argv )
     int nMem = 0;
     int nJump = 0;
     int nSize = 4;
+    int fReverse = 0;
+    int fColumn = 0;
+    int fSwap = 0;
     char * FileName;
     char Command[1000];
-    extern void Abc_GenMultiAdderTree( char * pFileName, int nVars );
-    extern void Abc_BddMulti( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump, int nSize );
+    extern void Abc_GenMultiAdderTree( char * pFileName, int nVars, int fReverse, int fColumn );
+    extern void Abc_BddMulti( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump, int nSize, int fReverse, int fColumn, int fSwap );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "JMNvh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "JMNcrsvh" ) ) != EOF )
     {
         switch ( c )
         {
@@ -46149,6 +46152,15 @@ int Abc_CommandAbc9BddMulti( Abc_Frame_t * pAbc, int argc, char ** argv )
             if ( nSize <= 0 )
                 goto usage;
             break;
+        case 'c':
+            fColumn ^= 1;
+            break;
+        case 'r':
+            fReverse ^= 1;
+            break;
+        case 's':
+            fSwap ^= 1;
+            break;
         case 'v':
             fVerbose ^= 1;
             break;
@@ -46164,18 +46176,21 @@ int Abc_CommandAbc9BddMulti( Abc_Frame_t * pAbc, int argc, char ** argv )
     }
     // get the input file name
     FileName = argv[globalUtilOptind];
-    Abc_GenMultiAdderTree( FileName, nSize );
+    Abc_GenMultiAdderTree( FileName, nSize, fReverse, fColumn );
     sprintf(Command, "read %s; st; &get", FileName );
     Cmd_CommandExecute( pAbc, Command );
-    Abc_BddMulti( pAbc->pGia, fVerbose, nMem, nJump, nSize );
+    Abc_BddMulti( pAbc->pGia, fVerbose, nMem, nJump, nSize, fReverse, fColumn, fSwap );
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &bdd [-JMN num] [-vh] <file>\n" );
+    Abc_Print( -2, "usage: &bdd [-JMN num] [-crsvh] <file>\n" );
     Abc_Print( -2, "\t        simple bdd construction with garbage collection\n" );
     Abc_Print( -2, "\t-J num: memory reallocation jump to 2^num, 0 is incremental reallocation [default = %d]\n", nJump );
     Abc_Print( -2, "\t-M num: memory size to allocate 2^? BDD varialbe [default = %d]\n", nMem );
     Abc_Print( -2, "\t-N num: size of multiplier NxN bit [default = %d]\n", nSize );
+    Abc_Print( -2, "\t-c    : toggle using column based variable ordering for adder tree [default = %s]\n", fColumn? "yes": "no" );
+    Abc_Print( -2, "\t-r    : toggle reversing the variable ordering for adder tree [default = %s]\n", fReverse? "yes": "no" );
+    Abc_Print( -2, "\t-s    : toggle swapping a and b, which are inputs of multiplier [default = %s]\n", fSwap? "yes": "no" );
     Abc_Print( -2, "\t-v    : toggle printing verbose information [default = %s]\n", fVerbose? "yes": "no" );
     Abc_Print( -2, "\t-h    : print the command usage\n");
     Abc_Print( -2, "\t<file> : intermediate file name for adder tree\n");
