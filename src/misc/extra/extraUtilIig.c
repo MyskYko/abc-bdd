@@ -118,6 +118,7 @@ void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLa
   Gia_Obj_t * pObj;
   int i;
   int nIte = 0;
+  int nInit = 0;
   unsigned X, Y, Z, K;
   unsigned * cache;
   Vec_Int_t * vars;
@@ -147,7 +148,8 @@ void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLa
     Vec_IntPush( vLatchVars, Gia_ManCiNum( pGia ) - nLatch + i );
   while ( 1 )
     {
-      if ( nVerbose ) printf( "init X:\n\t" );
+      nInit++;
+      if ( nVerbose ) printf( "init %d X:\n\t", nInit );
       X = 1;
       for ( i = 0; i < nLatch; i++ )
 	if ( rand() & 1 )
@@ -190,6 +192,7 @@ void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLa
   ABC_PRT( "total time", clk2 - clk );
   printf( "result:\n\t" );
   Abc_BddPrint( p, X );
+  printf( "init %d\n", nInit );
   printf( "iteration %d\n", nIte );
   printf( "nObjs = %u\n", p->nObjs );
   ABC_FREE( cache );
@@ -204,6 +207,7 @@ void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, 
   Gia_Obj_t * pObj;
   int i;
   int nIte = 0;
+  int nInit = 0;
   unsigned X, Y, Z, K;
   unsigned d0, d1, r;
   unsigned * cache;
@@ -246,7 +250,8 @@ void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, 
     Vec_IntPush( vNextLatchVars, Gia_ManCiNum( pGia ) + i );
   while ( 1 )
     {
-      if ( nVerbose ) printf( "init X:\n\t" );
+      nInit++;
+      if ( nVerbose ) printf( "init %d X:\n\t", nInit );
       X = 1;
       for ( i = 0; i < nLatch; i++ )
 	if ( rand() & 1 )
@@ -301,6 +306,7 @@ void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, 
   ABC_PRT( "total time", clk2 - clk );
   printf( "result:\n\t" );
   Abc_BddPrint( p, X );
+  printf( "init %d\n", nInit );
   printf( "iteration %d\n", nIte );
   printf( "nObjs = %u\n", p->nObjs );
   ABC_FREE( cache );
