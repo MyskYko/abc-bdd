@@ -541,6 +541,7 @@ static int Abc_CommandAbc9Cfs                ( Abc_Frame_t * pAbc, int argc, cha
 static int Abc_CommandAbc9Bdd                ( Abc_Frame_t * pAbc, int argc, char ** argv );
 static int Abc_CommandAbc9Cspf               ( Abc_Frame_t * pAbc, int argc, char ** argv );
 static int Abc_CommandAbc9BddMulti           ( Abc_Frame_t * pAbc, int argc, char ** argv );
+static int Abc_CommandAbc9Iig                ( Abc_Frame_t * pAbc, int argc, char ** argv );
 
 static int Abc_CommandAbc9Test               ( Abc_Frame_t * pAbc, int argc, char ** argv );
 
@@ -1247,7 +1248,7 @@ void Abc_Init( Abc_Frame_t * pAbc )
     Cmd_CommandAdd( pAbc, "ABC9",         "&bdd",          Abc_CommandAbc9Bdd,                    0 );
     Cmd_CommandAdd( pAbc, "ABC9",         "&cspf",         Abc_CommandAbc9Cspf,                   0 );
     Cmd_CommandAdd( pAbc, "ABC9",         "&bddm",         Abc_CommandAbc9BddMulti,               0 );
-    
+    Cmd_CommandAdd( pAbc, "ABC9",         "&iig",          Abc_CommandAbc9Iig,                    0 );
     Cmd_CommandAdd( pAbc, "ABC9",         "&test",         Abc_CommandAbc9Test,         0 );
     {
 //        extern Mf_ManTruthCount();
@@ -46194,6 +46195,105 @@ usage:
     Abc_Print( -2, "\t-v    : toggle printing verbose information [default = %s]\n", fVerbose? "yes": "no" );
     Abc_Print( -2, "\t-h    : print the command usage\n");
     Abc_Print( -2, "\t<file> : intermediate file name for adder tree\n");
+    return 1;
+}
+
+/**Function*************************************************************
+
+  Synopsis    []
+
+  Description []
+
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+int Abc_CommandAbc9Iig( Abc_Frame_t * pAbc, int argc, char ** argv )
+{
+    int c, nVerbose = 0;
+    int nMem = 0;
+    int nJump = 0;
+    int nLatch = 0;
+    int fReverse = 0;
+    extern void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLatch, int fReverse );
+    Extra_UtilGetoptReset();
+    while ( ( c = Extra_UtilGetopt( argc, argv, "JLMVrh" ) ) != EOF )
+    {
+        switch ( c )
+        {
+        case 'J':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-J\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nJump = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nJump < 0 )
+                goto usage;
+            break;
+	case 'L':
+	    if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-L\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nLatch = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nLatch <= 0 )
+                goto usage;
+            break;
+        case 'M':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-M\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nMem = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nMem < 0 )
+                goto usage;
+            break;
+        case 'V':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-V\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nVerbose = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nVerbose < 0 )
+                goto usage;
+            break;
+        case 'r':
+            fReverse ^= 1;
+            break;
+        case 'h':
+            goto usage;
+        default:
+            goto usage;
+        }
+    }
+    if ( nLatch <= 0 )
+      goto usage;
+    if ( pAbc->pGia == NULL )
+    {
+        Abc_Print( -1, "Abc_CommandAbc9Test(): There is no AIG.\n" );
+        return 1;
+    }
+    Abc_BddGiaIig( pAbc->pGia, nVerbose, nMem, nJump, nLatch, fReverse );
+    return 0;
+    
+usage:
+    Abc_Print( -2, "usage: &iig [-JLM num] [-vh]\n" );
+    Abc_Print( -2, "\t        inductive invariant generation using BDD\n" );
+    Abc_Print( -2, "\t-J num: memory reallocation jump to 2^num, 0 is incremental reallocation [default = %d]\n", nJump );
+    Abc_Print( -2, "\t-L num: number of latches [default = %d]\n", nLatch );
+    Abc_Print( -2, "\t-M num: memory size to allocate 2^? BDD varialbe [default = %d]\n", nMem );
+    Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
+    Abc_Print( -2, "\t-r    : toggle starting from almost 0 and increasing 1 [default = %s]\n", fReverse? "yes": "no" );
+    Abc_Print( -2, "\t-h    : print the command usage\n");
     return 1;
 }
 

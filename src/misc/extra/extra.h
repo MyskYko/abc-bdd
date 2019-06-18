@@ -466,6 +466,12 @@ extern unsigned        Abc_BddOr( Abc_BddMan * p, unsigned a, unsigned b );
 extern void            Abc_BddGia( Gia_Man_t * pGia, int fVerbose, int nJump, Abc_BddMan * p );
 extern int             Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth );
 extern int             Abc_BddCountNodesArray2( Abc_BddMan * p, Vec_Int_t * vNodes );
+extern void            Abc_BddPrint( Abc_BddMan * p, unsigned a );
+
+/*=== extraUtilVc.c ================================================================*/
+
+extern unsigned        Abc_BddIteAnd( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 );
+extern unsigned        Abc_BddVectorCompose( Abc_BddMan * p, unsigned F,  Vec_Int_t * Vars, unsigned * cache, int fAnd );
 
 /**AutomaticEnd***************************************************************/
 

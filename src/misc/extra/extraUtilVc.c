@@ -59,15 +59,16 @@ static inline unsigned Abc_BddIteCacheInsert( Abc_BddMan * p, unsigned Arg1, uns
   p->nCacheMisses++;
   return Res;
 }
-unsigned Abc_BddIte( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 )
+unsigned Abc_BddIteAnd( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 )
 {
-  /*
   unsigned r1 = Abc_BddAnd( p, c, d1 );
   if ( Abc_BddLitIsInvalid( r1 ) ) return Abc_BddInvalidLit();
   unsigned r0 = Abc_BddAnd( p, Abc_BddLitNot( c ), d0 );
   if ( Abc_BddLitIsInvalid( r0 ) ) return Abc_BddInvalidLit();
   return Abc_BddOr( p, r1, r0 );
-  */
+}
+unsigned Abc_BddIte( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 )
+{
   if ( c == 0 ) return d0;
   if ( c == 1 ) return d1;
   if ( Abc_BddLitIsCompl( c ) ) return Abc_BddIte( p, Abc_BddLitNot( c ), d0, d1 );
@@ -94,7 +95,7 @@ unsigned Abc_BddIte( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 )
   if ( Abc_BddLitIsInvalid( r ) ) return Abc_BddInvalidLit();
   return Abc_BddIteCacheInsert( p, c, d1, d0, r );
 }
-unsigned Abc_BddVectorCompose( Abc_BddMan * p, unsigned F,  Vec_Int_t * Vars, unsigned * cache )
+unsigned Abc_BddVectorCompose( Abc_BddMan * p, unsigned F,  Vec_Int_t * Vars, unsigned * cache, int fAnd )
 {
   if ( F == 0 )  return 0;
   if ( F == 1 )  return 1;
@@ -102,12 +103,13 @@ unsigned Abc_BddVectorCompose( Abc_BddMan * p, unsigned F,  Vec_Int_t * Vars, un
   int Index = Abc_BddVar( p, F );
   unsigned Then = Abc_BddThen( p, F );
   unsigned Else = Abc_BddElse( p, F );
-  unsigned rThen = Abc_BddVectorCompose( p, Then, Vars, cache );
+  unsigned rThen = Abc_BddVectorCompose( p, Then, Vars, cache, fAnd );
   if ( Abc_BddLitIsInvalid( rThen ) ) return Abc_BddInvalidLit();
-  unsigned rElse = Abc_BddVectorCompose( p, Else, Vars, cache );
+  unsigned rElse = Abc_BddVectorCompose( p, Else, Vars, cache, fAnd );
   if ( Abc_BddLitIsInvalid( rElse ) ) return Abc_BddInvalidLit();
   unsigned IndexFunc = Vec_IntEntry( Vars, Index );
-  unsigned Result = Abc_BddIte( p, IndexFunc, rThen, rElse );   // ITE( c, d1, d0 ) = (c & d1) | (!c & d0)
+  if ( Abc_BddLitIsInvalid( IndexFunc ) ) return Abc_BddInvalidLit();
+  unsigned Result = fAnd ? Abc_BddIteAnd( p, IndexFunc, rThen, rElse ) : Abc_BddIte( p, IndexFunc, rThen, rElse );   // ITE( c, d1, d0 ) = (c & d1) | (!c & d0)
   if ( Abc_BddLitIsInvalid( Result ) ) return Abc_BddInvalidLit();
   cache[Abc_BddLit2Var( F )] = Abc_BddLitNotCond( Result, Abc_BddLitIsCompl( F ) ) + 1;
   return Result;
@@ -339,7 +341,7 @@ void Abc_BddMulti( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump, int nSiz
   Gia_ManForEachCo( pGia, pObj, i )
     {
       //      printf( "%u\n", pObj->Value );
-      pObj->Value = Abc_BddVectorCompose( p, pObj->Value, products, cache );
+      pObj->Value = Abc_BddVectorCompose( p, pObj->Value, products, cache, 0 );
       assert( !Abc_BddLitIsInvalid( pObj->Value ) );
       //      printf( "%u\n", pObj->Value );
       if ( Abc_BddLit2Var( pObj->Value ) > p->nVars )
