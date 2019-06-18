@@ -46216,7 +46216,8 @@ int Abc_CommandAbc9Iig( Abc_Frame_t * pAbc, int argc, char ** argv )
     int nJump = 0;
     int nLatch = 0;
     int fReverse = 0;
-    extern void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLatch, int fReverse );
+    extern void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLatch );
+    extern void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLatch );
     Extra_UtilGetoptReset();
     while ( ( c = Extra_UtilGetopt( argc, argv, "JLMVrh" ) ) != EOF )
     {
@@ -46282,7 +46283,10 @@ int Abc_CommandAbc9Iig( Abc_Frame_t * pAbc, int argc, char ** argv )
         Abc_Print( -1, "Abc_CommandAbc9Test(): There is no AIG.\n" );
         return 1;
     }
-    Abc_BddGiaIig( pAbc->pGia, nVerbose, nMem, nJump, nLatch, fReverse );
+    if ( !fReverse )
+      Abc_BddGiaIig( pAbc->pGia, nVerbose, nMem, nJump, nLatch );
+    else
+      Abc_BddGiaIigReverse( pAbc->pGia, nVerbose, nMem, nJump, nLatch );
     return 0;
     
 usage:

@@ -111,110 +111,174 @@ unsigned Abc_BddTraverseOr( Abc_BddMan * p, unsigned x, Vec_Int_t * vIndex, int 
   SeeAlso     []
 
 ***********************************************************************/
-void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLatch, int fReverse )
+void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLatch )
 {
   abctime clk = Abc_Clock();
   Abc_BddMan * p;
   Gia_Obj_t * pObj;
   int i;
   int nIte = 0;
+  unsigned X, Y, Z, K;
+  unsigned * cache;
+  Vec_Int_t * vars;
+  Vec_Int_t * vLatchVars;
+  srand( time(NULL) );
   unsigned nObjsAllocInit = 1 << nMem;
-  if ( !fReverse )
+  while ( nObjsAllocInit < Gia_ManCiNum( pGia ) + 2 )
     {
-      while ( nObjsAllocInit < Gia_ManCiNum( pGia ) + 2 )
-	{
-	  nObjsAllocInit = nObjsAllocInit << 1;
-	  assert( nObjsAllocInit != 0 );
-	}
-      if ( nVerbose > 1 )
-	printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
-      p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, nVerbose > 1 );
+      nObjsAllocInit = nObjsAllocInit << 1;
+      assert( nObjsAllocInit != 0 );
     }
-  else
-    {
-      while ( nObjsAllocInit < Gia_ManCiNum( pGia ) + nLatch + 2 )
-	{
-	  nObjsAllocInit = nObjsAllocInit << 1;
-	  assert( nObjsAllocInit != 0 );
-	}
-      if ( nVerbose > 1 )
-	printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
-      p = Abc_BddManAlloc( Gia_ManCiNum( pGia ) + nLatch, nObjsAllocInit, nVerbose > 1 );
-    }
+  if ( nVerbose > 1 )
+    printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
+  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, nVerbose > 1 );
   Abc_BddGia( pGia, nVerbose > 1, nJump, p );
   abctime clk1 = Abc_Clock();
-  if ( nVerbose > 1 ) printf( "\n" );
-  ABC_PRT( "BDD (latch) construction time", clk1 - clk );
-  
-  srand( time(NULL) );
-  if ( nVerbose ) printf( "init X:" );
-  unsigned X = 1;
-  for ( i = 0; i < nLatch; i++ )
-    if ( rand() & 1 )
-      X = Abc_BddAnd( p, X, Abc_BddIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) );
-    else
-      X = Abc_BddAnd( p, X, Abc_BddLitNot( Abc_BddIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) ) );
-  if ( !fReverse ) X = Abc_BddLitNot( X );
-  assert( !Abc_BddLitIsInvalid( X ) );
-  if ( nVerbose ) Abc_BddPrint( p, X );
-  
-  unsigned * cache = ABC_CALLOC( unsigned, (long long)p->nObjsAlloc );
-  Vec_Int_t * vars = Vec_IntAlloc( Gia_ManCiNum( pGia ) );
+    if ( nVerbose > 1 ) printf( "\n" );
+  if ( nVerbose ) ABC_PRT( "BDD (latch) construction time", clk1 - clk );
+  cache = ABC_CALLOC( unsigned, (long long)p->nObjsAlloc );
+  vars = Vec_IntAlloc( Gia_ManCiNum( pGia ) );
   for ( i = 0; i < Gia_ManCiNum( pGia ) - nLatch; i++ )
     Vec_IntPush( vars, Abc_BddInvalidLit() );
   Gia_ManForEachCo( pGia, pObj, i )
     Vec_IntPush( vars, pObj->Value );
-  assert( Vec_IntSize( vars ) == Gia_ManCiNum( pGia ) );
-  Vec_Int_t * vLatchVars = Vec_IntAlloc( nLatch );
+  vLatchVars = Vec_IntAlloc( nLatch );
   for ( i = 0; i < nLatch; i++ )
     Vec_IntPush( vLatchVars, Gia_ManCiNum( pGia ) - nLatch + i );
-  unsigned * nextCache = ABC_CALLOC( unsigned, (long long)p->nObjsAlloc );
-  Vec_Int_t * nextVars = Vec_IntAlloc( Gia_ManCiNum( pGia ) + nLatch );
-  for ( i = 0; i < Gia_ManCiNum( pGia ); i++ )
-    Vec_IntPush( nextVars, Abc_BddInvalidLit() );
-  for ( i = 0; i < nLatch; i++ )
-    Vec_IntPush( nextVars, Abc_BddIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) );
-  assert( Vec_IntSize( nextVars ) == Gia_ManCiNum( pGia ) + nLatch );
-  Vec_Int_t * vNextLatchVars = Vec_IntAlloc( nLatch );
-  for ( i = 0; i < nLatch; i++ )
-    Vec_IntPush( vNextLatchVars, Gia_ManCiNum( pGia ) + i );
-  
   while ( 1 )
     {
-      unsigned Y = Abc_BddVectorCompose( p, X, vars, cache, 1 );
-      assert( !Abc_BddLitIsInvalid( Y ) );
-      unsigned Z = Abc_BddOr( p, Abc_BddLitNot( X ), Y );
-      assert( !Abc_BddLitIsInvalid( Z ) );
-      if ( Z == 1 )
+      if ( nVerbose ) printf( "init X:\n\t" );
+      X = 1;
+      for ( i = 0; i < nLatch; i++ )
+	if ( rand() & 1 )
+	  X = Abc_BddAnd( p, X, Abc_BddIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) );
+	else
+	  X = Abc_BddAnd( p, X, Abc_BddLitNot( Abc_BddIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) ) );
+      X = Abc_BddLitNot( X );
+      assert( !Abc_BddLitIsInvalid( X ) );
+      if ( nVerbose ) Abc_BddPrint( p, X );
+      while ( 1 )
 	{
-	  if ( nVerbose ) printf( "Z is always 1\n" );
-	  break;
-	}
-      if ( nVerbose ) printf( "Z is not always 1:" );
-      if ( nVerbose ) Abc_BddPrint( p, Z );
-      //todo reverse
-      if ( !fReverse )
-	{
-	  if ( nVerbose ) printf( "K:" );
-	  unsigned K = Abc_BddTraverseAnd( p, Z, vLatchVars, 1 );
+	  nIte++;
+	  if ( nVerbose ) printf( "\n####################\n###### ite %2d ######\n####################\n", nIte );
+	  Y = Abc_BddVectorCompose( p, X, vars, cache, 1 );
+	  assert( !Abc_BddLitIsInvalid( Y ) );
+	  Z = Abc_BddOr( p, Abc_BddLitNot( X ), Y );
+	  assert( !Abc_BddLitIsInvalid( Z ) );
+	  if ( Z == 1 )
+	    {
+	      if ( nVerbose ) printf( "Z is always 1\n" );
+	      break;
+	    }
+	  if ( nVerbose ) printf( "Z is not always 1:\n\t" );
+	  if ( nVerbose ) Abc_BddPrint( p, Z );
+	  if ( nVerbose ) printf( "K:\n\t" );
+	  K = Abc_BddTraverseAnd( p, Z, vLatchVars, 1 );
 	  assert( !Abc_BddLitIsInvalid( K ) );
 	  if ( nVerbose ) Abc_BddPrint( p, K );
-	  if ( nVerbose ) printf( "next X:" );
+	  if ( nVerbose ) printf( "next X:\n\t" );
 	  X = Abc_BddAnd( p, X, K );
 	  assert( !Abc_BddLitIsInvalid( X ) );
 	  if ( nVerbose ) Abc_BddPrint( p, X );
 	}
-      else
+      if ( X != 0 && X != 1 ) break;
+      if ( nVerbose ) printf( "trivial result, always %u\n", X );
+    }
+  abctime clk2 = Abc_Clock();
+  if ( nVerbose > 1 ) printf( "\n" );
+  if ( nVerbose ) ABC_PRT( "inductive invariant generation time", clk2 - clk1 );
+  ABC_PRT( "total time", clk2 - clk );
+  printf( "result:\n\t" );
+  Abc_BddPrint( p, X );
+  printf( "iteration %d\n", nIte );
+  printf( "nObjs = %u\n", p->nObjs );
+  ABC_FREE( cache );
+  Vec_IntFree( vars );
+  Vec_IntFree( vLatchVars );
+  Abc_BddManFree( p );
+}
+void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLatch )
+{
+  abctime clk = Abc_Clock();
+  Abc_BddMan * p;
+  Gia_Obj_t * pObj;
+  int i;
+  int nIte = 0;
+  unsigned X, Y, Z, K;
+  unsigned d0, d1, r;
+  unsigned * cache;
+  unsigned * nextCache;
+  Vec_Int_t * vars;
+  Vec_Int_t * nextVars;
+  Vec_Int_t * vLatchVars;
+  Vec_Int_t * vNextLatchVars;
+  srand( time(NULL) );
+  unsigned nObjsAllocInit = 1 << nMem;
+  while ( nObjsAllocInit < Gia_ManCiNum( pGia ) + nLatch + 2 )
+    {
+      nObjsAllocInit = nObjsAllocInit << 1;
+      assert( nObjsAllocInit != 0 );
+    }
+  if ( nVerbose > 1 )
+    printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
+  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ) + nLatch, nObjsAllocInit, nVerbose > 1 );
+  Abc_BddGia( pGia, nVerbose > 1, nJump, p );
+  abctime clk1 = Abc_Clock();
+  if ( nVerbose > 1 ) printf( "\n" );
+  if ( nVerbose ) ABC_PRT( "BDD (latch) construction time", clk1 - clk );
+  cache = ABC_CALLOC( unsigned, (long long)p->nObjsAlloc );
+  vars = Vec_IntAlloc( Gia_ManCiNum( pGia ) );
+  for ( i = 0; i < Gia_ManCiNum( pGia ) - nLatch; i++ )
+    Vec_IntPush( vars, Abc_BddInvalidLit() );
+  Gia_ManForEachCo( pGia, pObj, i )
+    Vec_IntPush( vars, pObj->Value );
+  vLatchVars = Vec_IntAlloc( nLatch );
+  for ( i = 0; i < nLatch; i++ )
+    Vec_IntPush( vLatchVars, Gia_ManCiNum( pGia ) - nLatch + i );
+  nextCache = ABC_CALLOC( unsigned, (long long)p->nObjsAlloc );
+  nextVars = Vec_IntAlloc( Gia_ManCiNum( pGia ) + nLatch );
+  for ( i = 0; i < Gia_ManCiNum( pGia ); i++ )
+    Vec_IntPush( nextVars, Abc_BddInvalidLit() );
+  for ( i = 0; i < nLatch; i++ )
+    Vec_IntPush( nextVars, Abc_BddIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) );
+  vNextLatchVars = Vec_IntAlloc( nLatch );
+  for ( i = 0; i < nLatch; i++ )
+    Vec_IntPush( vNextLatchVars, Gia_ManCiNum( pGia ) + i );
+  while ( 1 )
+    {
+      if ( nVerbose ) printf( "init X:\n\t" );
+      X = 1;
+      for ( i = 0; i < nLatch; i++ )
+	if ( rand() & 1 )
+	  X = Abc_BddAnd( p, X, Abc_BddIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) );
+	else
+	  X = Abc_BddAnd( p, X, Abc_BddLitNot( Abc_BddIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) ) );
+      assert( !Abc_BddLitIsInvalid( X ) );
+      if ( nVerbose ) Abc_BddPrint( p, X );
+      while ( 1 )
 	{
-	  if ( nVerbose ) printf( "K:" );
-	  unsigned K = 1;
+	  nIte++;
+	  if ( nVerbose ) printf( "\n####################\n###### ite %2d ######\n####################\n", nIte );
+	  Y = Abc_BddVectorCompose( p, X, vars, cache, 1 );
+	  assert( !Abc_BddLitIsInvalid( Y ) );
+	  Z = Abc_BddOr( p, Abc_BddLitNot( X ), Y );
+	  assert( !Abc_BddLitIsInvalid( Z ) );
+	  if ( Z == 1 )
+	    {
+	      if ( nVerbose ) printf( "Z is always 1\n" );
+	      break;
+	    }
+	  if ( nVerbose ) printf( "Z is not always 1:\n\t" );
+	  if ( nVerbose ) Abc_BddPrint( p, Z );
+	  if ( nVerbose ) printf( "K:\n\t" );
+	  K = 1;
 	  Gia_ManForEachCo( pGia, pObj, i )
 	    {
-	      unsigned d1 = Abc_BddOr( p, Z, Abc_BddIthVar( Gia_ManCiNum( pGia ) + i ) );
+	      d1 = Abc_BddOr( p, Z, Abc_BddIthVar( Gia_ManCiNum( pGia ) + i ) );
 	      assert( !Abc_BddLitIsInvalid( d1 ) );
-	      unsigned d0 = Abc_BddOr( p, Z, Abc_BddLitNot( Abc_BddIthVar( Gia_ManCiNum( pGia ) + i ) ) );
+	      d0 = Abc_BddOr( p, Z, Abc_BddLitNot( Abc_BddIthVar( Gia_ManCiNum( pGia ) + i ) ) );
 	      assert( !Abc_BddLitIsInvalid( d0 ) );
-	      unsigned r = Abc_BddIteAnd( p, pObj->Value, d1, d0 );
+	      r = Abc_BddIteAnd( p, pObj->Value, d1, d0 );
 	      assert( !Abc_BddLitIsInvalid( r ) );
 	      K = Abc_BddAnd( p, K, r );
 	      assert( !Abc_BddLitIsInvalid( K ) );
@@ -223,27 +287,22 @@ void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLa
 	  assert( !Abc_BddLitIsInvalid( K ) );
 	  K = Abc_BddVectorCompose( p, K, nextVars, nextCache, 1 );
 	  if ( nVerbose ) Abc_BddPrint( p, K );
-	  if ( nVerbose ) printf( "next X:" );
+	  if ( nVerbose ) printf( "next X:\n\t" );
 	  X = Abc_BddOr( p, X, K );
 	  assert( !Abc_BddLitIsInvalid( X ) );
 	  if ( nVerbose ) Abc_BddPrint( p, X );
 	}
-      nIte++;
+      if ( X != 0 && X != 1 ) break;
+      if ( nVerbose ) printf( "trivial result, always %u\n", X );
     }
-  
   abctime clk2 = Abc_Clock();
   if ( nVerbose > 1 ) printf( "\n" );
-  ABC_PRT( "inductive invariant generation time", clk2 - clk1 );
+  if ( nVerbose ) ABC_PRT( "inductive invariant generation time", clk2 - clk1 );
   ABC_PRT( "total time", clk2 - clk );
-  if ( X == 0 || X == 1 ) printf( "trivial result, always %u\n", X );
-  else
-    {
-      printf( "result " );
-      Abc_BddPrint( p, X );
-    }
+  printf( "result:\n\t" );
+  Abc_BddPrint( p, X );
   printf( "iteration %d\n", nIte );
   printf( "nObjs = %u\n", p->nObjs );
-  //  printf( "Shared nodes = %d Allocated nodes = %u\n", Abc_BddCountNodesArray2( p, vNodes ), p->nObjsAlloc );
   ABC_FREE( cache );
   Vec_IntFree( vars );
   Vec_IntFree( vLatchVars );
@@ -252,6 +311,7 @@ void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLa
   Vec_IntFree( vNextLatchVars );
   Abc_BddManFree( p );
 }
+
 ////////////////////////////////////////////////////////////////////////
 ///                       END OF FILE                                ///
 ////////////////////////////////////////////////////////////////////////
