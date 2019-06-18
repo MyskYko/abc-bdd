@@ -410,6 +410,31 @@ void Abc_BddPrintTest( Abc_BddMan * p )
   Abc_BddPrint( p, bFunc );
   printf( "Nodes = %d\n", Abc_BddCountNodes( p, bFunc ) );
 }
+void Abc_BddDump_rec( Abc_BddMan * p, unsigned a, int * pPath, int offset, FILE * f )
+{
+  if ( a == 0 ) 
+    return;
+  if ( a == 1 )
+    { 
+      int i;
+      for ( i = 0; i < p->nVars; i++ )
+	if ( pPath[i] == 0 || pPath[i] == 1 )
+	  fprintf( f, "%c%d", pPath[i] ? '+' : '-', i - offset );
+      fprintf( f, "\n" );
+      return; 
+    }
+  pPath[Abc_BddVar( p, a )] =  0;
+  Abc_BddDump_rec( p, Abc_BddElse( p, a ), pPath, offset, f );
+  pPath[Abc_BddVar( p, a )] =  1;
+  Abc_BddDump_rec( p, Abc_BddThen( p, a ), pPath, offset, f );
+  pPath[Abc_BddVar( p, a )] = -1;
+}
+void Abc_BddDump( Abc_BddMan * p, unsigned a, int offset, FILE * f )
+{
+  int * pPath = ABC_FALLOC( int, p->nVars );
+  Abc_BddDump_rec( p, a, pPath, offset, f );
+  ABC_FREE( pPath );
+}
 
 /**Function*************************************************************
 

@@ -467,7 +467,8 @@ extern void            Abc_BddGia( Gia_Man_t * pGia, int fVerbose, int nJump, Ab
 extern int             Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth );
 extern int             Abc_BddCountNodesArray2( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern void            Abc_BddPrint( Abc_BddMan * p, unsigned a );
-
+extern void            Abc_BddDump( Abc_BddMan * p, unsigned a, int offset, FILE * f );
+  
 /*=== extraUtilVc.c ================================================================*/
 
 extern unsigned        Abc_BddIteAnd( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 );

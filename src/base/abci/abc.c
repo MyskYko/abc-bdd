@@ -45930,7 +45930,7 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
     }
     if ( pAbc->pGia == NULL )
     {
-        Abc_Print( -1, "Abc_CommandAbc9Test(): There is no AIG.\n" );
+        Abc_Print( -1, "Abc_CommandAbc9Bdd(): There is no AIG.\n" );
         return 1;
     }
     Abc_BddGiaTest( pAbc->pGia, fVerbose, nMem, nJump );
@@ -46057,7 +46057,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     }
     if ( pAbc->pGia == NULL )
     {
-        Abc_Print( -1, "Abc_CommandAbc9Test(): There is no AIG.\n" );
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): There is no AIG.\n" );
         return 1;
     }
     if ( argc != globalUtilOptind + 1 )
@@ -46184,8 +46184,8 @@ int Abc_CommandAbc9BddMulti( Abc_Frame_t * pAbc, int argc, char ** argv )
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &bdd [-JMN num] [-crsvh] <file>\n" );
-    Abc_Print( -2, "\t        simple bdd construction with garbage collection\n" );
+    Abc_Print( -2, "usage: &bddm [-JMN num] [-crsvh] <file>\n" );
+    Abc_Print( -2, "\t        simple bdd construction for multiplier\n" );
     Abc_Print( -2, "\t-J num: memory reallocation jump to 2^num, 0 is incremental reallocation [default = %d]\n", nJump );
     Abc_Print( -2, "\t-M num: memory size to allocate 2^? BDD varialbe [default = %d]\n", nMem );
     Abc_Print( -2, "\t-N num: size of multiplier NxN bit [default = %d]\n", nSize );
@@ -46212,17 +46212,30 @@ usage:
 int Abc_CommandAbc9Iig( Abc_Frame_t * pAbc, int argc, char ** argv )
 {
     int c, nVerbose = 0;
+    int i;
     int nMem = 0;
     int nJump = 0;
-    int nLatch = 0;
+    int fConv = 0;
     int fReverse = 0;
-    extern void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLatch );
-    extern void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLatch );
+    char * FileName = NULL;
+    FILE * pFile = NULL;
+    char Command[1000];
+    extern void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, FILE * pFile );
+    extern void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, FILE * pFile );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "JLMVrh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "FJMVcrh" ) ) != EOF )
     {
         switch ( c )
         {
+        case 'F':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-F\" should be followed by a filename.\n" );
+                goto usage;
+            }
+            FileName = argv[globalUtilOptind];
+            globalUtilOptind++;
+            break;
         case 'J':
             if ( globalUtilOptind >= argc )
             {
@@ -46232,17 +46245,6 @@ int Abc_CommandAbc9Iig( Abc_Frame_t * pAbc, int argc, char ** argv )
             nJump = atoi(argv[globalUtilOptind]);
             globalUtilOptind++;
             if ( nJump < 0 )
-                goto usage;
-            break;
-	case 'L':
-	    if ( globalUtilOptind >= argc )
-            {
-                Abc_Print( -1, "Command line switch \"-L\" should be followed by an integer.\n" );
-                goto usage;
-            }
-            nLatch = atoi(argv[globalUtilOptind]);
-            globalUtilOptind++;
-            if ( nLatch <= 0 )
                 goto usage;
             break;
         case 'M':
@@ -46267,6 +46269,9 @@ int Abc_CommandAbc9Iig( Abc_Frame_t * pAbc, int argc, char ** argv )
             if ( nVerbose < 0 )
                 goto usage;
             break;
+        case 'c':
+            fConv ^= 1;
+            break;
         case 'r':
             fReverse ^= 1;
             break;
@@ -46276,26 +46281,38 @@ int Abc_CommandAbc9Iig( Abc_Frame_t * pAbc, int argc, char ** argv )
             goto usage;
         }
     }
-    if ( nLatch <= 0 )
-      goto usage;
     if ( pAbc->pGia == NULL )
     {
-        Abc_Print( -1, "Abc_CommandAbc9Test(): There is no AIG.\n" );
+        Abc_Print( -1, "Abc_CommandAbc9Iig(): There is no AIG.\n" );
         return 1;
     }
+    if ( FileName != NULL ) pFile = fopen( FileName, "w" );
+    if ( fConv )
+      {
+	sprintf(Command, "&put; comb" );
+	Cmd_CommandExecute( pAbc, Command );
+	sprintf(Command, "zeropo -N 0; removepo -N 0" );
+	for ( i = 0; i < Gia_ManPoNum( pAbc->pGia ); i++ )
+	  Cmd_CommandExecute( pAbc, Command );
+	sprintf(Command, "&get" );
+	Cmd_CommandExecute( pAbc, Command );
+      }
     if ( !fReverse )
-      Abc_BddGiaIig( pAbc->pGia, nVerbose, nMem, nJump, nLatch );
+      Abc_BddGiaIig( pAbc->pGia, nVerbose, nMem, nJump, pFile );
     else
-      Abc_BddGiaIigReverse( pAbc->pGia, nVerbose, nMem, nJump, nLatch );
+      Abc_BddGiaIigReverse( pAbc->pGia, nVerbose, nMem, nJump, pFile );
+    if ( FileName != NULL ) fclose( pFile );
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &iig [-JLM num] [-vh]\n" );
+    Abc_Print( -2, "usage: &iig [-F <file>] [-JMV num] [-crh]\n" );
     Abc_Print( -2, "\t        inductive invariant generation using BDD\n" );
+    Abc_Print( -2, "\t-F <file>: dump the resulting inductive invariant to the file without printing [default = %d]\n", FileName );
     Abc_Print( -2, "\t-J num: memory reallocation jump to 2^num, 0 is incremental reallocation [default = %d]\n", nJump );
-    Abc_Print( -2, "\t-L num: number of latches [default = %d]\n", nLatch );
+    //    Abc_Print( -2, "\t-L num: number of latches [default = %d]\n", nLatch );
     Abc_Print( -2, "\t-M num: memory size to allocate 2^? BDD varialbe [default = %d]\n", nMem );
     Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
+    Abc_Print( -2, "\t-c    : toggle converting circuit [default = %s]\n", fConv? "yes": "no" );
     Abc_Print( -2, "\t-r    : toggle starting from almost 0 and increasing 1 [default = %s]\n", fReverse? "yes": "no" );
     Abc_Print( -2, "\t-h    : print the command usage\n");
     return 1;

@@ -111,7 +111,7 @@ unsigned Abc_BddTraverseOr( Abc_BddMan * p, unsigned x, Vec_Int_t * vIndex, int 
   SeeAlso     []
 
 ***********************************************************************/
-void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLatch )
+void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, FILE * pFile )
 {
   abctime clk = Abc_Clock();
   Abc_BddMan * p;
@@ -119,6 +119,7 @@ void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLa
   int i;
   int nIte = 0;
   int nInit = 0;
+  int nLatch = Gia_ManCoNum( pGia );
   unsigned X, Y, Z, K;
   unsigned * cache;
   Vec_Int_t * vars;
@@ -190,17 +191,17 @@ void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLa
   if ( nVerbose > 1 ) printf( "\n" );
   if ( nVerbose ) ABC_PRT( "inductive invariant generation time", clk2 - clk1 );
   ABC_PRT( "total time", clk2 - clk );
-  printf( "result:\n\t" );
-  Abc_BddPrint( p, X );
   printf( "init %d\n", nInit );
   printf( "iteration %d\n", nIte );
   printf( "nObjs = %u\n", p->nObjs );
+  if ( pFile != NULL ) Abc_BddDump( p, X, Gia_ManCiNum( pGia ) - nLatch, pFile );
+  else Abc_BddDump( p, X, Gia_ManCiNum( pGia ) - nLatch, stdout );
   ABC_FREE( cache );
   Vec_IntFree( vars );
   Vec_IntFree( vLatchVars );
   Abc_BddManFree( p );
 }
-void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nLatch )
+void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, FILE * pFile )
 {
   abctime clk = Abc_Clock();
   Abc_BddMan * p;
@@ -208,6 +209,7 @@ void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, 
   int i;
   int nIte = 0;
   int nInit = 0;
+  int nLatch = Gia_ManCoNum( pGia );
   unsigned X, Y, Z, K;
   unsigned d0, d1, r;
   unsigned * cache;
@@ -304,11 +306,11 @@ void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, 
   if ( nVerbose > 1 ) printf( "\n" );
   if ( nVerbose ) ABC_PRT( "inductive invariant generation time", clk2 - clk1 );
   ABC_PRT( "total time", clk2 - clk );
-  printf( "result:\n\t" );
-  Abc_BddPrint( p, X );
   printf( "init %d\n", nInit );
   printf( "iteration %d\n", nIte );
   printf( "nObjs = %u\n", p->nObjs );
+  if ( pFile != NULL ) Abc_BddDump( p, X, Gia_ManCiNum( pGia ) - nLatch, pFile );
+  else Abc_BddDump( p, X, Gia_ManCiNum( pGia ) - nLatch, stdout );
   ABC_FREE( cache );
   Vec_IntFree( vars );
   Vec_IntFree( vLatchVars );
