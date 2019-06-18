@@ -349,6 +349,7 @@ void Abc_BddMulti( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump, int nSiz
   if( fVerbose ) printf( "\n" );
   ABC_PRT( "BDD (vc) construction time", clk2 - clk1 );
   ABC_PRT( "BDD (total) construction time", clk2 - clk );
+  printf( "nObjs = %u\n", p->nObjs );
   printf( "Shared nodes = %d Allocated nodes = %u\n", Abc_BddCountNodesArray2( p, vNodes ), p->nObjsAlloc );
   Vec_IntFree( vNodes );
   ABC_FREE( cache );

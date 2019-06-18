@@ -633,7 +633,8 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump )
       //	Abc_BddPrint( p, pObj->Value );
       if ( Abc_BddLit2Var( pObj->Value ) > p->nVars )
 	Vec_IntPush( vNodes, pObj->Value );
-    }  
+    }
+  printf( "nObjs = %u\n", p->nObjs );
   ABC_PRT( "BDD construction time", clk2 - clk );
   printf( "Shared nodes = %d Allocated nodes = %u\n", Abc_BddCountNodesArray2( p, vNodes ), p->nObjsAlloc );
   Vec_IntFree( vNodes );
