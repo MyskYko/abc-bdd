@@ -1,4 +1,5 @@
- - The command for bdd construction using the simple BDD package is "&bdd".
+send email to miyasaka@cad.t.u-tokyo.ac.jp for questions or comments 
+- The command for bdd construction using the simple BDD package is "&bdd".
  - The command for CSPF-based optimization (transduction method) is "&cspf". Weak-reduce is "&cspf -G 1 -N 0 -O 1 <file.blif>" and Eager-reduce is "&cspf -G 1 -N 0 <file.blif>".
  - Both commands are applicable to a strashed combinational circuit. Please read the circuit by "&read".
 
