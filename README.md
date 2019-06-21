@@ -3,7 +3,7 @@ send email to miyasaka@cad.t.u-tokyo.ac.jp for questions or comments
  - The command for CSPF-based optimization (transduction method) is "&cspf". Weak-reduce is "&cspf -G 1 -N 0 -O 1 <file.blif>" and Eager-reduce is "&cspf -G 1 -N 0 <file.blif>".
  - Both commands are applicable to a strashed combinational circuit. Please read the circuit by "&read".
  
-The simplest package (without garbage collection and reallocation) can be found at https://github.com/MyskYko/abc/commit/8cb55037cb7ed745e06256ff8426cfa569dde40f and its command is "&test".
+The simplest package (without garbage collection and reallocation) can be found at https://github.com/MyskYko/abc/commit/8cb55037cb7ed745e06256ff8426cfa569dde40f and its command is "&test" at that commit.
  
 
 # ABC: System for Sequential Logic Synthesis and Formal Verification
