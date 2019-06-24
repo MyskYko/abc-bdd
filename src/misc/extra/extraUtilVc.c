@@ -227,7 +227,7 @@ void Abc_BddMulti( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump, int nSiz
     }
   if ( fVerbose ) printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
   p = Abc_BddManAlloc( Gia_ManCiNum( pGia ) + nSize + nSize, nObjsAllocInit, fVerbose );
-  Abc_BddGia( pGia, fVerbose, nJump, p );
+  Abc_BddGia( pGia, fVerbose, nJump, p, 0, 0 );
   abctime clk1 = Abc_Clock();
   if( fVerbose ) printf( "\n" );
   ABC_PRT( "BDD (adder tree) construction time", clk1 - clk );

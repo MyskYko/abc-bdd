@@ -415,7 +415,7 @@ typedef struct Abc_BddMan_ Abc_BddMan;
 struct Abc_BddMan_ 
 {
   int                nVars;         // the number of variables
-  unsigned           nObjs;         // the number of nodes used
+  int                nObjs;         // the number of nodes used
   unsigned           nObjsAlloc;    // the number of nodes allocated
   int *              pUnique;       // unique table for nodes
   int *              pNexts;        // next pointer for nodes
@@ -428,7 +428,7 @@ struct Abc_BddMan_
   int                nCacheLookups; // the number of computed table lookups
   int                nCacheMisses;  // the number of computed table misses
   long long          nMemory;       // total amount of memory used (in bytes)
-  unsigned           nRemoved;      // the minimum int of removed node
+  int                nRemoved;      // the minimum int of removed node
   int                fVerbose;
 };
 
@@ -437,14 +437,22 @@ static inline unsigned Abc_BddInvalidLit()                           { return 0x
 static inline unsigned char Abc_BddInvalidMark()                     { return 0xff;                                                 }
 static inline unsigned char Abc_BddConstVar()                        { return 0xff;                                                 }
 static inline unsigned char Abc_BddRemovedVar()                      { return 0xff;                                                 }
+static inline unsigned Abc_BddConst0()                               { return 0;                                                    }
+static inline unsigned Abc_BddConst1()                               { return 1;                                                    }
 static inline unsigned Abc_BddVar2Lit( int i, int c )                { return i + i + (int)( c > 0 );                               }
-static inline unsigned Abc_BddIthVar( int i )                        { return Abc_BddVar2Lit( i + 1, 0 );                           }
 static inline int      Abc_BddLit2Var( unsigned i )                  { return i >> 1;                                               }
+static inline unsigned Abc_BddIthVar( int i )                        { return Abc_BddVar2Lit( i + 1, 0 );                           }
 static inline unsigned Abc_BddLitRegular( unsigned i )               { return i & ~01;                                              }
-static inline int      Abc_BddLitIsCompl( unsigned i )               { return i & 1;                                                }
+static inline unsigned Abc_BddLitNot( unsigned i )                   { return i ^ 1;                                                }
 static inline unsigned Abc_BddLitNotCond( unsigned i, int c )        { return i ^ (int)( c > 0 );                                   }
-static inline int      Abc_BddLitIsInvalid( unsigned i )             { return (int)( i == Abc_BddInvalidLit() );                    }
-static inline int      Abc_BddLitNot( unsigned i )                   { return i ^ 1;                                                }
+static inline int      Abc_BddLitIsCompl( unsigned i )               { return i & 1;                                                }
+static inline int      Abc_BddEq( unsigned i, unsigned j )            { return (int)( i == j );                                     }
+static inline int      Abc_BddLitIsConst0( unsigned i )              { return Abc_BddEq( i, Abc_BddConst0() );                      }
+static inline int      Abc_BddLitIsConst1( unsigned i )              { return Abc_BddEq( i, Abc_BddConst1() );                      }
+static inline int      Abc_BddLitIsConst( unsigned i )               { return Abc_BddLitIsConst0( i ) || Abc_BddLitIsConst1( i );   }
+static inline int      Abc_BddLitIsInvalid( unsigned i )             { return Abc_BddEq( i, Abc_BddInvalidLit() );                  }
+static inline void     Abc_BddSetLitRemoved( Abc_BddMan * p, unsigned i ) { p->pVars[Abc_BddLit2Var( i )] = Abc_BddRemovedVar();    }
+static inline int      Abc_BddLitIsRemoved( Abc_BddMan * p, unsigned i ) { return (int)( p->pVars[Abc_BddLit2Var( i )] == Abc_BddRemovedVar() ); }
 static inline int      Abc_BddVar( Abc_BddMan * p, unsigned i )      { return (int)p->pVars[Abc_BddLit2Var( i )];                   }
 static inline unsigned Abc_BddThen( Abc_BddMan * p, unsigned i )     { return Abc_BddLitNotCond( p->pObjs[Abc_BddLitRegular( i )], Abc_BddLitIsCompl( i ) ); }
 static inline unsigned Abc_BddElse( Abc_BddMan * p, unsigned i )     { return Abc_BddLitNotCond( p->pObjs[Abc_BddLitRegular( i ) + 1], Abc_BddLitIsCompl( i ) ); }
@@ -454,20 +462,18 @@ static inline void     Abc_BddIncMark( Abc_BddMan * p, unsigned i )  { assert( +
 static inline void     Abc_BddDecMark( Abc_BddMan * p, unsigned i )  { assert( --p->pMark[Abc_BddLit2Var( i )] != Abc_BddInvalidMark() ); }
 static inline void     Abc_BddSetMarkInvalid( Abc_BddMan * p, unsigned i ) { p->pMark[Abc_BddLit2Var( i )] = Abc_BddInvalidMark();  }
 static inline int      Abc_BddMarkIsInvalid( Abc_BddMan * p, unsigned i ) { return (int)( p->pMark[Abc_BddLit2Var( i )] == Abc_BddInvalidMark() ); }
-static inline void     Abc_BddSetVarRemoved( Abc_BddMan * p, unsigned i ) { p->pVars[Abc_BddLit2Var( i )] = Abc_BddRemovedVar();    }
-static inline int      Abc_BddVarIsRemoved( Abc_BddMan * p, unsigned i ) { return (int)( p->pVars[Abc_BddLit2Var( i )] == Abc_BddRemovedVar() ); }
-static inline int      Abc_BddIsLimit( Abc_BddMan * p )              { return (int)( p->nObjs == p->nObjsAlloc - 1 );               }
+static inline int      Abc_BddIsLimit( Abc_BddMan * p )              { return (int)( (unsigned)p->nObjs == p->nObjsAlloc - 1 );     }
 
 extern unsigned        Abc_BddUniqueCreate( Abc_BddMan * p, int Var, unsigned Then, unsigned Else );
 extern Abc_BddMan *    Abc_BddManAlloc( int nVars, unsigned nObjs, int fVerbose );
 extern void            Abc_BddManFree( Abc_BddMan * p );
 extern unsigned        Abc_BddAnd( Abc_BddMan * p, unsigned a, unsigned b );
 extern unsigned        Abc_BddOr( Abc_BddMan * p, unsigned a, unsigned b );
-extern void            Abc_BddGia( Gia_Man_t * pGia, int fVerbose, int nJump, Abc_BddMan * p );
+extern void            Abc_BddGia( Gia_Man_t * pGia, int fVerbose, int nJump, Abc_BddMan * p, int fRealloc, int fGarbage );
 extern int             Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth );
+extern int             Abc_BddCount1s( Abc_BddMan * p, unsigned a, int depth );
 extern int             Abc_BddCountNodesArray2( Abc_BddMan * p, Vec_Int_t * vNodes );
-extern void            Abc_BddPrint( Abc_BddMan * p, unsigned a );
-extern void            Abc_BddDump( Abc_BddMan * p, unsigned a, int offset, FILE * f );
+extern void            Abc_BddPrint( Abc_BddMan * p, unsigned a, int offset, FILE * f );
   
 /*=== extraUtilVc.c ================================================================*/
 

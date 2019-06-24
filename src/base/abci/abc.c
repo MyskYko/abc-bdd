@@ -45888,15 +45888,30 @@ usage:
 ***********************************************************************/
 int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
 {
-    int c, fVerbose = 0;
+    int c;
+    int nVerbose = 0;
     int nMem = 0;
     int nJump = 0;
-    extern void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump );
+    int fRealloc = 1;
+    int fDump = 0;
+    int fGarbage = 1;
+    char * FileName = NULL;
+    FILE * pFile = NULL;
+    extern void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, FILE * pFile, int fRealloc, int fGarbage );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "JMvh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "FJMVadgh" ) ) != EOF )
     {
         switch ( c )
         {
+        case 'F':
+	  if ( globalUtilOptind >= argc )
+            {
+	        Abc_Print( -1, "Command line switch \"-F\" should be followed by a filename.\n" );
+                goto usage;
+            }
+            FileName = argv[globalUtilOptind];
+            globalUtilOptind++;
+            break;
         case 'J':
             if ( globalUtilOptind >= argc )
             {
@@ -45919,8 +45934,25 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
             if ( nMem < 0 )
                 goto usage;
             break;
-        case 'v':
-            fVerbose ^= 1;
+        case 'V':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-V\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nVerbose = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nVerbose < 0 )
+                goto usage;
+            break;
+        case 'a':
+            fRealloc ^= 1;
+            break;
+        case 'd':
+            fDump ^= 1;
+            break;
+        case 'g':
+            fGarbage ^= 1;
             break;
         case 'h':
             goto usage;
@@ -45933,15 +45965,22 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
         Abc_Print( -1, "Abc_CommandAbc9Bdd(): There is no AIG.\n" );
         return 1;
     }
-    Abc_BddGiaTest( pAbc->pGia, fVerbose, nMem, nJump );
+    if ( fDump ) pFile = stdout;
+    if ( FileName != NULL ) pFile = fopen( FileName, "w" );
+    Abc_BddGiaTest( pAbc->pGia, nVerbose, nMem, nJump, pFile, fRealloc, fGarbage );
+    if ( FileName != NULL ) fclose( pFile );
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &bdd [-JM num] [-vh]\n" );
+    Abc_Print( -2, "usage: &bdd [-FJMV num] [-adgh]\n" );
     Abc_Print( -2, "\t        simple bdd construction with garbage collection\n" );
-    Abc_Print( -2, "\t-J num: memory reallocation jump to 2^num, 0 is incremental reallocation [default = %d]\n", nJump );
-    Abc_Print( -2, "\t-M num: memory size to allocate 2^? BDD varialbe [default = %d]\n", nMem );
-    Abc_Print( -2, "\t-v    : toggle printing verbose information [default = %s]\n", fVerbose? "yes": "no" );
+    Abc_Print( -2, "\t-F <file>: file to dump minterms of resulting BDDs\n" );
+    Abc_Print( -2, "\t-J num: memory reallocation jump to 2^num nodes, while the progress is deleted. 0 is incremental reallocation [default = %d]\n", nJump );
+    Abc_Print( -2, "\t-M num: memory size to allocate, 2^num BDD nodes [default = %d]\n", nMem );
+    Abc_Print( -2, "\t-V    : level of printing verbose information [default = %d]\n", nVerbose );
+    Abc_Print( -2, "\t-a    : toggle reallocating after the garbage collection fails or is skipped when the nodes reach the limit [default = %s]\n", fRealloc? "yes": "no" );
+    Abc_Print( -2, "\t-d    : toggle dumping minterms of resulting BDDs [default = %s]\n", fRealloc? "yes": "no" );
+    Abc_Print( -2, "\t-g    : toggle garbage collecting when the nodes reach the limit [default = %s]\n", fGarbage? "yes": "no" );
     Abc_Print( -2, "\t-h    : print the command usage\n");
     return 1;
 }
