@@ -78,7 +78,7 @@ unsigned Abc_BddUniqueCreate( Abc_BddMan * p, int Var, unsigned Then, unsigned E
   if ( Var < 0 || Var >= p->nVars )   return Abc_BddInvalidLit();
   if ( Var >= Abc_BddVar( p, Then ) ) return Abc_BddInvalidLit();
   if ( Var >= Abc_BddVar( p, Else ) ) return Abc_BddInvalidLit();
-  if ( Then == Else ) return Else;
+  if ( Abc_BddEq( Then, Else ) ) return Else;
   if ( !Abc_BddLitIsCompl( Else ) ) return Abc_BddUniqueCreateInt( p, Var, Then, Else );
   unsigned r = Abc_BddUniqueCreateInt( p, Var, Abc_BddLitNot( Then ), Abc_BddLitNot( Else ) );
   return ( Abc_BddLitIsInvalid( r ) ) ? Abc_BddInvalidLit() : Abc_BddLitNot( r );
@@ -177,7 +177,7 @@ void Abc_BddManFree( Abc_BddMan * p )
   ABC_FREE( p->pVars );
   ABC_FREE( p );
 }
-static inline void Abc_BddRehash( Abc_BddMan * p )
+void Abc_BddRehash( Abc_BddMan * p )
 {
   unsigned i, hash;
   int * q, * head, * head1, * head2;
@@ -207,7 +207,7 @@ static inline void Abc_BddRehash( Abc_BddMan * p )
 	}
     }
 }
-static inline void Abc_BddManRealloc( Abc_BddMan * p )
+void Abc_BddManRealloc( Abc_BddMan * p )
 {
   p->nObjsAlloc  = p->nObjsAlloc + p->nObjsAlloc;
   assert( p->nObjsAlloc != 0 );
@@ -411,7 +411,7 @@ void Abc_BddUnmarkChildren ( Abc_BddMan * p, unsigned i )
       Abc_BddUnmarkChildren( p, Else );
     }
 }
-static inline void Abc_BddRemoveNode( Abc_BddMan * p, unsigned i )
+void Abc_BddRemoveNode( Abc_BddMan * p, unsigned i )
 {
   int Var = Abc_BddVar( p, i );
   unsigned Then = Abc_BddThen( p, i );
@@ -424,7 +424,7 @@ static inline void Abc_BddRemoveNode( Abc_BddMan * p, unsigned i )
   *q_next = 0;
   Abc_BddSetLitRemoved( p, i );
 }
-static inline void Abc_BddRefresh( Abc_BddMan * p )
+void Abc_BddRefresh( Abc_BddMan * p )
 {
   int i, nFrontiers = 0;
   unsigned a;
@@ -466,7 +466,7 @@ static inline void Abc_BddRefresh( Abc_BddMan * p )
    SeeAlso     []
 
 ***********************************************************************/
-static inline void Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts )
+void Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts )
 {
   Gia_Obj_t * pObj; int i;
   Gia_ManStaticFanoutStart( pGia );

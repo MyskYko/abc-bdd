@@ -45903,6 +45903,15 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
     {
         switch ( c )
         {
+        case 'a':
+            fRealloc ^= 1;
+            break;
+        case 'd':
+            fDump ^= 1;
+            break;
+        case 'g':
+            fGarbage ^= 1;
+            break;
         case 'F':
 	  if ( globalUtilOptind >= argc )
             {
@@ -45945,15 +45954,6 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
             if ( nVerbose < 0 )
                 goto usage;
             break;
-        case 'a':
-            fRealloc ^= 1;
-            break;
-        case 'd':
-            fDump ^= 1;
-            break;
-        case 'g':
-            fGarbage ^= 1;
-            break;
         case 'h':
             goto usage;
         default:
@@ -45974,13 +45974,13 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
 usage:
     Abc_Print( -2, "usage: &bdd [-FJMV num] [-adgh]\n" );
     Abc_Print( -2, "\t        simple bdd construction with garbage collection\n" );
+    Abc_Print( -2, "\t-a    : toggle reallocating after the garbage collection fails or is skipped when the nodes reach the limit [default = %s]\n", fRealloc? "yes": "no" );
+    Abc_Print( -2, "\t-d    : toggle dumping minterms of resulting BDDs [default = %s]\n", fRealloc? "yes": "no" );
+    Abc_Print( -2, "\t-g    : toggle garbage collecting when the nodes reach the limit [default = %s]\n", fGarbage? "yes": "no" );
     Abc_Print( -2, "\t-F <file>: file to dump minterms of resulting BDDs\n" );
     Abc_Print( -2, "\t-J num: memory reallocation jump to 2^num nodes, while the progress is deleted. 0 is incremental reallocation [default = %d]\n", nJump );
     Abc_Print( -2, "\t-M num: memory size to allocate, 2^num BDD nodes [default = %d]\n", nMem );
     Abc_Print( -2, "\t-V    : level of printing verbose information [default = %d]\n", nVerbose );
-    Abc_Print( -2, "\t-a    : toggle reallocating after the garbage collection fails or is skipped when the nodes reach the limit [default = %s]\n", fRealloc? "yes": "no" );
-    Abc_Print( -2, "\t-d    : toggle dumping minterms of resulting BDDs [default = %s]\n", fRealloc? "yes": "no" );
-    Abc_Print( -2, "\t-g    : toggle garbage collecting when the nodes reach the limit [default = %s]\n", fGarbage? "yes": "no" );
     Abc_Print( -2, "\t-h    : print the command usage\n");
     return 1;
 }
@@ -46007,20 +46007,25 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     int nMemMax = 31;
     int fDvr = 0;
     int fCudd = 0;
+    int fRep = 0;
+    int nGate;
     char * FileName;
     char Command[1000];
     extern void Abc_BddNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nMemMax, int nType, int nIte, int nOpt, int nVerbose );
     extern void Abc_DdNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nMemMax, int nType, int nIte, int nOpt, int fDvr, int nVerbose );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "GNOMUVcrh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "GNOMUVcdrh" ) ) != EOF )
     {
         switch ( c )
         {
 	case 'c':
             fCudd ^= 1;
             break;
-	case 'r':
+	case 'd':
             fDvr ^= 1;
+            break;
+	case 'r':
+            fRep ^= 1;
             break;
         case 'G':
             if ( globalUtilOptind >= argc )
@@ -46105,20 +46110,24 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     }
     // get the input file name
     FileName = argv[globalUtilOptind];
-    if ( fCudd )
-      Abc_DdNandGiaTest( pAbc->pGia, FileName, nMem, nMemMax, nType, nIte, nOpt, fDvr, nVerbose );
-    else
-      Abc_BddNandGiaTest( pAbc->pGia, FileName, nMem, nMemMax, nType, nIte, nOpt, nVerbose );
-    // read the file just produced
-    sprintf(Command, "read %s; strash; &get", FileName );
-    Cmd_CommandExecute( pAbc, Command );
+    do
+      {
+	nGate = Gia_ManAndNum( pAbc->pGia );
+	if ( fCudd )
+	  Abc_DdNandGiaTest( pAbc->pGia, FileName, nMem, nMemMax, nType, nIte, nOpt, fDvr, nVerbose );
+	else
+	  Abc_BddNandGiaTest( pAbc->pGia, FileName, nMem, nMemMax, nType, nIte, nOpt, nVerbose );
+	sprintf(Command, "read %s; strash; &get", FileName );
+	Cmd_CommandExecute( pAbc, Command );
+      } while ( fRep && nGate != Gia_ManAndNum( pAbc->pGia ) );
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &cspf [-GNOMUV num] [-crh] <file>\n" );
+    Abc_Print( -2, "usage: &cspf [-GNOMUV num] [-cdrh] <file>\n" );
     Abc_Print( -2, "\t        nand circuit minimization by permissible function using simple bdd\n" );
-    Abc_Print( -2, "\t-c    : toggle CUDD not simple BDD [default = %s]\n", fCudd? "yes": "no" );
-    Abc_Print( -2, "\t-r    : toggle dynamic variable reoredering only in CUDD [default = %s]\n", fDvr? "yes": "no" );
+    Abc_Print( -2, "\t-c    : toggle using CUDD not simple BDD [default = %s]\n", fCudd? "yes": "no" );
+    Abc_Print( -2, "\t-d    : toggle dynamic variable reoredering only in CUDD [default = %s]\n", fDvr? "yes": "no" );
+    Abc_Print( -2, "\t-r    : toggle repeating optimization while it is effectie [default = %s]\n", fRep? "yes": "no" );
     Abc_Print( -2, "\t-G num: optimization type [default = %d]\n", nType );
     Abc_Print( -2, "\t-N num: max iteration (0 is no limit) [default = %d]\n", nIte );
     Abc_Print( -2, "\t-O num: option to minimization [default = %d]\n", nOpt );
