@@ -69,8 +69,8 @@ unsigned Abc_BddIteAnd( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 )
 }
 unsigned Abc_BddIte( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 )
 {
-  if ( c == 0 ) return d0;
-  if ( c == 1 ) return d1;
+  if ( Abc_BddLitIsConst0( c ) ) return d0;
+  if ( Abc_BddLitIsConst1( c ) ) return d1;
   if ( Abc_BddLitIsCompl( c ) ) return Abc_BddIte( p, Abc_BddLitNot( c ), d0, d1 );
   unsigned r, r0, r1;
   r = Abc_BddIteCacheLookup( p, c, d1, d0 );
@@ -97,8 +97,7 @@ unsigned Abc_BddIte( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 )
 }
 unsigned Abc_BddVectorCompose( Abc_BddMan * p, unsigned F,  Vec_Int_t * Vars, unsigned * cache, int fAnd )
 {
-  if ( F == 0 )  return 0;
-  if ( F == 1 )  return 1;
+  if ( Abc_BddLitIsConst( F ) )  return F;
   if ( cache[Abc_BddLit2Var( F )] != 0 ) return Abc_BddLitNotCond( cache[Abc_BddLit2Var( F )] - 1, Abc_BddLitIsCompl( F ) );
   int Index = Abc_BddVar( p, F );
   unsigned Then = Abc_BddThen( p, F );
@@ -211,7 +210,7 @@ void Abc_GenMultiAdderTree( char * pFileName, int nVars, int fReverse, int fColu
   SeeAlso     []
 
 ***********************************************************************/
-void Abc_BddMulti( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump, int nSize, int fReverse, int fColumn, int fSwap )
+void Abc_BddMulti( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nSize, int fReverse, int fColumn, int fSwap )
 {
   abctime clk = Abc_Clock();
   Abc_BddMan * p;
@@ -225,11 +224,10 @@ void Abc_BddMulti( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump, int nSiz
       nObjsAllocInit = nObjsAllocInit << 1;
       assert( nObjsAllocInit != 0 );
     }
-  if ( fVerbose ) printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
-  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ) + nSize + nSize, nObjsAllocInit, fVerbose );
-  Abc_BddGia( pGia, fVerbose, nJump, p, 0, 0 );
+  if ( nVerbose ) printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
+  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ) + nSize + nSize, nObjsAllocInit, nVerbose > 1 );
+  Abc_BddGia( pGia, nVerbose, nJump, p, 0, 0 );
   abctime clk1 = Abc_Clock();
-  if( fVerbose ) printf( "\n" );
   ABC_PRT( "BDD (adder tree) construction time", clk1 - clk );
   Vec_Int_t * products = Vec_IntAlloc( nSize * nSize );
   if ( fColumn )
@@ -340,15 +338,12 @@ void Abc_BddMulti( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump, int nSiz
   vNodes = Vec_IntAlloc( Gia_ManCoNum( pGia ) );
   Gia_ManForEachCo( pGia, pObj, i )
     {
-      //      printf( "%u\n", pObj->Value );
       pObj->Value = Abc_BddVectorCompose( p, pObj->Value, products, cache, 0 );
       assert( !Abc_BddLitIsInvalid( pObj->Value ) );
-      //      printf( "%u\n", pObj->Value );
       if ( Abc_BddLit2Var( pObj->Value ) > p->nVars )
 	Vec_IntPush( vNodes, pObj->Value );
     }
   abctime clk2 = Abc_Clock();
-  if( fVerbose ) printf( "\n" );
   ABC_PRT( "BDD (vc) construction time", clk2 - clk1 );
   ABC_PRT( "BDD (total) construction time", clk2 - clk );
   printf( "nObjs = %u\n", p->nObjs );

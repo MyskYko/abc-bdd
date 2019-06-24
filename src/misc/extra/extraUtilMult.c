@@ -536,6 +536,7 @@ void Abc_BddGia( Gia_Man_t * pGia, int nVerbose, int nJump, Abc_BddMan * p, int 
 	      continue;
 	    }
 	}
+      assert( !Abc_BddLitIsInvalid( pObj->Value ) );
       fRefresh = 0;
       Abc_BddIncMark( p, pObj->Value );
       pFanouts[Gia_ObjId( pGia, pObj0 )] -= 1;

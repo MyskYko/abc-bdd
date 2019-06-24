@@ -48,7 +48,7 @@ ABC_NAMESPACE_IMPL_START
 ***********************************************************************/
 void Abc_BddTraverse( Abc_BddMan * p, unsigned x, Vec_Int_t * vec, Vec_Int_t * vIndex, int fConst )
 {
-  if ( x == 0 || x == 1 )
+  if ( Abc_BddLitIsConst( x ) )
     {
       if ( fConst ) Vec_IntPush( vec, x );
       return;
