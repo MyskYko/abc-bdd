@@ -45972,10 +45972,10 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &bdd [-FJMV num] [-adgh]\n" );
+    Abc_Print( -2, "usage: &bdd [-F <file>] [-JMV num] [-adgh]\n" );
     Abc_Print( -2, "\t        simple bdd construction with garbage collection\n" );
     Abc_Print( -2, "\t-a    : toggle reallocating after the garbage collection fails or is skipped when the nodes reach the limit [default = %s]\n", fRealloc? "yes": "no" );
-    Abc_Print( -2, "\t-d    : toggle dumping minterms of resulting BDDs [default = %s]\n", fRealloc? "yes": "no" );
+    Abc_Print( -2, "\t-d    : toggle dumping minterms of resulting BDDs [default = %s]\n", fDump? "yes": "no" );
     Abc_Print( -2, "\t-g    : toggle garbage collecting when the nodes reach the limit [default = %s]\n", fGarbage? "yes": "no" );
     Abc_Print( -2, "\t-F <file>: file to dump minterms of resulting BDDs\n" );
     Abc_Print( -2, "\t-J num: memory reallocation jump to 2^num nodes, while the progress is deleted. 0 is incremental reallocation [default = %d]\n", nJump );
@@ -46155,7 +46155,6 @@ int Abc_CommandAbc9BddMulti( Abc_Frame_t * pAbc, int argc, char ** argv )
     int c;
     int nVerbose = 0;
     int nMem = 21;
-    int nJump = 0;
     int nSize = 4;
     int fReverse = 0;
     int fColumn = 0;
@@ -46163,23 +46162,12 @@ int Abc_CommandAbc9BddMulti( Abc_Frame_t * pAbc, int argc, char ** argv )
     char * FileName;
     char Command[1000];
     extern void Abc_GenMultiAdderTree( char * pFileName, int nVars, int fReverse, int fColumn );
-    extern void Abc_BddMulti( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, int nSize, int fReverse, int fColumn, int fSwap );
+    extern void Abc_BddMulti( Gia_Man_t * pGia, int nVerbose, int nMem, int nSize, int fReverse, int fColumn, int fSwap );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "JMNVcrsh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "MNVcrsh" ) ) != EOF )
     {
         switch ( c )
         {
-        case 'J':
-            if ( globalUtilOptind >= argc )
-            {
-                Abc_Print( -1, "Command line switch \"-J\" should be followed by an integer.\n" );
-                goto usage;
-            }
-            nJump = atoi(argv[globalUtilOptind]);
-            globalUtilOptind++;
-            if ( nJump < 0 )
-                goto usage;
-            break;
         case 'M':
             if ( globalUtilOptind >= argc )
             {
@@ -46237,19 +46225,18 @@ int Abc_CommandAbc9BddMulti( Abc_Frame_t * pAbc, int argc, char ** argv )
     Abc_GenMultiAdderTree( FileName, nSize, fReverse, fColumn );
     sprintf(Command, "read %s; st; &get", FileName );
     Cmd_CommandExecute( pAbc, Command );
-    Abc_BddMulti( pAbc->pGia, nVerbose, nMem, nJump, nSize, fReverse, fColumn, fSwap );
+    Abc_BddMulti( pAbc->pGia, nVerbose, nMem, nSize, fReverse, fColumn, fSwap );
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &bddm [-JMN num] [-crsvh] <file>\n" );
+    Abc_Print( -2, "usage: &bddm [-MNV num] [-crsh] <file>\n" );
     Abc_Print( -2, "\t        simple bdd construction for multiplier\n" );
-    Abc_Print( -2, "\t-J num: memory reallocation jump to 2^num, 0 is incremental reallocation [default = %d]\n", nJump );
     Abc_Print( -2, "\t-M num: memory size to allocate 2^? BDD varialbe [default = %d]\n", nMem );
     Abc_Print( -2, "\t-N num: size of multiplier NxN bit [default = %d]\n", nSize );
+    Abc_Print( -2, "\t-V    : level of printing verbose information [default = %d]\n", nVerbose );
     Abc_Print( -2, "\t-c    : toggle using column based variable ordering for adder tree [default = %s]\n", fColumn? "yes": "no" );
     Abc_Print( -2, "\t-r    : toggle reversing the variable ordering for adder tree [default = %s]\n", fReverse? "yes": "no" );
     Abc_Print( -2, "\t-s    : toggle swapping a and b, which are inputs of multiplier [default = %s]\n", fSwap? "yes": "no" );
-    Abc_Print( -2, "\t-V    : level of printing verbose information [default = %d]\n", nVerbose );
     Abc_Print( -2, "\t-h    : print the command usage\n");
     Abc_Print( -2, "\t<file> : intermediate file name for adder tree\n");
     return 1;
@@ -46270,17 +46257,17 @@ int Abc_CommandAbc9Iig( Abc_Frame_t * pAbc, int argc, char ** argv )
 {
     int c, nVerbose = 0;
     int i;
-    int nMem = 0;
-    int nJump = 0;
-    int fConv = 0;
-    int fReverse = 0;
+    int nMem = 21;
+    int fDump = 0;
+    int nPat = 1;
+    int fConv = 1;
+    int fRep = 0;
     char * FileName = NULL;
     FILE * pFile = NULL;
     char Command[1000];
-    extern void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, FILE * pFile );
-    extern void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, FILE * pFile );
+    extern void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int nPat, int frep );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "FJMVcrh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "FMNVcdrh" ) ) != EOF )
     {
         switch ( c )
         {
@@ -46293,17 +46280,6 @@ int Abc_CommandAbc9Iig( Abc_Frame_t * pAbc, int argc, char ** argv )
             FileName = argv[globalUtilOptind];
             globalUtilOptind++;
             break;
-        case 'J':
-            if ( globalUtilOptind >= argc )
-            {
-                Abc_Print( -1, "Command line switch \"-J\" should be followed by an integer.\n" );
-                goto usage;
-            }
-            nJump = atoi(argv[globalUtilOptind]);
-            globalUtilOptind++;
-            if ( nJump < 0 )
-                goto usage;
-            break;
         case 'M':
             if ( globalUtilOptind >= argc )
             {
@@ -46313,6 +46289,17 @@ int Abc_CommandAbc9Iig( Abc_Frame_t * pAbc, int argc, char ** argv )
             nMem = atoi(argv[globalUtilOptind]);
             globalUtilOptind++;
             if ( nMem < 0 )
+                goto usage;
+            break;
+        case 'N':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-N\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nPat = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nPat <= 0 )
                 goto usage;
             break;
         case 'V':
@@ -46329,8 +46316,11 @@ int Abc_CommandAbc9Iig( Abc_Frame_t * pAbc, int argc, char ** argv )
         case 'c':
             fConv ^= 1;
             break;
+        case 'd':
+            fDump ^= 1;
+            break;
         case 'r':
-            fReverse ^= 1;
+            fRep ^= 1;
             break;
         case 'h':
             goto usage;
@@ -46343,6 +46333,7 @@ int Abc_CommandAbc9Iig( Abc_Frame_t * pAbc, int argc, char ** argv )
         Abc_Print( -1, "Abc_CommandAbc9Iig(): There is no AIG.\n" );
         return 1;
     }
+    if ( fDump ) pFile = stdout;
     if ( FileName != NULL ) pFile = fopen( FileName, "w" );
     if ( fConv )
       {
@@ -46354,23 +46345,21 @@ int Abc_CommandAbc9Iig( Abc_Frame_t * pAbc, int argc, char ** argv )
 	sprintf(Command, "&get" );
 	Cmd_CommandExecute( pAbc, Command );
       }
-    if ( !fReverse )
-      Abc_BddGiaIig( pAbc->pGia, nVerbose, nMem, nJump, pFile );
-    else
-      Abc_BddGiaIigReverse( pAbc->pGia, nVerbose, nMem, nJump, pFile );
+    Abc_BddGiaIig( pAbc->pGia, nVerbose, nMem, pFile, nPat, fRep );
     if ( FileName != NULL ) fclose( pFile );
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &iig [-F <file>] [-JMV num] [-crh]\n" );
+    Abc_Print( -2, "usage: &iig [-F <file>] [-MNV num] [-cdrh]\n" );
     Abc_Print( -2, "\t        inductive invariant generation using BDD\n" );
     Abc_Print( -2, "\t-F <file>: dump the resulting inductive invariant to the file without printing [default = %d]\n", FileName );
-    Abc_Print( -2, "\t-J num: memory reallocation jump to 2^num, 0 is incremental reallocation [default = %d]\n", nJump );
     //    Abc_Print( -2, "\t-L num: number of latches [default = %d]\n", nLatch );
-    Abc_Print( -2, "\t-M num: memory size to allocate 2^? BDD varialbe [default = %d]\n", nMem );
+    Abc_Print( -2, "\t-M num: memory size to allocate 2^? BDD nodes [default = %d]\n", nMem );
+    Abc_Print( -2, "\t-N num: initial number of states for F to be 0 [default = %d]\n", nPat );
     Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
     Abc_Print( -2, "\t-c    : toggle converting circuit [default = %s]\n", fConv? "yes": "no" );
-    Abc_Print( -2, "\t-r    : toggle starting from almost 0 and increasing 1 [default = %s]\n", fReverse? "yes": "no" );
+    Abc_Print( -2, "\t-d    : toggle dumping resulting inductive invariant [default = %s]\n", fDump? "yes": "no" );
+    Abc_Print( -2, "\t-r    : toggle repeating if it fails [default = %s]\n", fRep? "yes": "no" );
     Abc_Print( -2, "\t-h    : print the command usage\n");
     return 1;
 }
