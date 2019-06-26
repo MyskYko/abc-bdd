@@ -605,6 +605,28 @@ int Abc_BddCount1s( Abc_BddMan * p, unsigned a, int depth )
   if ( Abc_BddLitIsConst1( a ) ) return 1 << ( p->nVars - depth );
   return Abc_BddCount1s( p, Abc_BddElse( p, a ), depth + 1 ) + Abc_BddCount1s( p, Abc_BddThen( p, a ), depth + 1 );
 }
+unsigned __int128 Abc_BddCount1s128( Abc_BddMan * p, unsigned a, int depth )
+{
+  if ( p->nVars - depth < 0 ) return 0;
+  if ( Abc_BddLitIsConst0( a ) ) return 0;
+  if ( Abc_BddLitIsConst1( a ) )
+    {
+      unsigned __int128 i = 1;
+      return i << ( p->nVars - depth );
+    }
+  return Abc_BddCount1s128( p, Abc_BddElse( p, a ), depth + 1 ) + Abc_BddCount1s128( p, Abc_BddThen( p, a ), depth + 1 );
+}
+unsigned __int128 Abc_BddCount0s128( Abc_BddMan * p, unsigned a, int depth )
+{
+  if ( p->nVars - depth < 0 ) return 0;
+  if ( Abc_BddLitIsConst1( a ) ) return 0;
+  if ( Abc_BddLitIsConst0( a ) )
+    {
+      unsigned __int128 i = 1;
+      return i << ( p->nVars - depth );
+    }
+  return Abc_BddCount0s128( p, Abc_BddElse( p, a ), depth + 1 ) + Abc_BddCount0s128( p, Abc_BddThen( p, a ), depth + 1 );
+}
 
 ////////////////////////////////////////////////////////////////////////
 ///                       END OF FILE                                ///

@@ -472,6 +472,8 @@ extern unsigned        Abc_BddOr( Abc_BddMan * p, unsigned a, unsigned b );
 extern void            Abc_BddGia( Gia_Man_t * pGia, int fVerbose, int nJump, Abc_BddMan * p, int fRealloc, int fGarbage );
 extern int             Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth );
 extern int             Abc_BddCount1s( Abc_BddMan * p, unsigned a, int depth );
+extern unsigned __int128 Abc_BddCount1s128( Abc_BddMan * p, unsigned a, int depth );
+extern unsigned __int128 Abc_BddCount0s128( Abc_BddMan * p, unsigned a, int depth );
 extern int             Abc_BddCountNodesArray2( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern void            Abc_BddPrint( Abc_BddMan * p, unsigned a, int offset, FILE * f );
   
