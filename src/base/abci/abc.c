@@ -46337,6 +46337,11 @@ int Abc_CommandAbc9Iig( Abc_Frame_t * pAbc, int argc, char ** argv )
     if ( FileName != NULL ) pFile = fopen( FileName, "w" );
     if ( fConv )
       {
+	if( Gia_ManRegNum( pAbc->pGia ) == 0 )
+	  {
+	    Abc_Print( -1, "Abc_CommandAbc9Iig(): The circuit is not sequential. Please use \"-c\".\n" );
+	    return 1;
+	  }
 	sprintf(Command, "&put; comb" );
 	Cmd_CommandExecute( pAbc, Command );
 	sprintf(Command, "zeropo -N 0; removepo -N 0" );
