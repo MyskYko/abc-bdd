@@ -446,7 +446,7 @@ static inline unsigned Abc_BddLitRegular( unsigned i )               { return i 
 static inline unsigned Abc_BddLitNot( unsigned i )                   { return i ^ 1;                                                }
 static inline unsigned Abc_BddLitNotCond( unsigned i, int c )        { return i ^ (int)( c > 0 );                                   }
 static inline int      Abc_BddLitIsCompl( unsigned i )               { return i & 1;                                                }
-static inline int      Abc_BddEq( unsigned i, unsigned j )            { return (int)( i == j );                                     }
+static inline int      Abc_BddEq( unsigned i, unsigned j )           { return (int)( i == j );                                      }
 static inline int      Abc_BddLitIsConst0( unsigned i )              { return Abc_BddEq( i, Abc_BddConst0() );                      }
 static inline int      Abc_BddLitIsConst1( unsigned i )              { return Abc_BddEq( i, Abc_BddConst1() );                      }
 static inline int      Abc_BddLitIsConst( unsigned i )               { return Abc_BddLitIsConst0( i ) || Abc_BddLitIsConst1( i );   }

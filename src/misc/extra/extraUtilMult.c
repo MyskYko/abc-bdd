@@ -81,7 +81,7 @@ unsigned Abc_BddUniqueCreate( Abc_BddMan * p, int Var, unsigned Then, unsigned E
   if ( Abc_BddEq( Then, Else ) ) return Else;
   if ( !Abc_BddLitIsCompl( Else ) ) return Abc_BddUniqueCreateInt( p, Var, Then, Else );
   unsigned r = Abc_BddUniqueCreateInt( p, Var, Abc_BddLitNot( Then ), Abc_BddLitNot( Else ) );
-  return ( Abc_BddLitIsInvalid( r ) ) ? Abc_BddInvalidLit() : Abc_BddLitNot( r );
+  return Abc_BddLitIsInvalid( r ) ? Abc_BddInvalidLit() : Abc_BddLitNot( r );
 }
 
 /**Function*************************************************************
@@ -110,7 +110,6 @@ static inline unsigned Abc_BddCacheInsert( Abc_BddMan * p, unsigned Arg1, unsign
   p->nCacheMisses++;
   return Res;
 }
-
 static inline void Abc_BddCacheRefresh( Abc_BddMan * p ) {
   ABC_FREE( p->pCache );
   p->pCache = ABC_CALLOC( unsigned, 3 * (long long)( p->nCacheMask + 1 ) );
@@ -180,30 +179,27 @@ void Abc_BddManFree( Abc_BddMan * p )
 void Abc_BddRehash( Abc_BddMan * p )
 {
   unsigned i, hash;
-  int * q, * head, * head1, * head2;
+  int * q, * tail, * tail1, * tail2;
   unsigned nObjsAllocOld = p->nObjsAlloc >> 1; // assuming nObjsAlloc has been doubled.
   for ( i = 0; i < nObjsAllocOld; i++ )
     {
       q = p->pUnique + i;
-      head1 = q;
-      head2 = q + nObjsAllocOld;
+      tail1 = q;
+      tail2 = q + nObjsAllocOld;
       while ( *q )
 	{
 	  hash = Abc_BddHash( (int)p->pVars[*q], p->pObjs[(unsigned)*q + *q], p->pObjs[(unsigned)*q + *q + 1] ) & p->nUniqueMask;
-	  if ( hash == i ) head = head1;
-	  else
+	  assert( hash == i || hash == i + nObjsAllocOld );
+	  if ( hash == i ) tail = tail1;
+	  else tail = tail2;
+	  if ( tail != q )
 	    {
-	      assert( hash == i + nObjsAllocOld );
-	      head = head2;
-	    }
-	  if ( head != q )
-	    {
-	      *head = *q;
+	      *tail = *q;
 	      *q = 0;
 	    }
-	  q = p->pNexts + *head;
-	  if ( head == head1 ) head1 = q;
-	  else head2 = q;
+	  q = p->pNexts + *tail;
+	  if ( tail == tail1 ) tail1 = q;
+	  else tail2 = q;
 	}
     }
 }
@@ -278,7 +274,7 @@ unsigned Abc_BddAnd( Abc_BddMan * p, unsigned a, unsigned b )
 unsigned Abc_BddOr( Abc_BddMan * p, unsigned a, unsigned b )
 {
   unsigned r = Abc_BddAnd( p, Abc_BddLitNot( a ), Abc_BddLitNot( b ) );
-  return ( Abc_BddLitIsInvalid( r ) ) ? Abc_BddInvalidLit() : Abc_BddLitNot( r );
+  return Abc_BddLitIsInvalid( r ) ? Abc_BddInvalidLit() : Abc_BddLitNot( r );
 }
 
 /**Function*************************************************************
