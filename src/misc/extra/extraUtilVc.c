@@ -50,7 +50,7 @@ static inline unsigned Abc_BddIteCacheLookup( Abc_BddMan * p, unsigned Arg1, uns
 {
   unsigned * pEnt = p->pCache + 4 * (long long)( Abc_BddHash( Arg1, Arg2, Arg3 ) & p->nCacheMask );
   p->nCacheLookups++;
-  return ( pEnt[0] == Arg1 && pEnt[1] == Arg2 && pEnt[2] == Arg3 ) ? pEnt[3] : Abc_BddInvalidLit();
+  return ( pEnt[0] == Arg1 && pEnt[1] == Arg2 && pEnt[2] == Arg3 ) ? pEnt[3] : Abc_BddLitInvalid();
 }
 static inline unsigned Abc_BddIteCacheInsert( Abc_BddMan * p, unsigned Arg1, unsigned Arg2, unsigned Arg3, unsigned Res )
 {
@@ -62,9 +62,9 @@ static inline unsigned Abc_BddIteCacheInsert( Abc_BddMan * p, unsigned Arg1, uns
 unsigned Abc_BddIteAnd( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 )
 {
   unsigned r1 = Abc_BddAnd( p, c, d1 );
-  if ( Abc_BddLitIsInvalid( r1 ) ) return Abc_BddInvalidLit();
+  if ( Abc_BddLitIsInvalid( r1 ) ) return Abc_BddLitInvalid();
   unsigned r0 = Abc_BddAnd( p, Abc_BddLitNot( c ), d0 );
-  if ( Abc_BddLitIsInvalid( r0 ) ) return Abc_BddInvalidLit();
+  if ( Abc_BddLitIsInvalid( r0 ) ) return Abc_BddLitInvalid();
   return Abc_BddOr( p, r1, r0 );
 }
 unsigned Abc_BddIte( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 )
@@ -88,29 +88,29 @@ unsigned Abc_BddIte( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 )
   unsigned d0Then = ( d0V == minV ) ? Abc_BddThen( p, d0 ): d0;
   unsigned d0Else = ( d0V == minV ) ? Abc_BddElse( p, d0 ): d0;
   r0 = Abc_BddIte( p, cElse, d1Else, d0Else );
-  if ( Abc_BddLitIsInvalid( r0 ) ) return Abc_BddInvalidLit();
+  if ( Abc_BddLitIsInvalid( r0 ) ) return Abc_BddLitInvalid();
   r1 = Abc_BddIte( p, cThen, d1Then, d0Then );
-  if ( Abc_BddLitIsInvalid( r1 ) ) return Abc_BddInvalidLit();
+  if ( Abc_BddLitIsInvalid( r1 ) ) return Abc_BddLitInvalid();
   r = Abc_BddUniqueCreate( p, minV, r1, r0 );
-  if ( Abc_BddLitIsInvalid( r ) ) return Abc_BddInvalidLit();
+  if ( Abc_BddLitIsInvalid( r ) ) return Abc_BddLitInvalid();
   return Abc_BddIteCacheInsert( p, c, d1, d0, r );
 }
 unsigned Abc_BddVectorCompose( Abc_BddMan * p, unsigned F,  Vec_Int_t * Vars, unsigned * cache, int fAnd )
 {
   if ( Abc_BddLitIsConst( F ) )  return F;
-  if ( cache[Abc_BddLit2Var( F )] != 0 ) return Abc_BddLitNotCond( cache[Abc_BddLit2Var( F )] - 1, Abc_BddLitIsCompl( F ) );
+  if ( cache[Abc_BddLit2Bvar( F )] != 0 ) return Abc_BddLitNotCond( cache[Abc_BddLit2Bvar( F )] - 1, Abc_BddLitIsCompl( F ) );
   int Index = Abc_BddVar( p, F );
   unsigned Then = Abc_BddThen( p, F );
   unsigned Else = Abc_BddElse( p, F );
   unsigned rThen = Abc_BddVectorCompose( p, Then, Vars, cache, fAnd );
-  if ( Abc_BddLitIsInvalid( rThen ) ) return Abc_BddInvalidLit();
+  if ( Abc_BddLitIsInvalid( rThen ) ) return Abc_BddLitInvalid();
   unsigned rElse = Abc_BddVectorCompose( p, Else, Vars, cache, fAnd );
-  if ( Abc_BddLitIsInvalid( rElse ) ) return Abc_BddInvalidLit();
+  if ( Abc_BddLitIsInvalid( rElse ) ) return Abc_BddLitInvalid();
   unsigned IndexFunc = Vec_IntEntry( Vars, Index );
-  if ( Abc_BddLitIsInvalid( IndexFunc ) ) return Abc_BddInvalidLit();
+  if ( Abc_BddLitIsInvalid( IndexFunc ) ) return Abc_BddLitInvalid();
   unsigned Result = fAnd ? Abc_BddIteAnd( p, IndexFunc, rThen, rElse ) : Abc_BddIte( p, IndexFunc, rThen, rElse );   // ITE( c, d1, d0 ) = (c & d1) | (!c & d0)
-  if ( Abc_BddLitIsInvalid( Result ) ) return Abc_BddInvalidLit();
-  cache[Abc_BddLit2Var( F )] = Abc_BddLitNotCond( Result, Abc_BddLitIsCompl( F ) ) + 1;
+  if ( Abc_BddLitIsInvalid( Result ) ) return Abc_BddLitInvalid();
+  cache[Abc_BddLit2Bvar( F )] = Abc_BddLitNotCond( Result, Abc_BddLitIsCompl( F ) ) + 1;
   return Result;
 }
 
@@ -240,13 +240,13 @@ void Abc_BddMulti( Gia_Man_t * pGia, int nVerbose, int nMem, int nSize, int fRev
 		{
 		  if ( fSwap )
 		    {
-		      a = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) );
-		      b = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i + k - 1 ) + 1 );
+		      a = Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) );
+		      b = Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i + k - 1 ) + 1 );
 		    }
 		  else
 		    {
-		      a = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i + k - 1 ) );
-		      b = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) + 1 );
+		      a = Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i + k - 1 ) );
+		      b = Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) + 1 );
 		    }
 		  /* printf( "a%d b%d\n", */
 		  /* 	  nSize - ( Abc_BddVar( p, a ) - Gia_ManCiNum( pGia ) ) / 2 - 1, */
@@ -264,13 +264,13 @@ void Abc_BddMulti( Gia_Man_t * pGia, int nVerbose, int nMem, int nSize, int fRev
 	      {
 		if ( fSwap )
 		  {
-		    a = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) );
-		    b = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i + k - 1 ) + 1 );
+		    a = Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) );
+		    b = Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i + k - 1 ) + 1 );
 		  }
 		else
 		  {
-		    a = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i + k - 1 ) );
-		    b = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) + 1 );
+		    a = Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i + k - 1 ) );
+		    b = Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) + 1 );
 		  }
 		/* printf( "a%d b%d\n", */
 		/* 	nSize - ( Abc_BddVar( p, a ) - Gia_ManCiNum( pGia ) ) / 2 - 1, */
@@ -289,13 +289,13 @@ void Abc_BddMulti( Gia_Man_t * pGia, int nVerbose, int nMem, int nSize, int fRev
 	    {
 	      if ( fSwap )
 		{
-		  a = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i - 1 ) );
-		  b = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) + 1 );
+		  a = Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i - 1 ) );
+		  b = Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) + 1 );
 		}
 	      else
 		{
-		  a = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) );
-		  b = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i - 1 ) + 1 );
+		  a = Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) );
+		  b = Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i - 1 ) + 1 );
 		}
 	      /* printf( "a%d b%d\n", */
 	      /* 	      nSize - ( Abc_BddVar( p, a ) - Gia_ManCiNum( pGia ) ) / 2 - 1, */
@@ -312,13 +312,13 @@ void Abc_BddMulti( Gia_Man_t * pGia, int nVerbose, int nMem, int nSize, int fRev
 	      {
 		if ( fSwap )
 		  {
-		    a = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i - 1 ) );
-		    b = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) + 1 );
+		    a = Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i - 1 ) );
+		    b = Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) + 1 );
 		  }
 		else
 		  {
-		    a = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) );
-		    b = Abc_BddIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i - 1 ) + 1 );
+		    a = Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - k - 1 ) );
+		    b = Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + 2 * ( nSize - i - 1 ) + 1 );
 		  }
 		/* printf( "a%d b%d\n", */
 		/* 	nSize - ( Abc_BddVar( p, a ) - Gia_ManCiNum( pGia ) ) / 2 - 1, */
@@ -340,14 +340,14 @@ void Abc_BddMulti( Gia_Man_t * pGia, int nVerbose, int nMem, int nSize, int fRev
     {
       pObj->Value = Abc_BddVectorCompose( p, pObj->Value, products, cache, 0 );
       assert( !Abc_BddLitIsInvalid( pObj->Value ) );
-      if ( Abc_BddLit2Var( pObj->Value ) > p->nVars )
+      if ( Abc_BddLit2Bvar( pObj->Value ) > p->nVars )
 	Vec_IntPush( vNodes, pObj->Value );
     }
   abctime clk2 = Abc_Clock();
   ABC_PRT( "BDD (vc) construction time", clk2 - clk1 );
   ABC_PRT( "BDD (total) construction time", clk2 - clk );
   printf( "nObjs = %u\n", p->nObjs );
-  printf( "Shared nodes = %d Allocated nodes = %u\n", Abc_BddCountNodesArray2( p, vNodes ), p->nObjsAlloc );
+  printf( "Shared nodes = %d Allocated nodes = %u\n", Abc_BddCountNodesArrayIndependent( p, vNodes ), p->nObjsAlloc );
   Vec_IntFree( vNodes );
   ABC_FREE( cache );
   Vec_IntFree( products );

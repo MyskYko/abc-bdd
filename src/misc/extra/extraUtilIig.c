@@ -68,14 +68,14 @@ unsigned Abc_BddTraverseAnd( Abc_BddMan * p, unsigned x, Vec_Int_t * vIndex, int
   int i;
   Vec_Int_t * vec = Vec_IntAlloc( 1 );
   Abc_BddTraverse( p, x, vec, vIndex, fConst );
-  unsigned Value = Abc_BddConst1();
+  unsigned Value = Abc_BddLitConst1();
   Vec_IntForEachEntry( vec, y, i )
     {
       Value = Abc_BddAnd( p, y, Value );
       if ( Abc_BddLitIsInvalid( Value ) )
 	{
 	  Vec_IntFree( vec );
-	  return Abc_BddInvalidLit();
+	  return Abc_BddLitInvalid();
 	}
     }
   Vec_IntFree( vec );
@@ -87,14 +87,14 @@ unsigned Abc_BddTraverseOr( Abc_BddMan * p, unsigned x, Vec_Int_t * vIndex, int 
   int i;
   Vec_Int_t * vec = Vec_IntAlloc( 1 );
   Abc_BddTraverse( p, x, vec, vIndex, fConst );
-  unsigned Value = Abc_BddConst0();
+  unsigned Value = Abc_BddLitConst0();
   Vec_IntForEachEntry( vec, y, i )
     {
       Value = Abc_BddOr( p, y, Value );
       if ( Abc_BddLitIsInvalid( Value ) )
 	{
 	  Vec_IntFree( vec );
-	  return Abc_BddInvalidLit();
+	  return Abc_BddLitInvalid();
 	}
     }
   Vec_IntFree( vec );
@@ -140,7 +140,7 @@ void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int 
   cache = ABC_CALLOC( unsigned, (long long)p->nObjsAlloc );
   vars = Vec_IntAlloc( Gia_ManCiNum( pGia ) );
   for ( i = 0; i < Gia_ManCiNum( pGia ) - nLatch; i++ )
-    Vec_IntPush( vars, Abc_BddInvalidLit() );
+    Vec_IntPush( vars, Abc_BddLitInvalid() );
   Gia_ManForEachCo( pGia, pObj, i )
     Vec_IntPush( vars, pObj->Value );
   vLatchVars = Vec_IntAlloc( nLatch );
@@ -150,16 +150,16 @@ void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int 
     {
       nInit++;
       if ( nVerbose ) printf( "init %d X:\n", nInit );
-      X = Abc_BddConst0();
+      X = Abc_BddLitConst0();
       for( j = 0; j < nPat; j++ )
 	{
-	  X_ = Abc_BddConst1();
+	  X_ = Abc_BddLitConst1();
 	  for ( i = 0; i < nLatch; i++ )
 	    {
 	      if ( rand() & 1 )
-		X_ = Abc_BddAnd( p, X_, Abc_BddIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) );
+		X_ = Abc_BddAnd( p, X_, Abc_BddLitIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) );
 	      else
-		X_ = Abc_BddAnd( p, X_, Abc_BddLitNot( Abc_BddIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) ) );
+		X_ = Abc_BddAnd( p, X_, Abc_BddLitNot( Abc_BddLitIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) ) );
 	      assert( !Abc_BddLitIsInvalid( X_ ) );
 	    }
 	  X = Abc_BddOr( p, X, X_ );
@@ -250,7 +250,7 @@ void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFil
   cache = ABC_CALLOC( unsigned, (long long)p->nObjsAlloc );
   vars = Vec_IntAlloc( Gia_ManCiNum( pGia ) );
   for ( i = 0; i < Gia_ManCiNum( pGia ) - nLatch; i++ )
-    Vec_IntPush( vars, Abc_BddInvalidLit() );
+    Vec_IntPush( vars, Abc_BddLitInvalid() );
   Gia_ManForEachCo( pGia, pObj, i )
     Vec_IntPush( vars, pObj->Value );
   vLatchVars = Vec_IntAlloc( nLatch );
@@ -259,9 +259,9 @@ void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFil
   nextCache = ABC_CALLOC( unsigned, (long long)p->nObjsAlloc );
   nextVars = Vec_IntAlloc( Gia_ManCiNum( pGia ) + nLatch );
   for ( i = 0; i < Gia_ManCiNum( pGia ); i++ )
-    Vec_IntPush( nextVars, Abc_BddInvalidLit() );
+    Vec_IntPush( nextVars, Abc_BddLitInvalid() );
   for ( i = 0; i < nLatch; i++ )
-    Vec_IntPush( nextVars, Abc_BddIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) );
+    Vec_IntPush( nextVars, Abc_BddLitIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) );
   vNextLatchVars = Vec_IntAlloc( nLatch );
   for ( i = 0; i < nLatch; i++ )
     Vec_IntPush( vNextLatchVars, Gia_ManCiNum( pGia ) + i );
@@ -271,12 +271,12 @@ void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFil
       if ( nVerbose ) printf( "init %d X:\n", nInit );
       X = 1;
       for ( i = 0; i < nLatch; i++ )
-	X = Abc_BddAnd( p, X, Abc_BddLitNot( Abc_BddIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) ) );
+	X = Abc_BddAnd( p, X, Abc_BddLitNot( Abc_BddLitIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) ) );
 	/*
 	if ( rand() & 1 )
-	  X = Abc_BddAnd( p, X, Abc_BddIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) );
+	  X = Abc_BddAnd( p, X, Abc_BddLitIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) );
 	else
-	  X = Abc_BddAnd( p, X, Abc_BddLitNot( Abc_BddIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) ) );
+	  X = Abc_BddAnd( p, X, Abc_BddLitNot( Abc_BddLitIthVar( Gia_ManCiNum( pGia ) - nLatch + i ) ) );
 	*/
       assert( !Abc_BddLitIsInvalid( X ) );
       if ( nVerbose > 1 ) Abc_BddPrint( p, X, 0, stdout );
@@ -299,9 +299,9 @@ void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFil
 	  K = 1;
 	  Gia_ManForEachCo( pGia, pObj, i )
 	    {
-	      d1 = Abc_BddOr( p, Z, Abc_BddIthVar( Gia_ManCiNum( pGia ) + i ) );
+	      d1 = Abc_BddOr( p, Z, Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + i ) );
 	      assert( !Abc_BddLitIsInvalid( d1 ) );
-	      d0 = Abc_BddOr( p, Z, Abc_BddLitNot( Abc_BddIthVar( Gia_ManCiNum( pGia ) + i ) ) );
+	      d0 = Abc_BddOr( p, Z, Abc_BddLitNot( Abc_BddLitIthVar( Gia_ManCiNum( pGia ) + i ) ) );
 	      assert( !Abc_BddLitIsInvalid( d0 ) );
 	      r = Abc_BddIteAnd( p, pObj->Value, d1, d0 );
 	      assert( !Abc_BddLitIsInvalid( r ) );

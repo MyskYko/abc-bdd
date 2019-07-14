@@ -199,23 +199,23 @@ static inline void Abc_BddNandGenNet( Abc_NandMan * p, Gia_Man_t * pGia )
   int i; int id, idj, id0, id1;
   // constant
   id = 0;
-  p->newNodeValues[id] = Abc_BddConst0();
+  p->newNodeValues[id] = Abc_BddLitConst0();
   p->faninList[id] = 0;
   p->fanoutList[id] = Vec_IntAlloc( 1 );
   idj = Abc_BddNandCompl( p, id );
-  p->newNodeValues[idj] = Abc_BddConst1();
+  p->newNodeValues[idj] = Abc_BddLitConst1();
   p->faninList[idj] = 0;
   p->fanoutList[idj] = Vec_IntAlloc( 1 );
   // pi
   Gia_ManForEachCi( pGia, pObj, i )
     {
       id = Gia_ObjId( pGia, pObj );
-      p->newNodeValues[id] = Abc_BddIthVar( i );
+      p->newNodeValues[id] = Abc_BddLitIthVar( i );
       p->faninList[id] = 0;
       p->fanoutList[id] = Vec_IntAlloc( 1 );
       Vec_IntPush( p->pis, id );
       idj = Abc_BddNandCompl( p, id );
-      p->newNodeValues[idj] = Abc_BddLitNot( Abc_BddIthVar( i ) );
+      p->newNodeValues[idj] = Abc_BddLitNot( Abc_BddLitIthVar( i ) );
       p->faninList[idj] = Vec_IntAlloc( 1 );
       p->fanoutList[idj] = Vec_IntAlloc( 1 );
       Vec_IntPush( p->livingNodes, idj );
@@ -471,7 +471,7 @@ static inline void Abc_BddNandSortFaninAll( Abc_NandMan * p )
 static inline int Abc_BddNandBuild( Abc_NandMan * p, int id )
 {
   int idj; int j;
-  unsigned Value = Abc_BddConst1();
+  unsigned Value = Abc_BddLitConst1();
   Vec_IntForEachEntry( p->faninList[id], idj, j )
     {
       Value = Abc_BddAnd( p->pBdd, Value, Abc_BddNandObjValue( p, idj ) );
@@ -508,10 +508,10 @@ static inline int Abc_BddNandCheck( Abc_NandMan * p )
   unsigned Value;
   Vec_IntForEachEntry( p->livingNodes, id, i )
     {
-      Value = Abc_BddConst1();
+      Value = Abc_BddLitConst1();
       Vec_IntForEachEntry( p->faninList[id], idj, j )
 	Value = Abc_BddAnd( p->pBdd, Value, Abc_BddNandObjValue( p, idj ) );
-      if ( !Abc_BddEq( Abc_BddNandObjValue( p, id ), Abc_BddLitNot( Value ) ) )
+      if ( !Abc_BddLitIsEq( Abc_BddNandObjValue( p, id ), Abc_BddLitNot( Value ) ) )
 	{
 	  printf( "error : different at %d %10u %10u\n", id, Abc_BddNandObjValue( p, id ), Abc_BddLitNot( Value ) );
 	  return 1;
@@ -559,7 +559,7 @@ static inline int Abc_BddNandCspfC( Abc_NandMan * p, int id ) {
   p->C[id] = Vec_IntAlloc( Vec_IntSize( p->faninList[id] ) );
   Vec_IntForEachEntry( p->faninList[id], idj, j )
     {
-      fanins = Abc_BddConst1();
+      fanins = Abc_BddLitConst1();
       Vec_IntForEachEntryStart( p->faninList[id], idk, k, j + 1 )
 	fanins = Abc_BddAnd( p->pBdd, fanins, Abc_BddNandObjValue( p, idk ) );
       if ( Abc_BddLitIsInvalid( fanins ) ) return 1;
@@ -897,7 +897,7 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	  Vec_IntPushUnique( fanouts, id );
 	  Vec_IntPushUnique( fanouts, idj );
 	  eq = Abc_BddOr( p->pBdd, Abc_BddLitNot( fx ), gx );
-	  Value = Abc_BddConst1();
+	  Value = Abc_BddLitConst1();
 	  Vec_IntForEachEntry( p->pis, idk, k ) 
 	    if ( Abc_BddNandTryConnect( p, idk, new_id ) == 1 )
 	      {
