@@ -32,8 +32,6 @@ ABC_NAMESPACE_IMPL_START
 ///                        DECLARATIONS                              ///
 ////////////////////////////////////////////////////////////////////////
 
-#define MAX_NUM_FRONTIERS 10000
-
 ////////////////////////////////////////////////////////////////////////
 ///                     FUNCTION DEFINITIONS                         ///
 ////////////////////////////////////////////////////////////////////////
@@ -60,7 +58,7 @@ static inline unsigned Abc_BddUniqueCreateInt( Abc_BddMan * p, int Var, unsigned
   if ( Abc_BddIsLimit( p ) )
     {
       for ( ; p->nRemoved < p->nObjs; p->nRemoved++ )
-	if ( Abc_BddLitIsRemoved( p, Abc_BddBvar2Lit( p->nRemoved, 0 ) ) ) break;
+	if ( Abc_BddBvarIsRemoved( p, p->nRemoved ) ) break;
       if ( p->nRemoved == p->nObjs ) return Abc_BddLitInvalid();
       *q = p->nRemoved++;
     }
@@ -407,44 +405,34 @@ void Abc_BddUnmarkChildren_rec( Abc_BddMan * p, unsigned i )
       Abc_BddUnmarkChildren_rec( p, Else );
     }
 }
-static inline void Abc_BddRemoveNode( Abc_BddMan * p, unsigned i )
+static inline void Abc_BddRemoveNodeByBvar( Abc_BddMan * p, int i )
 {
-  int *q = p->pUnique + ( Abc_BddHash( Abc_BddVar( p, i ), Abc_BddThen( p, i ), Abc_BddElse( p, i ) ) & p->nUniqueMask );
+  int *q = p->pUnique + ( Abc_BddHash( (int)p->pVars[i], p->pObjs[(unsigned)i + i], p->pObjs[(unsigned)i + i + 1] ) & p->nUniqueMask );
   for ( ; *q; q = p->pNexts + *q )
-    if ( *q == Abc_BddLit2Bvar( i ) ) break;
+    if ( *q == i ) break;
   int *q_next = p->pNexts + *q;
   *q = *q_next;
   *q_next = 0;
-  Abc_BddSetLitRemoved( p, i );
+  Abc_BddSetBvarRemoved( p, i );
+  if ( p->nRemoved > i ) p->nRemoved = i;
 }
 static inline void Abc_BddGarbageCollect( Abc_BddMan * p )
 {
-  int i, nFrontiers = 0;
-  unsigned a;
-  unsigned pFrontiers[MAX_NUM_FRONTIERS];
+  int i, bvar;
+  Vec_Int_t * pFrontiers = Vec_IntAlloc( 1 );
   if ( p->fVerbose ) printf( "Refresh\n" );
   for ( i = p->nVars + 1; i < p->nObjs; i++ )
-    {
-      a = Abc_BddBvar2Lit( i, 0 );
-      if ( Abc_BddMark( p, a ) )
-	{
-	  pFrontiers[nFrontiers] = a;
-	  nFrontiers += 1;
-	  assert( nFrontiers < MAX_NUM_FRONTIERS );
-	}
-    }
-  for ( i = 0; i < nFrontiers; i++ ) Abc_BddMarkChildren_rec( p, pFrontiers[i] );
+    if ( p->pMark[i] )
+      Vec_IntPush( pFrontiers, i );
+  Vec_IntForEachEntry( pFrontiers, bvar, i )
+    Abc_BddMarkChildren_rec( p, Abc_BddBvar2Lit( bvar, 0 ) );
   for ( i = p->nVars + 1; i < p->nObjs; i++ )
-    {
-      a = Abc_BddBvar2Lit( i, 0 );
-      if ( !Abc_BddMark( p, a ) && !Abc_BddLitIsRemoved( p, a ) )
-	{
-	  if ( p->nRemoved > i ) p->nRemoved = i;
-	  Abc_BddRemoveNode( p, a );
-	}
-    }
-  for ( i = 0; i < nFrontiers; i++ ) Abc_BddUnmarkChildren_rec( p, pFrontiers[i] );
+    if ( !p->pMark[i] && !Abc_BddBvarIsRemoved( p, i ) )
+      Abc_BddRemoveNodeByBvar( p, i );
+  Vec_IntForEachEntry( pFrontiers, bvar, i )
+    Abc_BddUnmarkChildren_rec( p, Abc_BddBvar2Lit( bvar, 0 ) );
   Abc_BddCacheRemove( p );
+  Vec_IntFree( pFrontiers );
 }
 
 /**Function*************************************************************
@@ -579,6 +567,15 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, int nJump, FILE *
   ABC_PRT( "BDD construction time", clk2 - clk );
   printf( "Shared nodes = %d  Independent BDDs nodes = %d\n", Abc_BddCountNodesArrayShared( p, vNodes ), Abc_BddCountNodesArrayIndependent( p, vNodes ) );
   printf( "Used nodes = %d  Allocated nodes = %u\n", p->nObjs, p->nObjsAlloc - 1 );
+  if ( 0 )
+    {
+      Abc_BddSwap( p, 0 );
+      printf( "Shared nodes = %d  Independent BDDs nodes = %d\n", Abc_BddCountNodesArrayShared( p, vNodes ), Abc_BddCountNodesArrayIndependent( p, vNodes ) );
+      printf( "Used nodes = %d  Allocated nodes = %u\n", p->nObjs, p->nObjsAlloc - 1 );
+      Abc_BddSwap( p, 0 );
+      printf( "Shared nodes = %d  Independent BDDs nodes = %d\n", Abc_BddCountNodesArrayShared( p, vNodes ), Abc_BddCountNodesArrayIndependent( p, vNodes ) );
+      printf( "Used nodes = %d  Allocated nodes = %u\n", p->nObjs, p->nObjsAlloc - 1 );
+    }
   Vec_IntFree( vNodes );
   Abc_BddManFree( p );
 }

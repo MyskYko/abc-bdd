@@ -454,8 +454,8 @@ static inline int      Abc_BddLitIsConst0( unsigned i )              { return Ab
 static inline int      Abc_BddLitIsConst1( unsigned i )              { return Abc_BddLitIsEq( i, Abc_BddLitConst1() );              }
 static inline int      Abc_BddLitIsConst( unsigned i )               { return Abc_BddLitIsConst0( i ) || Abc_BddLitIsConst1( i );   }
 static inline int      Abc_BddLitIsInvalid( unsigned i )             { return Abc_BddLitIsEq( i, Abc_BddLitInvalid() );             }
-static inline int      Abc_BddLitIsRemoved( Abc_BddMan * p, unsigned i ) { return (int)( p->pVars[Abc_BddLit2Bvar( i )] == Abc_BddVarRemoved() ); }
-static inline void     Abc_BddSetLitRemoved( Abc_BddMan * p, unsigned i ) { p->pVars[Abc_BddLit2Bvar( i )] = Abc_BddVarRemoved();   }
+static inline int      Abc_BddBvarIsRemoved( Abc_BddMan * p, int i ) { return (int)( p->pVars[i] == Abc_BddVarRemoved() );          }
+static inline void     Abc_BddSetBvarRemoved( Abc_BddMan * p, int i ) { p->pVars[i] = Abc_BddVarRemoved();                          }
 
 static inline int      Abc_BddVar( Abc_BddMan * p, unsigned i )      { return (int)p->pVars[Abc_BddLit2Bvar( i )];                  }
 static inline unsigned Abc_BddThen( Abc_BddMan * p, unsigned i )     { return Abc_BddLitNotCond( p->pObjs[Abc_BddLitRegular( i )], Abc_BddLitIsCompl( i ) ); }
@@ -489,6 +489,10 @@ extern unsigned __int128 Abc_BddCount0s128( Abc_BddMan * p, unsigned a, int dept
 
 extern unsigned        Abc_BddIteAnd( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 );
 extern unsigned        Abc_BddVectorCompose( Abc_BddMan * p, unsigned F,  Vec_Int_t * Vars, unsigned * cache, int fAnd );
+
+/*=== extraUtilReorder.c ================================================================*/
+
+extern void            Abc_BddSwap( Abc_BddMan * p, int x );
 
 /**AutomaticEnd***************************************************************/
 
