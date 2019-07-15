@@ -531,19 +531,19 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int
   Gia_ManForEachCo( pGia, pObj, i )
     {
       if ( pFile != NULL ) Abc_BddPrint( p, pObj->Value, 0, pFile );
-      if ( Abc_BddLit2Bvar( pObj->Value ) > p->nVars ) Vec_IntPush( vNodes, pObj->Value );
+      if ( !Abc_BddLitIsConst( pObj->Value ) ) Vec_IntPush( vNodes, pObj->Value );
     }
   ABC_PRT( "BDD construction time", clk2 - clk );
   printf( "Shared nodes = %d  Independent BDDs nodes = %d\n", Abc_BddCountNodesArrayShared( p, vNodes ), Abc_BddCountNodesArrayIndependent( p, vNodes ) );
   printf( "Used nodes = %d  Allocated nodes = %u\n", p->nObjs, p->nObjsAlloc - 1 );
-  if ( 0 )
+  if ( 1 )
     {
-      Abc_BddSwap( p, 0 );
+      clk = Abc_Clock();
+      Abc_BddReorder( p, vNodes, 3 );
       printf( "Shared nodes = %d  Independent BDDs nodes = %d\n", Abc_BddCountNodesArrayShared( p, vNodes ), Abc_BddCountNodesArrayIndependent( p, vNodes ) );
       printf( "Used nodes = %d  Allocated nodes = %u\n", p->nObjs, p->nObjsAlloc - 1 );
-      Abc_BddSwap( p, 0 );
-      printf( "Shared nodes = %d  Independent BDDs nodes = %d\n", Abc_BddCountNodesArrayShared( p, vNodes ), Abc_BddCountNodesArrayIndependent( p, vNodes ) );
-      printf( "Used nodes = %d  Allocated nodes = %u\n", p->nObjs, p->nObjsAlloc - 1 );
+      clk2 = Abc_Clock();
+      ABC_PRT( "Reoredering time", clk2 - clk );
     }
   Vec_IntFree( vNodes );
   Abc_BddManFree( p );

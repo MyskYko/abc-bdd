@@ -423,6 +423,7 @@ struct Abc_BddMan_
   unsigned *         pObjs;         // array of pairs cof0 for each node
   unsigned char *    pVars;         // array of variables for each node
   unsigned char *    pMark;         // array of marks for each BDD node
+  unsigned *         pRefs;         // array of reference counts for each BDD node
   unsigned           nUniqueMask;   // selection mask for unique table
   unsigned           nCacheMask;    // selection mask for computed table
   int                nCacheLookups; // the number of computed table lookups
@@ -436,6 +437,7 @@ struct Abc_BddMan_
 static inline unsigned Abc_BddHash( int Arg0, int Arg1, int Arg2 )   { return 12582917 * Arg0 + 4256249 * Arg1 + 741457 * Arg2;     }
 static inline unsigned Abc_BddLitInvalid()                           { return 0xffffffff;                                           }
 static inline unsigned char Abc_BddMarkInvalid()                     { return 0xff;                                                 }
+static inline unsigned Abc_BddRefInvalid()                           { return 0xffffffff;                                           }
 static inline unsigned char Abc_BddVarConst()                        { return 0xff;                                                 }
 static inline unsigned char Abc_BddVarRemoved()                      { return 0xff;                                                 }
 static inline unsigned Abc_BddLitConst0()                            { return 0;                                                    }
@@ -466,6 +468,10 @@ static inline void     Abc_BddSetMark( Abc_BddMan * p, unsigned i, int m ) { p->
 static inline void     Abc_BddIncMark( Abc_BddMan * p, unsigned i )  { assert( ++p->pMark[Abc_BddLit2Bvar( i )] != Abc_BddMarkInvalid() ); }
 static inline void     Abc_BddDecMark( Abc_BddMan * p, unsigned i )  { assert( --p->pMark[Abc_BddLit2Bvar( i )] != Abc_BddMarkInvalid() ); }
 
+static inline unsigned Abc_BddRef( Abc_BddMan * p, unsigned i )      { return p->pRefs[Abc_BddLit2Bvar( i )];                       }
+static inline void     Abc_BddIncRef( Abc_BddMan * p, unsigned i )   { assert( ++p->pRefs[Abc_BddLit2Bvar( i )] != Abc_BddRefInvalid() ); }
+static inline void     Abc_BddDecRef( Abc_BddMan * p, unsigned i )   { assert( --p->pRefs[Abc_BddLit2Bvar( i )] != Abc_BddRefInvalid() ); }
+
 static inline int      Abc_BddIsLimit( Abc_BddMan * p )              { return (int)( (unsigned)p->nObjs == p->nObjsAlloc - 1 );     }
 
 extern unsigned        Abc_BddUniqueCreate( Abc_BddMan * p, int Var, unsigned Then, unsigned Else );
@@ -490,7 +496,7 @@ extern unsigned        Abc_BddVectorCompose( Abc_BddMan * p, unsigned F,  Vec_In
 
 /*=== extraUtilReorder.c ================================================================*/
 
-extern void            Abc_BddSwap( Abc_BddMan * p, int x );
+extern void            Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nOpt );
 
 /**AutomaticEnd***************************************************************/
 
