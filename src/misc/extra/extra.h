@@ -465,8 +465,6 @@ static inline int      Abc_BddMark( Abc_BddMan * p, unsigned i )     { return (i
 static inline void     Abc_BddSetMark( Abc_BddMan * p, unsigned i, int m ) { p->pMark[Abc_BddLit2Bvar( i )] = m;                    }
 static inline void     Abc_BddIncMark( Abc_BddMan * p, unsigned i )  { assert( ++p->pMark[Abc_BddLit2Bvar( i )] != Abc_BddMarkInvalid() ); }
 static inline void     Abc_BddDecMark( Abc_BddMan * p, unsigned i )  { assert( --p->pMark[Abc_BddLit2Bvar( i )] != Abc_BddMarkInvalid() ); }
-static inline void     Abc_BddSetMarkInvalid( Abc_BddMan * p, unsigned i ) { p->pMark[Abc_BddLit2Bvar( i )] = Abc_BddMarkInvalid(); }
-static inline int      Abc_BddMarkIsInvalid( Abc_BddMan * p, unsigned i ) { return (int)( p->pMark[Abc_BddLit2Bvar( i )] == Abc_BddMarkInvalid() ); }
 
 static inline int      Abc_BddIsLimit( Abc_BddMan * p )              { return (int)( (unsigned)p->nObjs == p->nObjsAlloc - 1 );     }
 
@@ -478,7 +476,7 @@ extern unsigned        Abc_BddOr( Abc_BddMan * p, unsigned a, unsigned b );
 extern int             Abc_BddCountNodesArrayShared( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern int             Abc_BddCountNodesArrayIndependent( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern void            Abc_BddPrint( Abc_BddMan * p, unsigned a, int offset, FILE * f );
-extern int             Abc_BddGia( Gia_Man_t * pGia, int fVerbose, int nJump, Abc_BddMan * p, int fRealloc, int fGarbage );
+extern int             Abc_BddGia( Gia_Man_t * pGia, int fVerbose, Abc_BddMan * p, int fRealloc, int fGarbage );
 
 extern int             Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth );
 extern int             Abc_BddCount1s( Abc_BddMan * p, unsigned a, int depth );
