@@ -540,7 +540,7 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int
     {
       int prev = Abc_BddCountNodesArrayShared( p, vNodes );
       clk = Abc_Clock();
-      int diff = Abc_BddReorder( p, vNodes, 0 );
+      int diff = Abc_BddReorder( p, vNodes, 1 );
       clk2 = Abc_Clock();
       int now = Abc_BddCountNodesArrayShared( p, vNodes );
       ABC_PRT( "Reoredering time", clk2 - clk );
