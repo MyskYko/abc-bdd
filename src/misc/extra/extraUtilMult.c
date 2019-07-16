@@ -538,13 +538,18 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int
   printf( "Used nodes = %d  Allocated nodes = %u\n", p->nObjs, p->nObjsAlloc - 1 );
   if ( 1 )
     {
+      int prev = Abc_BddCountNodesArrayShared( p, vNodes );
       clk = Abc_Clock();
-      Abc_BddReorder( p, vNodes, 3 );
-      printf( "Shared nodes = %d  Independent BDDs nodes = %d\n", Abc_BddCountNodesArrayShared( p, vNodes ), Abc_BddCountNodesArrayIndependent( p, vNodes ) );
-      printf( "Used nodes = %d  Allocated nodes = %u\n", p->nObjs, p->nObjsAlloc - 1 );
+      int diff = Abc_BddReorder( p, vNodes, 0 );
       clk2 = Abc_Clock();
+      int now = Abc_BddCountNodesArrayShared( p, vNodes );
       ABC_PRT( "Reoredering time", clk2 - clk );
+      printf( "Gain %d (%d -> %d)\n", diff, prev, now );
+      assert( prev + diff == now );
     }
+  printf( "Shared nodes = %d  Independent BDDs nodes = %d\n", Abc_BddCountNodesArrayShared( p, vNodes ), Abc_BddCountNodesArrayIndependent( p, vNodes ) );
+  printf( "Used nodes = %d  Allocated nodes = %u\n", p->nObjs, p->nObjsAlloc - 1 );
+  
   Vec_IntFree( vNodes );
   Abc_BddManFree( p );
 }
