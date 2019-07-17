@@ -423,7 +423,6 @@ struct Abc_BddMan_
   unsigned *         pObjs;         // array of pairs cof0 for each node
   unsigned char *    pVars;         // array of variables for each node
   unsigned char *    pMark;         // array of marks for each BDD node
-  int *              pRefs;         // array of reference counts for each BDD node
   unsigned *         pEdges;        // array of number of incoming edges for each BDD node
   unsigned           nUniqueMask;   // selection mask for unique table
   unsigned           nCacheMask;    // selection mask for computed table
@@ -468,10 +467,6 @@ static inline int      Abc_BddMark( Abc_BddMan * p, unsigned i )     { return (i
 static inline void     Abc_BddSetMark( Abc_BddMan * p, unsigned i, int m ) { p->pMark[Abc_BddLit2Bvar( i )] = m;                    }
 static inline void     Abc_BddIncMark( Abc_BddMan * p, unsigned i )  { assert( ++p->pMark[Abc_BddLit2Bvar( i )] != Abc_BddMarkInvalid() ); }
 static inline void     Abc_BddDecMark( Abc_BddMan * p, unsigned i )  { assert( --p->pMark[Abc_BddLit2Bvar( i )] != Abc_BddMarkInvalid() ); }
-
-static inline int      Abc_BddRef( Abc_BddMan * p, unsigned i )      { return p->pRefs[Abc_BddLit2Bvar( i )];                       }
-static inline void     Abc_BddIncRef( Abc_BddMan * p, unsigned i, int d ) { assert( ( p->pRefs[Abc_BddLit2Bvar( i )] += d ) >= 0 ); }
-static inline void     Abc_BddDecRef( Abc_BddMan * p, unsigned i, int d ) { assert( ( p->pRefs[Abc_BddLit2Bvar( i )] -= d ) >= 0 ); }
 
 static inline unsigned Abc_BddEdge( Abc_BddMan * p, unsigned i )     { return p->pEdges[Abc_BddLit2Bvar( i )];                     }
 static inline void     Abc_BddIncEdge( Abc_BddMan * p, unsigned i )  { assert( ++p->pEdges[Abc_BddLit2Bvar( i )] != Abc_BddEdgeInvalid() ); }
