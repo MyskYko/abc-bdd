@@ -32,8 +32,6 @@ ABC_NAMESPACE_IMPL_START
 ///                        DECLARATIONS                              ///
 ////////////////////////////////////////////////////////////////////////
 
-abctime timeForUniSearch = 0;
-
 ////////////////////////////////////////////////////////////////////////
 ///                     FUNCTION DEFINITIONS                         ///
 ////////////////////////////////////////////////////////////////////////
@@ -144,8 +142,6 @@ static inline void Abc_BddShiftBvar( Abc_BddMan * p, int i, int d )
   int * q, * head;
   int * next = p->pNexts + i;
   // remove
-  
-  abctime clk = Abc_Clock();
   hash = Abc_BddHash( Var, Then, Else ) & p->nUniqueMask;
   q = p->pUnique + hash;
   for ( ; *q; q = p->pNexts + *q )
@@ -154,15 +150,11 @@ static inline void Abc_BddShiftBvar( Abc_BddMan * p, int i, int d )
 	*q = *next;
 	break;
       }
-  abctime clk2 = Abc_Clock();
-  timeForUniSearch += clk2 - clk;
-
   // change
   Var = p->pVars[i] = p->pVars[i] + d;
   // register (overwrite. remove non-used node)
   hash = Abc_BddHash( Var, Then, Else ) & p->nUniqueMask;
   head = q = p->pUnique + hash;
-  clk = Abc_Clock();  
   for ( ; *q; q = p->pNexts + *q )
     if ( (int)p->pVars[*q] == Var && p->pObjs[(unsigned)*q + *q] == Then && p->pObjs[(unsigned)*q + *q + 1] == Else )
       {
@@ -171,51 +163,10 @@ static inline void Abc_BddShiftBvar( Abc_BddMan * p, int i, int d )
 	*q = i;
 	return;
       }
-  clk2 = Abc_Clock();
-  timeForUniSearch += clk2 - clk;
   *next = *head;
   *head = i;
 }
-/*
-// swap x-th variable and (x+1)-th variable
-int Abc_BddSwap2( Abc_BddMan * p, int x )
-{
-  int i, bvar, nNew = 0, nRemoved = 0;
-  Vec_Int_t * pXthNodes = Vec_IntAlloc( 1 );
-  Vec_Int_t * pX1thNodes = Vec_IntAlloc( 1 );
-  // deref of children of x-level nodes can precede and save raising unnecessary x1-level nodes
-  for ( i = 1; i < p->nObjs; i++ )
-    {
-      if ( !p->pRefs[i] ) continue;
-      if ( (int)p->pVars[i] == x + 1 )
-	Vec_IntPush( pX1thNodes, i );
-      else if ( (int)p->pVars[i] == x )
-	{
-	  unsigned Then = p->pObjs[(unsigned)i + i];
-	  unsigned Else = p->pObjs[(unsigned)i + i + 1];
-	  if ( Abc_BddVar( p, Then ) == x + 1 || Abc_BddVar( p, Else ) == x + 1 )
-	    {
-	      int Ref = p->pRefs[i];
-	      Vec_IntPush( pXthNodes, i );
-	      Abc_BddDeref_rec( p, Then, Ref );
-	      if ( Abc_BddVar( p, Then ) == x + 1 && !Abc_BddRef( p, Then ) ) nRemoved += 1;
-	      Abc_BddDeref_rec( p, Else, Ref );
-	      if ( Abc_BddVar( p, Else ) == x + 1 && !Abc_BddRef( p, Else ) ) nRemoved += 1;
-	    }
-	  else
-	    Abc_BddShiftBvar( p, i, 1 );
-	}
-    }
-  Vec_IntForEachEntry( pX1thNodes, bvar, i )
-    if ( p->pRefs[bvar] ) Abc_BddShiftBvar( p, bvar, -1 );
-  Vec_IntForEachEntry( pXthNodes, bvar, i )
-    Abc_BddSwapBvar2( p, bvar, &nNew );
-  //  printf( "diff = %d  new = %d  removed = %d\n", nNew - nRemoved, nNew, nRemoved );
-  Vec_IntFree( pXthNodes );
-  Vec_IntFree( pX1thNodes );
-  return nNew - nRemoved;
-}
-*/
+
 /**Function*************************************************************
    
    Synopsis    []
@@ -240,9 +191,11 @@ static inline void Abc_BddSwapBvar3( Abc_BddMan * p, int i, int * nNew, int * nR
   hash = Abc_BddHash( Var, Then, Else ) & p->nUniqueMask;
   q = p->pUnique + hash;
   for ( ; *q; q = p->pNexts + *q )
-    if ( *q == i ) break;
-  assert( *q );
-  *q = *next;
+    if ( *q == i )
+      {
+	*q = *next;
+	break;
+      }
   // new chlidren
   assert( Abc_BddVar( p, Then ) != Var + 1 );
   Abc_BddDecEdgeNonConst( p, Then );
@@ -385,7 +338,7 @@ static inline void Abc_BddSwapBvar4( Abc_BddMan * p, Vec_Int_t ** liveNodes, int
   if ( !Abc_BddEdge( p, n1 ) && Abc_BddVar( p, n1 ) == Var + 1 )
     {
       *nNew += 1;
-      Vec_IntPush( liveNodes[Var], n1 ); // live nodes will be swapped
+      Vec_IntPush( liveNodes[p->nVars + 1], n1 );
       Abc_BddIncEdgeNonConst( p, f11 );
       Abc_BddIncEdgeNonConst( p, f01 );
     }
@@ -393,7 +346,7 @@ static inline void Abc_BddSwapBvar4( Abc_BddMan * p, Vec_Int_t ** liveNodes, int
   if ( !Abc_BddEdge( p, n0 ) && Abc_BddVar( p, n0 ) == Var + 1 )
     {
       *nNew += 1;
-      Vec_IntPush( liveNodes[Var], n0 ); // live nodes will be swapped
+      Vec_IntPush( liveNodes[p->nVars + 1], n0 );
       Abc_BddIncEdgeNonConst( p, f10 );
       Abc_BddIncEdgeNonConst( p, f00 );
     }
@@ -418,6 +371,8 @@ static inline void Abc_BddSwapBvar4( Abc_BddMan * p, Vec_Int_t ** liveNodes, int
 // swap x-th variable and (x+1)-th variable
 int Abc_BddSwap4( Abc_BddMan * p, Vec_Int_t ** liveNodes, int x )
 {
+  liveNodes[p->nVars    ] = Vec_IntAlloc( Vec_IntSize( liveNodes[x    ] ) ); // new layer x
+  liveNodes[p->nVars + 1] = Vec_IntAlloc( Vec_IntSize( liveNodes[x + 1] ) ); // new layer x + 1
   // TODO : Hashtable
   int i, nNew = 0, nRemoved = 0;
   unsigned a;
@@ -431,33 +386,38 @@ int Abc_BddSwap4( Abc_BddMan * p, Vec_Int_t ** liveNodes, int x )
 	  Abc_BddDecEdgeNonConst( p, Abc_BddElse( p, a ) );
 	}
       else
-	Abc_BddShiftBvar( p, Abc_BddLit2Bvar( a ), 1 );
+	{
+	  Abc_BddShiftBvar( p, Abc_BddLit2Bvar( a ), 1 );
+	  Vec_IntPush( liveNodes[p->nVars + 1], a );
+	}
     }
   // walk lower level
-  Vec_IntForEachEntryReverse( liveNodes[x + 1], a, i )
+  Vec_IntForEachEntry( liveNodes[x + 1], a, i )
     {
       if ( !Abc_BddEdge( p, a ) )
 	{
 	  Abc_BddDecEdgeNonConst( p, Abc_BddThen( p, a ) );
 	  Abc_BddDecEdgeNonConst( p, Abc_BddElse( p, a ) );
 	  nRemoved++;
-	  Vec_IntDrop( liveNodes[x + 1], i );
 	}
       else
-	Abc_BddShiftBvar( p, Abc_BddLit2Bvar( a ), -1 );
+	{
+	  Abc_BddShiftBvar( p, Abc_BddLit2Bvar( a ), -1 );
+	  Vec_IntPush( liveNodes[p->nVars], a );
+	}
     }
   // walk upper level again
   Vec_IntForEachEntryReverse( liveNodes[x], a, i )
     if ( Abc_BddVar( p, a ) == x )
       {
 	Abc_BddSwapBvar4( p, liveNodes, Abc_BddLit2Bvar( a ), &nNew, &nRemoved );
-	Vec_IntDrop( liveNodes[x], i );
-	Vec_IntPush( liveNodes[x + 1], a );
+	Vec_IntPush( liveNodes[p->nVars], a );
       }
   // swap liveNodes
-  Vec_Int_t * tmp = liveNodes[x];
-  liveNodes[x] = liveNodes[x + 1];
-  liveNodes[x + 1] = tmp;
+  Vec_IntFree( liveNodes[x] );
+  Vec_IntFree( liveNodes[x + 1] );
+  liveNodes[x] = liveNodes[p->nVars];
+  liveNodes[x + 1] = liveNodes[p->nVars + 1];
   //  printf( "diff = %d  new = %d  removed = %d\n", nNew - nRemoved, nNew, nRemoved );
   return nNew - nRemoved;
 }
@@ -479,7 +439,7 @@ static inline void Abc_BddShift( Abc_BddMan * p, Vec_Int_t ** liveNodes, int * p
   for ( j = 0; j < distance; j++ )
     {
       if ( fUp ) *pos -= 1;
-      //      *diff += Abc_BddSwap3( p, liveNodes, *pos );
+      //*diff += Abc_BddSwap3( p, liveNodes, *pos );
       *diff += Abc_BddSwap4( p, liveNodes, *pos );
       ABC_SWAP( int, new2old[*pos], new2old[*pos + 1] ); // for debugging
       if ( !fUp ) *pos += 1;
@@ -503,7 +463,7 @@ int Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
   int totalDiff = 0;
   unsigned a;
   
-  Vec_Int_t ** liveNodes = ABC_CALLOC( Vec_Int_t *, p->nVars );
+  Vec_Int_t ** liveNodes = ABC_CALLOC( Vec_Int_t *, p->nVars + 2);
   for ( i = 0; i < p->nVars; i++ )
     liveNodes[i] = Vec_IntAlloc( p->nObjs / p->nVars + p->nObjs % p->nVars );
   p->pEdges = ABC_CALLOC( unsigned, p->nObjsAlloc );
@@ -587,9 +547,10 @@ int Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
     }
   Abc_BddUncountEdge( p, pFunctions ); // for debugging
   ABC_FREE( p->pEdges );
-  ABC_FREE( descendingOrder );  
+  ABC_FREE( descendingOrder );
+  for ( i = 0; i < p->nVars; i++ )
+    Vec_IntFree( liveNodes[i] );
   ABC_FREE( liveNodes );
-  ABC_PRT( "total unique search time", timeForUniSearch );
   return totalDiff;
 }
 
