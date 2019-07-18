@@ -45894,16 +45894,20 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
     int fRealloc = 1;
     int fGarbage = 1;
     int fReorder = 0;
+    int fFinalReorder = 0;
     char * FileName = NULL;
     FILE * pFile = NULL;
-    extern void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int fRealloc, int fGarbage, int fReorder );
+    extern void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int fRealloc, int fGarbage, int fReorder, int fFinalReorder );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "FMVagrh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "FMVafgrh" ) ) != EOF )
     {
         switch ( c )
         {
         case 'a':
             fRealloc ^= 1;
+            break;
+        case 'f':
+            fFinalReorder ^= 1;
             break;
         case 'g':
             fGarbage ^= 1;
@@ -45954,14 +45958,15 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
         return 1;
     }
     if ( FileName != NULL ) pFile = fopen( FileName, "w" );
-    Abc_BddGiaTest( pAbc->pGia, nVerbose, nMem, pFile, fRealloc, fGarbage, fReorder );
+    Abc_BddGiaTest( pAbc->pGia, nVerbose, nMem, pFile, fRealloc, fGarbage, fReorder, fFinalReorder );
     if ( FileName != NULL ) fclose( pFile );
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &bdd [-F <file>] [-MV num] [-agrh]\n" );
+    Abc_Print( -2, "usage: &bdd [-F <file>] [-MV num] [-afgrh]\n" );
     Abc_Print( -2, "\t        BDD construction with simple BDD package\n" );
     Abc_Print( -2, "\t-a    : toggle reallocating by double when nodes reach the limit (after garbage collection) [default = %s]\n", fRealloc? "yes": "no" );
+    Abc_Print( -2, "\t-f    : toggle reordering after building BDDs [default = %s]\n", fFinalReorder? "yes": "no" );
     Abc_Print( -2, "\t-g    : toggle garbage collecting when nodes reach the limit [default = %s]\n", fGarbage? "yes": "no" );
     Abc_Print( -2, "\t-r    : toggle reoredering when nodes reach the limit [default = %s]\n", fReorder? "yes": "no" );
     Abc_Print( -2, "\t-F <file>: file to dump BDDs\n" );
