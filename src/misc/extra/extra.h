@@ -483,7 +483,7 @@ extern void            Abc_BddUnmark_rec( Abc_BddMan * p, unsigned i );
 extern int             Abc_BddCountNodesArrayShared( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern int             Abc_BddCountNodesArrayIndependent( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern void            Abc_BddPrint( Abc_BddMan * p, unsigned a, int offset, FILE * f );
-extern int             Abc_BddGia( Gia_Man_t * pGia, int fVerbose, Abc_BddMan * p, int fRealloc, int fGarbage );
+extern int             Abc_BddGia( Gia_Man_t * pGia, int fVerbose, Abc_BddMan * p, int fRealloc, int fGarbage, int fReorder );
 
 extern int             Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth );
 extern int             Abc_BddCount1s( Abc_BddMan * p, unsigned a, int depth );

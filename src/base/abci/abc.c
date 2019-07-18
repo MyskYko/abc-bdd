@@ -45893,11 +45893,12 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
     int nMem = 0;
     int fRealloc = 1;
     int fGarbage = 1;
+    int fReorder = 0;
     char * FileName = NULL;
     FILE * pFile = NULL;
-    extern void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int fRealloc, int fGarbage );
+    extern void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int fRealloc, int fGarbage, int fReorder );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "FMVagh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "FMVagrh" ) ) != EOF )
     {
         switch ( c )
         {
@@ -45906,6 +45907,9 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
             break;
         case 'g':
             fGarbage ^= 1;
+            break;
+        case 'r':
+            fReorder ^= 1;
             break;
         case 'F':
 	  if ( globalUtilOptind >= argc )
@@ -45950,15 +45954,16 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
         return 1;
     }
     if ( FileName != NULL ) pFile = fopen( FileName, "w" );
-    Abc_BddGiaTest( pAbc->pGia, nVerbose, nMem, pFile, fRealloc, fGarbage );
+    Abc_BddGiaTest( pAbc->pGia, nVerbose, nMem, pFile, fRealloc, fGarbage, fReorder );
     if ( FileName != NULL ) fclose( pFile );
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &bdd [-F <file>] [-MV num] [-agh]\n" );
+    Abc_Print( -2, "usage: &bdd [-F <file>] [-MV num] [-agrh]\n" );
     Abc_Print( -2, "\t        BDD construction with simple BDD package\n" );
     Abc_Print( -2, "\t-a    : toggle reallocating by double when nodes reach the limit (after garbage collection) [default = %s]\n", fRealloc? "yes": "no" );
     Abc_Print( -2, "\t-g    : toggle garbage collecting when nodes reach the limit [default = %s]\n", fGarbage? "yes": "no" );
+    Abc_Print( -2, "\t-r    : toggle reoredering when nodes reach the limit [default = %s]\n", fReorder? "yes": "no" );
     Abc_Print( -2, "\t-F <file>: file to dump BDDs\n" );
     Abc_Print( -2, "\t-M num: memory size to allocate (2^num nodes) [default = %d]\n", nMem );
     Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );

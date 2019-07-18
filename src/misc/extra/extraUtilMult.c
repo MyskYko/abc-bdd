@@ -440,7 +440,7 @@ static inline void Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts )
    SeeAlso     []
 
 ***********************************************************************/
-static inline int Abc_BddRefresh( Abc_BddMan * p, int fVerbose, int fGarbage, int fRealloc, int * fRefresh, Vec_Int_t * pFrontiers )
+static inline int Abc_BddRefresh( Abc_BddMan * p, int fVerbose, int fGarbage, int fRealloc, int fReorder, int * fRefresh, Vec_Int_t * pFrontiers )
 {
   if ( fGarbage && !*fRefresh )
     {
@@ -452,9 +452,14 @@ static inline int Abc_BddRefresh( Abc_BddMan * p, int fVerbose, int fGarbage, in
   if ( p->nObjsAlloc >= 1 << 31 ) return -1;
   if ( fVerbose ) printf( "Reallocate nodes by 2^%d\n", Abc_Base2Log( p->nObjsAlloc << 1 ) );
   Abc_BddManRealloc( p );
+  if ( fReorder )
+    {
+      Abc_BddReorder( p, pFrontiers, 0 );
+      Abc_BddGarbageCollect( p, pFrontiers );
+    }
   return 0;
 }
-int Abc_BddGia( Gia_Man_t * pGia, int nVerbose, Abc_BddMan * p, int fRealloc, int fGarbage )
+int Abc_BddGia( Gia_Man_t * pGia, int nVerbose, Abc_BddMan * p, int fRealloc, int fGarbage, int fReorder )
 {
   Gia_Obj_t * pObj, * pObj0, *pObj1;
   int i, fRefresh = 0;
@@ -480,7 +485,7 @@ int Abc_BddGia( Gia_Man_t * pGia, int nVerbose, Abc_BddMan * p, int fRealloc, in
       pObj->Value = Abc_BddAnd( p, Cof0, Cof1 );
       if ( Abc_BddLitIsInvalid( pObj->Value ) )
 	{
-	  if ( Abc_BddRefresh( p, nVerbose, fGarbage, fRealloc, &fRefresh, pFrontiers ) )
+	  if ( Abc_BddRefresh( p, nVerbose, fGarbage, fRealloc, fReorder, &fRefresh, pFrontiers ) )
 	    return -1;
 	  i--;
 	  continue;
@@ -504,7 +509,7 @@ int Abc_BddGia( Gia_Man_t * pGia, int nVerbose, Abc_BddMan * p, int fRealloc, in
     }
   return 0;
 }
-void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int fRealloc, int fGarbage )
+void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int fRealloc, int fGarbage, int fReorder )
 {
   abctime clk = Abc_Clock();
   Abc_BddMan * p;
@@ -519,7 +524,7 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int
     }
   if ( nVerbose ) printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
   p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, nVerbose > 1 );
-  int r = Abc_BddGia( pGia, nVerbose, p, fRealloc, fGarbage );
+  int r = Abc_BddGia( pGia, nVerbose, p, fRealloc, fGarbage, fReorder );
   if ( r )
     {
       printf( "The number of nodes exceeds the limit\n" );
@@ -540,15 +545,15 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int
     {
       int prev = Abc_BddCountNodesArrayShared( p, vNodes );
       clk = Abc_Clock();
-      int diff = Abc_BddReorder( p, vNodes, 0 );
+      int diff = Abc_BddReorder( p, vNodes, 1 );
       clk2 = Abc_Clock();
       int now = Abc_BddCountNodesArrayShared( p, vNodes );
-      ABC_PRT( "Reoredering time", clk2 - clk );
+      ABC_PRT( "Reordering time", clk2 - clk );
       printf( "Gain %d (%d -> %d)\n", diff, prev, now );
       assert( prev + diff == now );
+      printf( "Shared nodes = %d  Independent BDDs nodes = %d\n", Abc_BddCountNodesArrayShared( p, vNodes ), Abc_BddCountNodesArrayIndependent( p, vNodes ) );
+      printf( "Used nodes = %d  Allocated nodes = %u\n", p->nObjs, p->nObjsAlloc - 1 );
     }
-  printf( "Shared nodes = %d  Independent BDDs nodes = %d\n", Abc_BddCountNodesArrayShared( p, vNodes ), Abc_BddCountNodesArrayIndependent( p, vNodes ) );
-  printf( "Used nodes = %d  Allocated nodes = %u\n", p->nObjs, p->nObjsAlloc - 1 );
   
   Vec_IntFree( vNodes );
   Abc_BddManFree( p );
