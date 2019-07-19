@@ -472,7 +472,7 @@ static inline unsigned Abc_BddEdge( Abc_BddMan * p, unsigned i )     { return p-
 static inline void     Abc_BddIncEdge( Abc_BddMan * p, unsigned i )  { assert( ++p->pEdges[Abc_BddLit2Bvar( i )] != Abc_BddEdgeInvalid() ); }
 static inline void     Abc_BddDecEdge( Abc_BddMan * p, unsigned i )  { assert( --p->pEdges[Abc_BddLit2Bvar( i )] != Abc_BddEdgeInvalid() ); }
 
-static inline int      Abc_BddIsLimit( Abc_BddMan * p )              { return (int)( (unsigned)p->nObjs == p->nObjsAlloc - 1 );     }
+static inline int      Abc_BddIsLimit( Abc_BddMan * p )              { return (int)( (unsigned)p->nObjs == p->nObjsAlloc || (unsigned)p->nObjs == Abc_BddLit2Bvar( Abc_BddLitInvalid() ) ); }
 
 extern unsigned        Abc_BddUniqueCreate( Abc_BddMan * p, int Var, unsigned Then, unsigned Else );
 extern Abc_BddMan *    Abc_BddManAlloc( int nVars, unsigned nObjs, int fVerbose );
