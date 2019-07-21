@@ -244,6 +244,7 @@ static inline void Abc_BddManRealloc( Abc_BddMan * p )
     {
       p->pNextsTmp   = ABC_REALLOC( int, p->pNextsTmp, p->nObjsAlloc );
       assert( p->pNextsTmp );
+      memset ( p->pNextsTmp + nObjsAllocOld, 0, sizeof(int) * nObjsAllocOld );
     }
 }
 
@@ -543,35 +544,41 @@ static inline void Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts )
 ***********************************************************************/
 static inline int Abc_BddRefresh( Abc_BddMan * p, int fVerbose, int fGarbage, int fRealloc, int fReorder, int * fRefresh, Vec_Int_t * pFrontiers )
 {
-  if ( fGarbage && !*fRefresh )
+  if ( fGarbage )
+    Abc_BddGarbageCollect( p, pFrontiers );
+  int r = 0;
+  if ( fReorder )
     {
-      Abc_BddGarbageCollect( p, pFrontiers );
-      *fRefresh = 1;
-      return 0;
+      //r = Abc_BddReorderConverge( p, pFrontiers, fVerbose );
+      r = Abc_BddReorder( p, pFrontiers, fVerbose );
     }
-  while( 1 )
+  if ( !fRefresh )
     {
-      if ( fReorder )
+      if ( !r || !fRealloc ) 
 	{
-	  Abc_BddGarbageCollect( p, pFrontiers );
-	  abctime clk = Abc_Clock(); // for measurement
-	  if ( !Abc_BddReorderConverge( p, pFrontiers, fVerbose ) )
-	    //if ( !Abc_BddReorder( p, pFrontiers, fVerbose ) )
-	    {
-	      Abc_BddGarbageCollect( p, pFrontiers );
-	      abctime clk2 = Abc_Clock(); // for measurement
-	      ref_time += clk2 - clk; // for measurement
-	      break;
-	    }
-	  abctime clk2 = Abc_Clock(); // for measurement
-	  ref_time += clk2 - clk; // for measurement
+	  if ( fReorder && fGarbage )
+	    Abc_BddGarbageCollect( p, pFrontiers );
+	  *fRefresh = 1;
+	  return 0;
 	}
-      if ( !fRealloc ) return -1;
+    }
+  if ( fRefresh && ( !fRealloc || p->nObjsAlloc >= 1 << 31 ) )
+    return -1;
+  assert ( fRealloc );
+  do
+    {
       if ( p->nObjsAlloc >= 1 << 31 ) return -1;
       if ( fVerbose ) printf( "Reallocate nodes by 2^%d\n", Abc_Base2Log( p->nObjsAlloc << 1 ) );
       Abc_BddManRealloc( p );
-      if ( !fReorder ) break;
-    }
+      if ( fReorder )
+	{
+	  r = Abc_BddReorderConverge( p, pFrontiers, fVerbose );
+	  //r = Abc_BddReorder( p, pFrontiers, fVerbose );
+	}
+    } while ( r );
+  if ( fReorder && fGarbage )
+    Abc_BddGarbageCollect( p, pFrontiers );
+  *fRefresh = 1;  
   return 0;
 }
 int Abc_BddGia( Gia_Man_t * pGia, int nVerbose, Abc_BddMan * p, int fRealloc, int fGarbage, int fReorder )
@@ -640,6 +647,7 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
   if ( nVerbose ) printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
   clk = Abc_Clock();
   p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, nVerbose > 2 );
+  if ( fReorder ) Abc_BddReorderAlloc( p );
   int r = Abc_BddGia( pGia, nVerbose, p, fRealloc, fGarbage, fReorder );
   if ( r )
     {
@@ -658,14 +666,12 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
   ABC_PRT( "refresh time", ref_time ); // for measurement
   if ( fFinalReorder )
     {
+      if ( !fReorder ) Abc_BddReorderAlloc( p );
       int prev = Abc_BddCountNodesArrayShared( p, vNodes );
-      Abc_BddReorderAlloc( p );
       clk = Abc_Clock();
-      Abc_BddReorder2( p, vNodes, nVerbose );
       //Abc_BddReorder( p, vNodes, nVerbose );
-      //Abc_BddReorderConverge( p, vNodes, nVerbose );
+      Abc_BddReorderConverge( p, vNodes, nVerbose );
       clk2 = Abc_Clock();
-      Abc_BddReorderFree( p );
       int now = Abc_BddCountNodesArrayShared( p, vNodes );
       printf( "Gain %d -> %d (%d)\n", prev, now, now - prev );
       printf( "Shared BDD size = %6d nodes.", Abc_BddCountNodesArrayShared( p, vNodes ) );
@@ -685,6 +691,7 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
 	  else printf( "pi%03d ", j );
 	}
       printf( "\n" );
+      Abc_BddReorderFree( p );
     }
   if ( pFileName != NULL ) Abc_BddWriteBlif( p, vNodes, pFileName );
   Vec_IntFree( vNodes );

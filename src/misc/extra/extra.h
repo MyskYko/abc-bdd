@@ -485,6 +485,7 @@ static inline void     Abc_BddSetVarOfBvar( Abc_BddMan * p, int i, int Var ) { p
 static inline void     Abc_BddSetThenOfBvar( Abc_BddMan * p, int i, unsigned Then ) { p->pObjs[Abc_BddBvar2Lit( i, 0 )] = Then;     }
 static inline void     Abc_BddSetElseOfBvar( Abc_BddMan * p, int i, unsigned Else ) { p->pObjs[Abc_BddBvar2Lit( i, 1 )] = Else;     }
 static inline void     Abc_BddSetNextOfBvar( Abc_BddMan * p, int i, int Next ) { p->pNexts[i] = Next;                               }
+static inline void     Abc_BddSetNextTmpOfBvar( Abc_BddMan * p, int i, int Next ) { p->pNextsTmp[i] = Next;                         }
 static inline void     Abc_BddSetEdgeOfBvar( Abc_BddMan * p, int i, int Edge ) { p->pEdges[i] = Edge;                               }
 
 static inline void     Abc_BddSetMark( Abc_BddMan * p, unsigned i, int m ) { p->pMark[Abc_BddLit2Bvar( i )] = m;                    }
@@ -533,6 +534,8 @@ extern int            Abc_BddReorderConverge( Abc_BddMan * p, Vec_Int_t * pFunct
 
 /*=== extraUtilReorder2.c ================================================================*/
 
+extern void           Abc_BddReorder2Alloc( Abc_BddMan * p );
+extern void           Abc_BddReorder2Free( Abc_BddMan * p );
 extern int            Abc_BddReorder2( Abc_BddMan * p, Vec_Int_t * pFunctions, int fVerbose );
 
 /**AutomaticEnd***************************************************************/

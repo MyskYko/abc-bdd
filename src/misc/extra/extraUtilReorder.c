@@ -441,12 +441,6 @@ void Abc_BddReorderAlloc( Abc_BddMan * p )
     p->liveBvars[i] = Vec_IntAlloc( p->nObjsAlloc / p->nVars );
   p->pEdges = ABC_CALLOC( unsigned, p->nObjsAlloc );
   assert( p->pEdges );
-  p->liveNodes = ABC_ALLOC( Vec_Ptr_t *, p->nVars + 2);
-  for ( i = 0; i < p->nVars + 2; i++ )
-    p->liveNodes[i] = Vec_PtrAlloc( p->nObjsAlloc / p->nVars );
-  p->nTableMask = ( 1 << Abc_Base2Log( p->nObjsAlloc / p->nVars ) ) - 1;
-  p->pTable = ABC_CALLOC( int, p->nTableMask + 1 );
-  p->pNextsTmp = ABC_ALLOC( int, p->nObjsAlloc );
 }
 void Abc_BddReorderFree( Abc_BddMan * p )
 {
@@ -455,11 +449,6 @@ void Abc_BddReorderFree( Abc_BddMan * p )
   for ( i = 0; i < p->nVars + 2; i++ )
     Vec_IntFree( p->liveBvars[i] );
   ABC_FREE( p->liveBvars );
-  for ( i = 0; i < p->nVars + 2; i++ )
-    Vec_PtrFreeFree( p->liveNodes[i] );
-  ABC_FREE( p->liveNodes );
-  ABC_FREE( p->pTable );
-  ABC_FREE( p->pNextsTmp );
 }
 
 /**Function*************************************************************

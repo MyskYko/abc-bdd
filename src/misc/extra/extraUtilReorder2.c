@@ -43,6 +43,28 @@ typedef struct Abc_BddNode_ Abc_BddNode;
 ////////////////////////////////////////////////////////////////////////
 ///                     FUNCTION DEFINITIONS                         ///
 ////////////////////////////////////////////////////////////////////////
+void Abc_BddP_rec( Abc_BddMan * p, unsigned i )
+{
+  if ( Abc_BddLitIsConst( i ) ) return;
+  if ( Abc_BddMark( p, i ) ) return;
+  printf("Bvar %d  Var %3d  Then %5d  Else %5d\n", Abc_BddLit2Bvar( i ), Abc_BddVar( p, i ), Abc_BddThen( p, i ), Abc_BddElse( p, i ) );
+  Abc_BddSetMark( p, i, 1 );
+  Abc_BddP_rec( p, Abc_BddElse( p, i ) );
+  Abc_BddP_rec( p, Abc_BddThen( p, i ) );
+}
+void Abc_BddP( Abc_BddMan * p, Vec_Int_t * pFunctions )
+{
+  int i;
+  unsigned a;
+  Vec_IntForEachEntry( pFunctions, a, i )
+    Abc_BddP_rec( p, a );
+  for ( i = 0; i < p->nVars; i++ )
+    Abc_BddP_rec( p, Abc_BddLitIthVar( i ) );
+  Vec_IntForEachEntry( pFunctions, a, i )
+    Abc_BddUnmark_rec( p, a );
+  for ( i = 0; i < p->nVars; i++ )
+    Abc_BddUnmark_rec( p, Abc_BddLitIthVar( i ) );
+}
 
 /**Function*************************************************************
    
@@ -103,7 +125,7 @@ static inline int Abc_BddSimulateSwapBvar( Abc_BddMan * p, int i )
       newThen = Abc_BddLitInvalid();
       hash = Abc_BddHash( 0, f11, f01 ) & p->nTableMask;
       q = p->pTable + hash;
-      for ( ; *q; q = p->pNexts + *q )
+      for ( ; *q; q = p->pNextsTmp + *q )
 	if ( Abc_BddVarOfBvar( p, *q ) != Var + 1 || *q >= p->nSimObjs )
 	  {
 	    *q = 0;
@@ -131,7 +153,7 @@ static inline int Abc_BddSimulateSwapBvar( Abc_BddMan * p, int i )
 	  Abc_BddIncEdgeNonConst( p, f01 );
 	  Vec_IntPush( p->liveBvars[p->nVars + 1], b );
 	  q = p->pTable + hash;
-	  Abc_BddSetNextOfBvar( p, b, *q );
+	  Abc_BddSetNextTmpOfBvar( p, b, *q );
 	  *q = b;
 	}
       newThen = Abc_BddLitNotCond( newThen, fCompl );
@@ -143,7 +165,7 @@ static inline int Abc_BddSimulateSwapBvar( Abc_BddMan * p, int i )
       newElse = Abc_BddLitInvalid();
       hash = Abc_BddHash( 0, f10, f00 ) & p->nTableMask;
       q = p->pTable + hash;
-      for ( ; *q; q = p->pNexts + *q )
+      for ( ; *q; q = p->pNextsTmp + *q )
 	if ( Abc_BddVarOfBvar( p, *q ) != Var + 1 || *q >= p->nSimObjs )
 	  {
 	    *q = 0;
@@ -171,7 +193,7 @@ static inline int Abc_BddSimulateSwapBvar( Abc_BddMan * p, int i )
 	  Abc_BddIncEdgeNonConst( p, f00 );
 	  Vec_IntPush( p->liveBvars[p->nVars + 1], b );
 	  q = p->pTable + hash;
-	  Abc_BddSetNextOfBvar( p, b, *q );
+	  Abc_BddSetNextTmpOfBvar( p, b, *q );
 	  *q = b;
 	}
     }
@@ -219,14 +241,14 @@ static inline int Abc_BddSimulateSwap( Abc_BddMan * p, int pos, int * diff )
 	unsigned Else = Abc_BddElseOfBvar( p, b );
 	unsigned hash = Abc_BddHash( 0, Then, Else ) & p->nTableMask;
 	int * q = p->pTable + hash;
-	for ( ; *q; q = p->pNexts + *q )
+	for ( ; *q; q = p->pNextsTmp + *q )
 	  if ( p->pVars[*q] != Var || *q == b )
 	    {
 	      *q = 0;
 	      break;
 	    }
 	q = p->pTable + hash;
-	Abc_BddSetNextOfBvar( p, b, *q );
+	Abc_BddSetNextTmpOfBvar( p, b, *q );
 	*q = b;
       }
   // walk lower level
@@ -289,6 +311,7 @@ static inline int Abc_BddSimulateShift( Abc_BddMan * p, int pos, int distance, i
       if ( fUp ) curPos -= 1;
       if ( Abc_BddSimulateSwap( p, curPos, &diff ) )
 	{
+	  if ( !fUp ) curPos += 1;
 	  fOutOfNodes = 1;
 	  break;
 	}
@@ -319,14 +342,43 @@ static inline int Abc_BddSimulateShift( Abc_BddMan * p, int pos, int distance, i
   return fOutOfNodes;
 }
 
+void Abc_BddReorder2Alloc( Abc_BddMan * p )
+{
+  int i;
+  p->liveBvars = ABC_ALLOC( Vec_Int_t *, p->nVars + 2);
+  for ( i = 0; i < p->nVars + 2; i++ )
+    p->liveBvars[i] = Vec_IntAlloc( p->nObjsAlloc / p->nVars );
+  p->pEdges = ABC_CALLOC( unsigned, p->nObjsAlloc );
+  assert( p->pEdges );
+  p->liveNodes = ABC_ALLOC( Vec_Ptr_t *, p->nVars + 2);
+  for ( i = 0; i < p->nVars + 2; i++ )
+    p->liveNodes[i] = Vec_PtrAlloc( p->nObjsAlloc / p->nVars );
+  p->nTableMask = ( 1 << Abc_Base2Log( p->nObjsAlloc / p->nVars ) ) - 1;
+  p->pTable = ABC_CALLOC( int, p->nTableMask + 1 );
+  p->pNextsTmp = ABC_CALLOC( int, p->nObjsAlloc );
+}
+void Abc_BddReorder2Free( Abc_BddMan * p )
+{
+  int i;
+  ABC_FREE( p->pEdges );
+  for ( i = 0; i < p->nVars + 2; i++ )
+    Vec_IntFree( p->liveBvars[i] );
+  ABC_FREE( p->liveBvars );
+  for ( i = 0; i < p->nVars + 2; i++ )
+    Vec_PtrFreeFree( p->liveNodes[i] );
+  ABC_FREE( p->liveNodes );
+  ABC_FREE( p->pTable );
+  ABC_FREE( p->pNextsTmp );
+}
+
 int Abc_BddReorder2( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 {
+  //  Abc_BddP( p, pFunctions );
   int i, j, k;
   int b;
   int best_i;
   Abc_BddNode * x;
   int fOutOfNodes = 0;
-  int nAverageNodes = p->nObjs / p->nVars + p->nObjs % p->nVars;
   for ( i = 0; i < p->nVars + 2; i++ )
     Vec_IntShrink( p->liveBvars[i], 0 );
   Abc_BddCountEdgeAndBvar( p, pFunctions );
@@ -370,7 +422,6 @@ int Abc_BddReorder2( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
     }
   for ( i = 0; i < p->nVars; i++ )
     {
-      memcpy( p->pNextsTmp, p->pNexts, sizeof(int) * p->nObjs );
       int pos = -1;
       int curPos;
       int diff = 0;
@@ -424,7 +475,6 @@ int Abc_BddReorder2( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 	  printf( "best position %d, gain %d\n", bestPos, bestDiff );
 	  printf( "%d goes %s by %d\n", descendingOrder[i], goUp? "up": "down", distance );
         }
-      memcpy( p->pNexts, p->pNextsTmp, sizeof(int) * p->nObjs );
       int r = Abc_BddShift( p, &curPos, &diff, distance, goUp, &bestPos, &bestDiff, new2old, nVerbose > 1 );
       assert( !r );
       for ( j = 0; j < p->nVars; j++ )
@@ -461,6 +511,8 @@ int Abc_BddReorder2( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
   Abc_BddUncountEdge( p, pFunctions );
   ABC_FREE( new2old );
   ABC_FREE( descendingOrder );
+  //  printf( "###############################\n" );  
+  //  Abc_BddP( p, pFunctions );
   return fOutOfNodes;
 }
 
