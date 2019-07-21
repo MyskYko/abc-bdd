@@ -32,6 +32,8 @@ ABC_NAMESPACE_IMPL_START
 ///                        DECLARATIONS                              ///
 ////////////////////////////////////////////////////////////////////////
 
+abctime ref_time = 0;
+
 ////////////////////////////////////////////////////////////////////////
 ///                     FUNCTION DEFINITIONS                         ///
 ////////////////////////////////////////////////////////////////////////
@@ -51,10 +53,12 @@ static inline unsigned Abc_BddUniqueCreateInt( Abc_BddMan * p, int Var, unsigned
 {
   int * q = p->pUnique + ( Abc_BddHash( Var, Then, Else ) & p->nUniqueMask );
   for ( ; *q; q = p->pNexts + *q )
-    if ( (int)p->pVars[*q] == Var && p->pObjs[(unsigned)*q + *q] == Then && p->pObjs[(unsigned)*q + *q + 1] == Else )
+    if ( Abc_BddVarOfBvar( p, *q ) == Var &&
+	 Abc_BddThenOfBvar( p, *q ) == Then &&
+	 Abc_BddElseOfBvar( p, *q ) == Else )
       return Abc_BddBvar2Lit( *q, 0 );
   q = p->pUnique + ( Abc_BddHash( Var, Then, Else ) & p->nUniqueMask );
-  int head = *q;
+  int headBvar = *q;
   if ( Abc_BddIsLimit( p ) )
     {
       for ( ; p->nRemoved < p->nObjs; p->nRemoved++ )
@@ -63,10 +67,11 @@ static inline unsigned Abc_BddUniqueCreateInt( Abc_BddMan * p, int Var, unsigned
       *q = p->nRemoved++;
     }
   else *q = p->nObjs++;
-  p->pVars[*q] = Var;
-  p->pObjs[(unsigned)*q + *q] = Then;
-  p->pObjs[(unsigned)*q + *q + 1] = Else;
-  *( p->pNexts + *q ) = head;
+  Abc_BddSetVarOfBvar( p, *q, Var );
+  Abc_BddSetThenOfBvar( p, *q, Then );
+  Abc_BddSetElseOfBvar( p, *q, Else );
+  Abc_BddSetNextOfBvar( p, *q, headBvar );
+  if(p->pEdges != NULL) Abc_BddSetEdgeOfBvar( p, *q, 0 ); // for reordering
   if ( p->fVerbose )
     printf( "Added node %10d: Var = %3d  Then = %10u  Else = %10u  Removed = %10u\n", *q, Var, Then, Else, p->nRemoved );
   return Abc_BddBvar2Lit( *q, 0 );
@@ -102,9 +107,7 @@ static inline unsigned Abc_BddCacheLookup( Abc_BddMan * p, unsigned Arg1, unsign
 static inline unsigned Abc_BddCacheInsert( Abc_BddMan * p, unsigned Arg1, unsigned Arg2, unsigned Res )
 {
   unsigned * pEnt = p->pCache + 3*(long long)( Abc_BddHash( 0, Arg1, Arg2 ) & p->nCacheMask );
-  pEnt[0] = Arg1;
-  pEnt[1] = Arg2;
-  pEnt[2] = Res;
+  pEnt[0] = Arg1; pEnt[1] = Arg2; pEnt[2] = Res;
   p->nCacheMisses++;
   return Res;
 }
@@ -186,7 +189,7 @@ static inline void Abc_BddRehash( Abc_BddMan * p )
       tail2 = q + nObjsAllocOld;
       while ( *q )
 	{
-	  hash = Abc_BddHash( (int)p->pVars[*q], p->pObjs[(unsigned)*q + *q], p->pObjs[(unsigned)*q + *q + 1] ) & p->nUniqueMask;
+	  hash = Abc_BddHash( Abc_BddVarOfBvar( p, *q ), Abc_BddThenOfBvar( p, *q ), Abc_BddElseOfBvar( p, *q ) ) & p->nUniqueMask;
 	  assert( hash == i || hash == i + nObjsAllocOld );
 	  if ( hash == i ) tail = tail1;
 	  else tail = tail2;
@@ -203,8 +206,10 @@ static inline void Abc_BddRehash( Abc_BddMan * p )
 }
 static inline void Abc_BddManRealloc( Abc_BddMan * p )
 {
+  unsigned nObjsAllocOld = p->nObjsAlloc;
   p->nObjsAlloc  = p->nObjsAlloc + p->nObjsAlloc;
   assert( p->nObjsAlloc != 0 );
+  int nUniqueMaskOld = p->nUniqueMask;
   p->nUniqueMask = ( 1 << Abc_Base2Log( p->nObjsAlloc ) ) - 1;
   p->nCacheMask  = ( 1 << Abc_Base2Log( p->nObjsAlloc ) ) - 1;
   p->pUnique     = ABC_REALLOC( int, p->pUnique, p->nUniqueMask + 1 );
@@ -217,11 +222,11 @@ static inline void Abc_BddManRealloc( Abc_BddMan * p )
   assert( p->pObjs );
   assert( p->pMark );
   assert( p->pVars );
-  memset( p->pUnique + ( ( p->nUniqueMask + 1 ) >> 1 ), 0, sizeof(int) * ( ( p->nUniqueMask + 1 ) >> 1 ) );
-  memset( p->pNexts + ( ( p->nUniqueMask + 1 ) >> 1 ), 0, sizeof(int) * ( ( p->nUniqueMask + 1 ) >> 1 ) );
-  memset( p->pObjs + p->nObjsAlloc, 0, sizeof(unsigned) * p->nObjsAlloc );
-  memset( p->pMark + ( p->nObjsAlloc >> 1 ), 0, sizeof(unsigned char) * ( p->nObjsAlloc >> 1 ) );
-  memset( p->pVars + ( p->nObjsAlloc >> 1 ), 0, sizeof(unsigned char) * ( p->nObjsAlloc >> 1 ) );
+  memset( p->pUnique + ( nUniqueMaskOld + 1 ), 0, sizeof(int) * ( nUniqueMaskOld + 1 ) );
+  memset( p->pNexts + ( nUniqueMaskOld + 1 ), 0, sizeof(int) * ( nUniqueMaskOld + 1 ) );
+  memset( p->pObjs + 2 * (long long)nObjsAllocOld, 0, sizeof(unsigned) * 2 * (long long)nObjsAllocOld );
+  memset( p->pMark + nObjsAllocOld, 0, sizeof(unsigned char) * nObjsAllocOld );
+  memset( p->pVars + nObjsAllocOld, 0, sizeof(unsigned char) * nObjsAllocOld );
   Abc_BddCacheRemove( p );
   p->nMemory = sizeof(Abc_BddMan) + 
     ( p->nUniqueMask + 1 ) * sizeof(int) + 
@@ -327,7 +332,7 @@ int Abc_BddCountNodesArrayShared( Abc_BddMan * p, Vec_Int_t * vNodes )
   for ( i = 0; i < p->nVars; i++ )
     Abc_BddUnmark_rec( p, Abc_BddLitIthVar( i ) );
   //  return Count;
-  return Count + 4; // add 4 to make the number comparable to abc command "collapse -v"
+  return Count + 4; // add 4 to make the number comparable to command "collapse -v"
 }
 int Abc_BddCountNodesArrayIndependent( Abc_BddMan * p, Vec_Int_t * vNodes )
 {
@@ -470,7 +475,7 @@ void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName )
 ***********************************************************************/
 static inline void Abc_BddRemoveNodeByBvar( Abc_BddMan * p, int i )
 {
-  int * q = p->pUnique + ( Abc_BddHash( (int)p->pVars[i], p->pObjs[(unsigned)i + i], p->pObjs[(unsigned)i + i + 1] ) & p->nUniqueMask );
+  int * q = p->pUnique + ( Abc_BddHash( Abc_BddVarOfBvar( p, i ), Abc_BddThenOfBvar( p, i ), Abc_BddElseOfBvar( p, i ) ) & p->nUniqueMask );
   for ( ; *q; q = p->pNexts + *q )
     if ( *q == i ) break;
   int * q_next = p->pNexts + *q;
@@ -487,7 +492,7 @@ static inline void Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFrontiers
   Vec_IntForEachEntry( pFrontiers, x, i )
     Abc_BddMark_rec( p, x );
   for ( i = p->nVars + 1; i < p->nObjs; i++ )
-    if ( !p->pMark[i] && !Abc_BddBvarIsRemoved( p, i ) )
+    if ( !Abc_BddMarkOfBvar( p, i ) && !Abc_BddBvarIsRemoved( p, i ) )
       Abc_BddRemoveNodeByBvar( p, i );
   Vec_IntForEachEntry( pFrontiers, x, i )
     Abc_BddUnmark_rec( p, x );
@@ -533,14 +538,28 @@ static inline int Abc_BddRefresh( Abc_BddMan * p, int fVerbose, int fGarbage, in
       *fRefresh = 1;
       return 0;
     }
-  if ( !fRealloc ) return -1;
-  if ( p->nObjsAlloc >= 1 << 31 ) return -1;
-  if ( fVerbose ) printf( "Reallocate nodes by 2^%d\n", Abc_Base2Log( p->nObjsAlloc << 1 ) );
-  Abc_BddManRealloc( p );
-  if ( fReorder )
+  while( 1 )
     {
-      Abc_BddReorder( p, pFrontiers, fVerbose );
-      Abc_BddGarbageCollect( p, pFrontiers );
+      if ( fReorder )
+	{
+	  Abc_BddGarbageCollect( p, pFrontiers );
+	  abctime clk = Abc_Clock(); // for measurement
+	  if ( !Abc_BddReorderConverge( p, pFrontiers, fVerbose ) )
+	    //if ( !Abc_BddReorder( p, pFrontiers, fVerbose ) )
+	    {
+	      Abc_BddGarbageCollect( p, pFrontiers );
+	      abctime clk2 = Abc_Clock(); // for measurement
+	      ref_time += clk2 - clk; // for measurement
+	      break;
+	    }
+	  abctime clk2 = Abc_Clock(); // for measurement
+	  ref_time += clk2 - clk; // for measurement
+	}
+      if ( !fRealloc ) return -1;
+      if ( p->nObjsAlloc >= 1 << 31 ) return -1;
+      if ( fVerbose ) printf( "Reallocate nodes by 2^%d\n", Abc_Base2Log( p->nObjsAlloc << 1 ) );
+      Abc_BddManRealloc( p );
+      if ( !fReorder ) break;
     }
   return 0;
 }
@@ -596,11 +615,11 @@ int Abc_BddGia( Gia_Man_t * pGia, int nVerbose, Abc_BddMan * p, int fRealloc, in
 }
 void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fRealloc, int fGarbage, int fReorder, int fFinalReorder )
 {
-  abctime clk = Abc_Clock();
+  abctime clk, clk2;
   Abc_BddMan * p;
   Vec_Int_t * vNodes;
   Gia_Obj_t * pObj;
-  int i;
+  int i, j;
   unsigned nObjsAllocInit = 1 << nMem;
   while ( nObjsAllocInit < Gia_ManCiNum( pGia ) + 2 )
     {
@@ -608,6 +627,7 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
       assert( nObjsAllocInit != 0 );
     }
   if ( nVerbose ) printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
+  clk = Abc_Clock();
   p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, nVerbose > 2 );
   int r = Abc_BddGia( pGia, nVerbose, p, fRealloc, fGarbage, fReorder );
   if ( r )
@@ -616,30 +636,33 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
       Abc_BddManFree( p );
       return;
     }
-  abctime clk2 = Abc_Clock();
+  clk2 = Abc_Clock();
   vNodes = Vec_IntAlloc( Gia_ManCoNum( pGia ) );
   Gia_ManForEachCo( pGia, pObj, i )
     Vec_IntPush( vNodes, pObj->Value );
   printf( "Shared BDD size = %6d nodes.", Abc_BddCountNodesArrayShared( p, vNodes ) );
   ABC_PRT( "  BDD construction time", clk2 - clk );
-  printf( "Sum of BDD nodes for each BDD = %d  Used nodes = %d  Allocated nodes = %u\n", Abc_BddCountNodesArrayIndependent( p, vNodes ), p->nObjs, ( p->nObjsAlloc == 1 << 31 ) ? p->nObjsAlloc - 1 : p->nObjsAlloc );
+  printf( "Sum of BDD nodes for each BDD = %d", Abc_BddCountNodesArrayIndependent( p, vNodes ) );
+  printf( "  Used nodes = %d  Allocated nodes = %u\n", p->nObjs, ( p->nObjsAlloc == 1 << 31 ) ? p->nObjsAlloc - 1 : p->nObjsAlloc );
+  ABC_PRT( "refresh time", ref_time ); // for measurement
   if ( fFinalReorder )
     {
       int prev = Abc_BddCountNodesArrayShared( p, vNodes );
       clk = Abc_Clock();
-      int diff = Abc_BddReorder( p, vNodes, nVerbose );
+      Abc_BddReorder2( p, vNodes, nVerbose );
+      //Abc_BddReorder( p, vNodes, nVerbose );
+      //Abc_BddReorderConverge( p, vNodes, nVerbose );
       clk2 = Abc_Clock();
       int now = Abc_BddCountNodesArrayShared( p, vNodes );
-      printf( "Gain %d (%d -> %d)\n", diff, prev, now );
-      assert( prev + diff == now );
+      printf( "Gain %d -> %d (%d)\n", prev, now, now - prev );
       printf( "Shared BDD size = %6d nodes.", Abc_BddCountNodesArrayShared( p, vNodes ) );
       ABC_PRT( "  Final reordering time", clk2 - clk );
-      printf( "Sum of BDD nodes for each BDD = %d  Used nodes = %d  Allocated nodes = %u\n", Abc_BddCountNodesArrayIndependent( p, vNodes ), p->nObjs, ( p->nObjsAlloc == 1 << 31 ) ? p->nObjsAlloc - 1 : p->nObjsAlloc );
+      printf( "Sum of BDD nodes for each BDD = %d", Abc_BddCountNodesArrayIndependent( p, vNodes ) );
+      printf( "  Used nodes = %d  Allocated nodes = %u\n", p->nObjs, ( p->nObjsAlloc == 1 << 31 ) ? p->nObjsAlloc - 1 : p->nObjsAlloc );
     }
   if ( fReorder || fFinalReorder )
     {
       printf( "Ordering:\n" );
-      int j;
       for ( i = 0; i < p->nVars; i++ )
 	{
 	  for ( j = 0; j < p->nVars; j++ )

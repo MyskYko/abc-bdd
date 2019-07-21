@@ -19,6 +19,7 @@ SRC +=    src/misc/extra/extraUtilBitMatrix.c \
     src/misc/extra/extraUtilProgress.c \
     src/misc/extra/extraUtilReader.c \
     src/misc/extra/extraUtilReorder.c \
+    src/misc/extra/extraUtilReorder2.c \
     src/misc/extra/extraUtilSupp.c \
     src/misc/extra/extraUtilTruth.c \
     src/misc/extra/extraUtilUtil.c \
