@@ -56,7 +56,7 @@ void Abc_BddCountEdge_rec( Abc_BddMan * p, unsigned i )
   Abc_BddCountEdge_rec( p, Abc_BddElse( p, i ) );
   Abc_BddCountEdge_rec( p, Abc_BddThen( p, i ) );
 }
-void Abc_BddUncountEdge_rec( Abc_BddMan * p, unsigned i ) // for verification
+void Abc_BddUncountEdge_rec( Abc_BddMan * p, unsigned i )
 {
   if ( Abc_BddLitIsConst( i ) ) return;
   Abc_BddDecEdge( p, i );
@@ -65,7 +65,7 @@ void Abc_BddUncountEdge_rec( Abc_BddMan * p, unsigned i ) // for verification
   Abc_BddUncountEdge_rec( p, Abc_BddElse( p, i ) );
   Abc_BddUncountEdge_rec( p, Abc_BddThen( p, i ) );
 }
-static inline void Abc_BddCountEdge( Abc_BddMan * p, Vec_Int_t * pFunctions )
+void Abc_BddCountEdge( Abc_BddMan * p, Vec_Int_t * pFunctions )
 {
   int i;
   unsigned a;
@@ -74,7 +74,7 @@ static inline void Abc_BddCountEdge( Abc_BddMan * p, Vec_Int_t * pFunctions )
   Vec_IntForEachEntry( pFunctions, a, i )
     Abc_BddUnmark_rec( p, a );
 }
-static inline void Abc_BddUncountEdge( Abc_BddMan * p, Vec_Int_t * pFunctions )
+void Abc_BddUncountEdge( Abc_BddMan * p, Vec_Int_t * pFunctions )
 {
   int i;
   unsigned a;
@@ -98,7 +98,7 @@ void Abc_BddCountEdgeAndBvar_rec( Abc_BddMan * p, unsigned i )
   Abc_BddCountEdgeAndBvar_rec( p, Abc_BddElse( p, i ) );
   Abc_BddCountEdgeAndBvar_rec( p, Abc_BddThen( p, i ) );
 }
-static inline void Abc_BddCountEdgeAndBvar( Abc_BddMan * p, Vec_Int_t * pFunctions )
+void Abc_BddCountEdgeAndBvar( Abc_BddMan * p, Vec_Int_t * pFunctions )
 {
   int i;
   unsigned a;
@@ -421,14 +421,64 @@ int Abc_BddShift( Abc_BddMan * p, int * pos, int * diff, int distance, int fUp, 
     }
   return 0;
 }
+
+/**Function*************************************************************
+   
+   Synopsis    []
+
+   Description []
+               
+   SideEffects []
+
+   SeeAlso     []
+
+***********************************************************************/
+void Abc_BddReorderAlloc( Abc_BddMan * p )
+{
+  int i;
+  p->liveBvars = ABC_ALLOC( Vec_Int_t *, p->nVars + 2);
+  for ( i = 0; i < p->nVars + 2; i++ )
+    p->liveBvars[i] = Vec_IntAlloc( p->nObjsAlloc / p->nVars );
+  p->pEdges = ABC_CALLOC( unsigned, p->nObjsAlloc );
+  assert( p->pEdges );
+  p->liveNodes = ABC_ALLOC( Vec_Ptr_t *, p->nVars + 2);
+  for ( i = 0; i < p->nVars + 2; i++ )
+    p->liveNodes[i] = Vec_PtrAlloc( p->nObjsAlloc / p->nVars );
+  p->nTableMask = ( 1 << Abc_Base2Log( p->nObjsAlloc / p->nVars ) ) - 1;
+  p->pTable = ABC_CALLOC( int, p->nTableMask + 1 );
+  p->pNextsTmp = ABC_ALLOC( int, p->nObjsAlloc );
+}
+void Abc_BddReorderFree( Abc_BddMan * p )
+{
+  int i;
+  ABC_FREE( p->pEdges );
+  for ( i = 0; i < p->nVars + 2; i++ )
+    Vec_IntFree( p->liveBvars[i] );
+  ABC_FREE( p->liveBvars );
+  for ( i = 0; i < p->nVars + 2; i++ )
+    Vec_PtrFreeFree( p->liveNodes[i] );
+  ABC_FREE( p->liveNodes );
+  ABC_FREE( p->pTable );
+  ABC_FREE( p->pNextsTmp );
+}
+
+/**Function*************************************************************
+   
+   Synopsis    []
+
+   Description []
+               
+   SideEffects []
+
+   SeeAlso     []
+
+***********************************************************************/
 int Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 {
   int i, j, best_i;
   int fOutOfNodes = 0;
-  p->liveBvars = ABC_CALLOC( Vec_Int_t *, p->nVars + 2);
   for ( i = 0; i < p->nVars + 2; i++ )
-    p->liveBvars[i] = Vec_IntAlloc( p->nObjs / p->nVars + p->nObjs % p->nVars );
-  p->pEdges = ABC_CALLOC( unsigned, p->nObjsAlloc );
+    Vec_IntShrink( p->liveBvars[i], 0 );
   Abc_BddCountEdgeAndBvar( p, pFunctions );
   int * new2old = ABC_CALLOC( int, p->nVars );
   for ( i = 0; i < p->nVars; i++ ) new2old[i] = i;
@@ -509,13 +559,9 @@ int Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 	}
       if ( fOutOfNodes ) break;
     }
-  //Abc_BddUncountEdge( p, pFunctions ); // for debugging
-  ABC_FREE( p->pEdges );
+  Abc_BddUncountEdge( p, pFunctions );
   ABC_FREE( new2old );
   ABC_FREE( descendingOrder );
-  for ( i = 0; i < p->nVars + 2; i++ )
-    Vec_IntFree( p->liveBvars[i] );
-  ABC_FREE( p->liveBvars );
   return fOutOfNodes;
 }
 
@@ -523,10 +569,8 @@ int Abc_BddReorderConverge( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose
 {
   int i, j, best_i;
   int fOutOfNodes = 0;
-  p->liveBvars = ABC_CALLOC( Vec_Int_t *, p->nVars + 2);
   for ( i = 0; i < p->nVars + 2; i++ )
-    p->liveBvars[i] = Vec_IntAlloc( p->nObjs / p->nVars + p->nObjs % p->nVars );
-  p->pEdges = ABC_CALLOC( unsigned, p->nObjsAlloc );
+    Vec_IntShrink( p->liveBvars[i], 0 );
   Abc_BddCountEdgeAndBvar( p, pFunctions );
   int * new2old = ABC_CALLOC( int, p->nVars );
   for ( i = 0; i < p->nVars; i++ ) new2old[i] = i;
@@ -614,13 +658,9 @@ int Abc_BddReorderConverge( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose
 	}
       if ( fOutOfNodes ) break;
     }
-  //Abc_BddUncountEdge( p, pFunctions ); // for debugging
-  ABC_FREE( p->pEdges );
+  Abc_BddUncountEdge( p, pFunctions );
   ABC_FREE( new2old );
   ABC_FREE( descendingOrder );
-  for ( i = 0; i < p->nVars + 2; i++ )
-    Vec_IntFree( p->liveBvars[i] );
-  ABC_FREE( p->liveBvars );
   return fOutOfNodes;
   //  return totalDiff;
 }

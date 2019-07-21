@@ -437,6 +437,7 @@ struct Abc_BddMan_
   int                nSimObjs;
   int *              pTable;        // unique table for nodes in a layer. used for reordering
   int                nTableMask;    // selection mask for table. used for reordering
+  int *              pNextsTmp;
 };
 
 // Var = Variable, Lit = Literal, Bvar = BddVariable = Lit >> 1 
@@ -520,8 +521,13 @@ extern unsigned        Abc_BddVectorCompose( Abc_BddMan * p, unsigned F,  Vec_In
 
 /*=== extraUtilReorder.c ================================================================*/
 
+extern void           Abc_BddCountEdge( Abc_BddMan * p, Vec_Int_t * pFunctions );
+extern void           Abc_BddUncountEdge( Abc_BddMan * p, Vec_Int_t * pFunctions );
+extern void           Abc_BddCountEdgeAndBvar( Abc_BddMan * p, Vec_Int_t * pFunctions );
 extern void           Abc_BddShiftBvar( Abc_BddMan * p, int i, int d );
 extern int            Abc_BddShift( Abc_BddMan * p, int * pos, int * diff, int distance, int fUp, int * bestPos, int * bestDiff, int * new2old, int fVerbose );
+extern void           Abc_BddReorderAlloc( Abc_BddMan * p );
+extern void           Abc_BddReorderFree( Abc_BddMan * p );
 extern int            Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int fVerbose );
 extern int            Abc_BddReorderConverge( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose );
 

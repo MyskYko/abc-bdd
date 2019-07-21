@@ -234,6 +234,17 @@ static inline void Abc_BddManRealloc( Abc_BddMan * p )
     (long long)p->nObjsAlloc * 2 * sizeof(int) +
     (long long)p->nObjsAlloc * 3 * sizeof(char);
   Abc_BddRehash( p );
+  if ( p->pEdges != NULL )
+    {
+      p->pEdges      = ABC_REALLOC( unsigned, p->pEdges, p->nObjsAlloc );
+      assert( p->pEdges );
+      memset ( p->pEdges + nObjsAllocOld, 0, sizeof(unsigned) * nObjsAllocOld );
+    }
+  if ( p->pNextsTmp != NULL )
+    {
+      p->pNextsTmp   = ABC_REALLOC( int, p->pNextsTmp, p->nObjsAlloc );
+      assert( p->pNextsTmp );
+    }
 }
 
 /**Function*************************************************************
@@ -648,11 +659,13 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
   if ( fFinalReorder )
     {
       int prev = Abc_BddCountNodesArrayShared( p, vNodes );
+      Abc_BddReorderAlloc( p );
       clk = Abc_Clock();
       Abc_BddReorder2( p, vNodes, nVerbose );
       //Abc_BddReorder( p, vNodes, nVerbose );
       //Abc_BddReorderConverge( p, vNodes, nVerbose );
       clk2 = Abc_Clock();
+      Abc_BddReorderFree( p );
       int now = Abc_BddCountNodesArrayShared( p, vNodes );
       printf( "Gain %d -> %d (%d)\n", prev, now, now - prev );
       printf( "Shared BDD size = %6d nodes.", Abc_BddCountNodesArrayShared( p, vNodes ) );
