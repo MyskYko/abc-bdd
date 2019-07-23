@@ -426,9 +426,20 @@ void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName )
   fprintf( f, ".model top\n" );
   fprintf( f, ".inputs" );
   for ( i = 0; i < p->nVars; i++ )
+    {
+      for ( j = 0; j < p->nVars; j++ )
+	if ( Abc_BddVar( p, Abc_BddLitIthVar( j ) ) == i ) break;
+      if ( p->nVars <= 10 ) fprintf( f, " pi%d", j );
+      else if ( p->nVars <= 100 ) fprintf( f, " pi%02d", j );
+      else fprintf( f, " pi%03d", j );
+    }
+  printf( "\n" );
+  /*
+  for ( i = 0; i < p->nVars; i++ )
     if ( p->nVars <= 10 ) fprintf( f, " pi%d ", i );
     else if ( p->nVars <= 100 ) fprintf( f, " pi%02d ", i );
     else fprintf( f, " pi%03d ", i );
+  */
   fprintf( f, "\n.outputs" );
   for ( i = 0; i < Vec_IntSize( vNodes ); i++ )
     if ( p->nVars <= 10 ) fprintf( f, " po%d ", i );
@@ -675,8 +686,8 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
       if ( !nReorder ) Abc_BddReorderAlloc( p );
       int prev = Abc_BddCountNodesArrayShared( p, vNodes );
       clk = Abc_Clock();
-      if ( nFinalReorder == 1 ) Abc_BddReorder( p, vNodes, nVerbose );
-      else if ( nFinalReorder == 2 ) Abc_BddReorderConverge( p, vNodes, nVerbose );
+      if ( nFinalReorder == 1 ) Abc_BddReorder( p, vNodes, nVerbose - 1 );
+      else if ( nFinalReorder == 2 ) Abc_BddReorderConverge( p, vNodes, nVerbose - 1 );
       else printf("Invalid reordering level %d. It should be at most 2.\n", nFinalReorder);
       clk2 = Abc_Clock();
       int now = Abc_BddCountNodesArrayShared( p, vNodes );

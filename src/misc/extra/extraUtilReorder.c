@@ -557,6 +557,7 @@ int Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 
 int Abc_BddReorderConverge( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 {
+  if ( nVerbose < 0 ) nVerbose = 0;
   int i, j, best_i;
   int fOutOfNodes = 0;
   for ( i = 0; i < p->nVars + 2; i++ )
