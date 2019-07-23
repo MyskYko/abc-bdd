@@ -45893,35 +45893,31 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
     int nMem = 0;
     int fRealloc = 1;
     int fGarbage = 1;
-    int fReorder = 0;
-    int fFinalReorder = 0;
+    int nReorder = 0;
+    int nFinalReorder = 0;
     char * pFileName = NULL;
-    extern void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fRealloc, int fGarbage, int fReorder, int fFinalReorder );
+    extern void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fRealloc, int fGarbage, int nReorder, int nFinalReorder );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "FMVafgrh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "FMRVWagh" ) ) != EOF )
     {
         switch ( c )
         {
         case 'a':
             fRealloc ^= 1;
             break;
-        case 'f':
-            fFinalReorder ^= 1;
-            break;
         case 'g':
             fGarbage ^= 1;
-            break;
-        case 'r':
-            fReorder ^= 1;
             break;
         case 'F':
 	  if ( globalUtilOptind >= argc )
             {
-	        Abc_Print( -1, "Command line switch \"-F\" should be followed by a filename.\n" );
+	        Abc_Print( -1, "Command line switch \"-F\" should be followed by an integer.\n" );
                 goto usage;
             }
-            pFileName = argv[globalUtilOptind];
+  	    nFinalReorder = atoi(argv[globalUtilOptind]);
             globalUtilOptind++;
+	    if ( nFinalReorder < 0 )
+	      goto usage;
             break;
         case 'M':
             if ( globalUtilOptind >= argc )
@@ -45932,6 +45928,17 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
             nMem = atoi(argv[globalUtilOptind]);
             globalUtilOptind++;
             if ( nMem < 0 )
+                goto usage;
+            break;
+        case 'R':
+	  if ( globalUtilOptind >= argc )
+            {
+	        Abc_Print( -1, "Command line switch \"-R\" should be followed by an integer.\n" );
+                goto usage;
+            }
+	    nReorder = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nReorder < 0 )
                 goto usage;
             break;
         case 'V':
@@ -45945,6 +45952,15 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
             if ( nVerbose < 0 )
                 goto usage;
             break;
+        case 'W':
+	  if ( globalUtilOptind >= argc )
+            {
+	        Abc_Print( -1, "Command line switch \"-W\" should be followed by a blif filename.\n" );
+                goto usage;
+            }
+            pFileName = argv[globalUtilOptind];
+            globalUtilOptind++;
+            break;
         case 'h':
             goto usage;
         default:
@@ -45956,19 +45972,19 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
         Abc_Print( -1, "Abc_CommandAbc9Bdd(): There is no AIG.\n" );
         return 1;
     }
-    Abc_BddGiaTest( pAbc->pGia, nVerbose, nMem, pFileName, fRealloc, fGarbage, fReorder, fFinalReorder );
+    Abc_BddGiaTest( pAbc->pGia, nVerbose, nMem, pFileName, fRealloc, fGarbage, nReorder, nFinalReorder );
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &bdd [-F <file>] [-MV num] [-afgrh]\n" );
+    Abc_Print( -2, "usage: &bdd [-W <file>] [-FMRV num] [-agh]\n" );
     Abc_Print( -2, "\t        BDD construction with simple BDD package\n" );
     Abc_Print( -2, "\t-a    : toggle reallocating by double when nodes reach the limit (after garbage collection) [default = %s]\n", fRealloc? "yes": "no" );
-    Abc_Print( -2, "\t-f    : toggle reordering after building BDDs [default = %s]\n", fFinalReorder? "yes": "no" );
     Abc_Print( -2, "\t-g    : toggle garbage collecting when nodes reach the limit [default = %s]\n", fGarbage? "yes": "no" );
-    Abc_Print( -2, "\t-r    : toggle reoredering when nodes reach the limit [default = %s]\n", fReorder? "yes": "no" );
-    Abc_Print( -2, "\t-F <file>: file to write blif of constructed BDDs\n" );
+    Abc_Print( -2, "\t-F num: toggel reordering after building BDDs. 0=off, 1=shift, 2=shift_converge [default = %d]\n", nFinalReorder );
     Abc_Print( -2, "\t-M num: memory size to allocate (2^num nodes) [default = %d]\n", nMem );
+    Abc_Print( -2, "\t-R num: toggle reordering. 0=off, 1=shift, 2=shift_converge [default = %d]\n", nReorder );
     Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
+    Abc_Print( -2, "\t-W <file>: file to write blif of constructed BDDs\n" );
     Abc_Print( -2, "\t-h    : print the command usage\n");
     return 1;
 }

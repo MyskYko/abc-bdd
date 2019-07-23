@@ -323,7 +323,6 @@ static inline int Abc_BddSwap( Abc_BddMan * p, int x, int * diff )
     {
       // swap liveBvars
       *diff += Vec_IntSize( p->liveBvars[p->nVars] ) + Vec_IntSize( p->liveBvars[p->nVars + 1] ) - Vec_IntSize( p->liveBvars[x] ) - Vec_IntSize( p->liveBvars[x + 1] );
-      //printf("newtop %d  newlow %d  oldtop %d  oldlow %d\n", Vec_IntSize( p->liveBvars[p->nVars] ), Vec_IntSize( p->liveBvars[p->nVars + 1] ), Vec_IntSize( p->liveBvars[x] ), Vec_IntSize( p->liveBvars[x + 1] ));
       Vec_Int_t * tmp;
       tmp = p->liveBvars[x];
       p->liveBvars[x] = p->liveBvars[p->nVars];
@@ -414,6 +413,7 @@ int Abc_BddShift( Abc_BddMan * p, int * pos, int * diff, int distance, int fUp, 
       if ( fVerbose )
 	{
 	  int k;
+	  printf("\n");
 	  for ( k = 0; k < p->nVars; k++ )
 	    printf( "%d,", new2old[k] );
 	  printf("  current position %d  gain %d\n", *pos, *diff);
@@ -464,6 +464,7 @@ void Abc_BddReorderFree( Abc_BddMan * p )
 ***********************************************************************/
 int Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 {
+  if ( nVerbose < 0 ) nVerbose = 0;
   int i, j, best_i;
   int fOutOfNodes = 0;
   for ( i = 0; i < p->nVars + 2; i++ )
@@ -519,7 +520,7 @@ int Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 	  printf( "###############################\n" );
 	  printf( "# begin shift %d (%d/%d)\n", descendingOrder[i], i + 1, p->nVars );
 	  printf( "###############################\n" );
-	  printf( "%d goes %s by %d\n", descendingOrder[i], goUp? "up": "down", distance );
+	  printf( "\t%d goes %s by %d\n", descendingOrder[i], goUp? "up": "down", distance );
 	}
       fOutOfNodes = Abc_BddShift( p, &pos, &diff, distance, goUp, &bestPos, &bestDiff, new2old, nVerbose > 1 );
       if ( !fOutOfNodes )
@@ -527,7 +528,7 @@ int Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 	  goUp ^= 1;
 	  distance = p->nVars - 1;
 	  if ( nVerbose )
-	    printf( "%d goes %s by %d\n", descendingOrder[i], goUp? "up": "down", distance );
+	    printf( "\n\t%d goes %s by %d\n", descendingOrder[i], goUp? "up": "down", distance );
 	  fOutOfNodes = Abc_BddShift( p, &pos, &diff, distance, goUp, &bestPos, &bestDiff, new2old, nVerbose > 1 );
 	}
       goUp ^= 1;
@@ -535,8 +536,8 @@ int Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
       else distance = bestPos - pos;
       if ( nVerbose )
 	{
-	  printf( "best position %d, gain %d\n", bestPos, bestDiff );
-	  printf( "%d goes %s by %d\n", descendingOrder[i], goUp? "up": "down", distance );
+	  printf( "\n\tbest position %d, gain %d\n", bestPos, bestDiff );
+	  printf( "\t%d goes %s by %d\n", descendingOrder[i], goUp? "up": "down", distance );
         }
       int r = Abc_BddShift( p, &pos, &diff, distance, goUp, &bestPos, &bestDiff, new2old, nVerbose > 1 );
       assert( !r );
@@ -615,7 +616,7 @@ int Abc_BddReorderConverge( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose
 	      printf( "###############################\n" );
 	      printf( "# begin shift %d (%d/%d)\n", descendingOrder[i], i + 1, p->nVars );
 	      printf( "###############################\n" );
-	      printf( "%d goes %s by %d\n", descendingOrder[i], goUp? "up": "down", distance );
+	      printf( "\t%d goes %s by %d\n", descendingOrder[i], goUp? "up": "down", distance );
 	    }
 	  fOutOfNodes = Abc_BddShift( p, &pos, &diff, distance, goUp, &bestPos, &bestDiff, new2old, nVerbose > 1 );
 	  if ( !fOutOfNodes )
@@ -623,7 +624,7 @@ int Abc_BddReorderConverge( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose
 	      goUp ^= 1;
 	      distance = p->nVars - 1;
 	      if ( nVerbose )
-		printf( "%d goes %s by %d\n", descendingOrder[i], goUp? "up": "down", distance );
+		printf( "\n\t%d goes %s by %d\n", descendingOrder[i], goUp? "up": "down", distance );
 	      fOutOfNodes = Abc_BddShift( p, &pos, &diff, distance, goUp, &bestPos, &bestDiff, new2old, nVerbose > 1 );
 	    }
 	  goUp ^= 1;
@@ -631,8 +632,8 @@ int Abc_BddReorderConverge( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose
 	  else distance = bestPos - pos;
 	  if ( nVerbose )
 	    {
-	      printf( "best position %d, gain %d\n", bestPos, bestDiff );
-	      printf( "%d goes %s by %d\n", descendingOrder[i], goUp? "up": "down", distance );
+	      printf( "\n\tbest position %d, gain %d\n", bestPos, bestDiff );
+	      printf( "\t%d goes %s by %d\n", descendingOrder[i], goUp? "up": "down", distance );
 	    }
 	  int r = Abc_BddShift( p, &pos, &diff, distance, goUp, &bestPos, &bestDiff, new2old, nVerbose > 1 );
 	  assert( !r );

@@ -429,15 +429,10 @@ struct Abc_BddMan_
   int                nCacheMisses;  // the number of computed table misses
   long long          nMemory;       // total amount of memory used (in bytes)
   int                nRemoved;      // the minimum int of removed node
-  int                fVerbose;
+  int                nVerbose;
 
   unsigned *         pEdges;        // array of number of incoming edges for each BDD node. used for reordering
-  Vec_Ptr_t **       liveNodes;     // array of live nodes for each layer. used for reordering
   Vec_Int_t **       liveBvars;     // array of live bvars for each layer. used for reordering
-  int                nSimObjs;
-  int *              pTable;        // unique table for nodes in a layer. used for reordering
-  int                nTableMask;    // selection mask for table. used for reordering
-  int *              pNextsTmp;
 };
 
 // Var = Variable, Lit = Literal, Bvar = BddVariable = Lit >> 1 
@@ -485,7 +480,6 @@ static inline void     Abc_BddSetVarOfBvar( Abc_BddMan * p, int i, int Var ) { p
 static inline void     Abc_BddSetThenOfBvar( Abc_BddMan * p, int i, unsigned Then ) { p->pObjs[Abc_BddBvar2Lit( i, 0 )] = Then;     }
 static inline void     Abc_BddSetElseOfBvar( Abc_BddMan * p, int i, unsigned Else ) { p->pObjs[Abc_BddBvar2Lit( i, 1 )] = Else;     }
 static inline void     Abc_BddSetNextOfBvar( Abc_BddMan * p, int i, int Next ) { p->pNexts[i] = Next;                               }
-static inline void     Abc_BddSetNextTmpOfBvar( Abc_BddMan * p, int i, int Next ) { p->pNextsTmp[i] = Next;                         }
 static inline void     Abc_BddSetEdgeOfBvar( Abc_BddMan * p, int i, int Edge ) { p->pEdges[i] = Edge;                               }
 
 static inline void     Abc_BddSetMark( Abc_BddMan * p, unsigned i, int m ) { p->pMark[Abc_BddLit2Bvar( i )] = m;                    }
@@ -508,7 +502,7 @@ extern void            Abc_BddUnmark_rec( Abc_BddMan * p, unsigned i );
 extern int             Abc_BddCountNodesArrayShared( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern int             Abc_BddCountNodesArrayIndependent( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern void            Abc_BddPrint( Abc_BddMan * p, unsigned a, int offset, FILE * f );
-extern int             Abc_BddGia( Gia_Man_t * pGia, int fVerbose, Abc_BddMan * p, int fRealloc, int fGarbage, int fReorder );
+extern int             Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p, int fRealloc, int fGarbage, int nReorder );
 
 extern int             Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth );
 extern int             Abc_BddCount1s( Abc_BddMan * p, unsigned a, int depth );
@@ -531,12 +525,6 @@ extern void           Abc_BddReorderAlloc( Abc_BddMan * p );
 extern void           Abc_BddReorderFree( Abc_BddMan * p );
 extern int            Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int fVerbose );
 extern int            Abc_BddReorderConverge( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose );
-
-/*=== extraUtilReorder2.c ================================================================*/
-
-extern void           Abc_BddReorder2Alloc( Abc_BddMan * p );
-extern void           Abc_BddReorder2Free( Abc_BddMan * p );
-extern int            Abc_BddReorder2( Abc_BddMan * p, Vec_Int_t * pFunctions, int fVerbose );
 
 /**AutomaticEnd***************************************************************/
 
