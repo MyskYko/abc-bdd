@@ -32,8 +32,6 @@ ABC_NAMESPACE_IMPL_START
 ///                        DECLARATIONS                              ///
 ////////////////////////////////////////////////////////////////////////
 
-#define MAX_NUM_FRONTIERS 10000
-
 ////////////////////////////////////////////////////////////////////////
 ///                     FUNCTION DEFINITIONS                         ///
 ////////////////////////////////////////////////////////////////////////
@@ -51,44 +49,39 @@ ABC_NAMESPACE_IMPL_START
 ***********************************************************************/
 static inline unsigned Abc_BddUniqueCreateInt( Abc_BddMan * p, int Var, unsigned Then, unsigned Else )
 {
-  int *q = p->pUnique + ( Abc_BddHash( Var, Then, Else ) & p->nUniqueMask );
+  int * q = p->pUnique + ( Abc_BddHash( Var, Then, Else ) & p->nUniqueMask );
   for ( ; *q; q = p->pNexts + *q )
-    if ( (int)p->pVars[*q] == Var && p->pObjs[(unsigned)*q + *q] == Then && p->pObjs[(unsigned)*q + *q + 1] == Else )
-      return Abc_BddVar2Lit( *q, 0 );
+    if ( Abc_BddVarOfBvar( p, *q ) == Var &&
+	 Abc_BddThenOfBvar( p, *q ) == Then &&
+	 Abc_BddElseOfBvar( p, *q ) == Else )
+      return Abc_BddBvar2Lit( *q, 0 );
   q = p->pUnique + ( Abc_BddHash( Var, Then, Else ) & p->nUniqueMask );
-  int head = *q;
+  int headBvar = *q;
   if ( Abc_BddIsLimit( p ) )
     {
       for ( ; p->nRemoved < p->nObjs; p->nRemoved++ )
-	if ( Abc_BddVarIsRemoved( p, Abc_BddVar2Lit( p->nRemoved, 0 ) ) ) break;
-      if ( p->nRemoved == p->nObjs ) 
-	return Abc_BddInvalidLit();
+	if ( Abc_BddBvarIsRemoved( p, p->nRemoved ) ) break;
+      if ( p->nRemoved == p->nObjs ) return Abc_BddLitInvalid();
       *q = p->nRemoved++;
     }
-  else
-    *q = p->nObjs++;
-  p->pVars[*q] = Var;
-  p->pObjs[(unsigned)*q + *q] = Then;
-  p->pObjs[(unsigned)*q + *q + 1] = Else;
-  *( p->pNexts + *q ) = head;
-  if ( p->fVerbose )
-    {
-      printf( "\rAdded node %10d: Var = %3d.  Then = %10u.  Else = %10u. Removed = %10u.", *q, Var, Then, Else, p->nRemoved );
-      fflush( stdout );
-    }
-  return Abc_BddVar2Lit( *q, 0 );
+  else *q = p->nObjs++;
+  Abc_BddSetVarOfBvar( p, *q, Var );
+  Abc_BddSetThenOfBvar( p, *q, Then );
+  Abc_BddSetElseOfBvar( p, *q, Else );
+  Abc_BddSetNextOfBvar( p, *q, headBvar );
+  if ( p->nVerbose > 1 )
+    printf( "\rAdded node %10d: Var = %3d  Then = %10u  Else = %10u  Removed = %10u", *q, Var, Then, Else, p->nRemoved );
+  return Abc_BddBvar2Lit( *q, 0 );
 }
-static inline unsigned Abc_BddUniqueCreate( Abc_BddMan * p, int Var, unsigned Then, unsigned Else )
+unsigned Abc_BddUniqueCreate( Abc_BddMan * p, int Var, unsigned Then, unsigned Else )
 {
-  if ( Var < 0 || Var >= p->nVars )   return Abc_BddInvalidLit();
-  if ( Var >= Abc_BddVar( p, Then ) ) return Abc_BddInvalidLit();
-  if ( Var >= Abc_BddVar( p, Else ) ) return Abc_BddInvalidLit();
-  if ( Then == Else )
-    return Else;
-  if ( !Abc_BddLitIsCompl( Else ) )
-    return Abc_BddUniqueCreateInt( p, Var, Then, Else );
+  if ( Var < 0 || Var >= p->nVars )   return Abc_BddLitInvalid();
+  if ( Var >= Abc_BddVar( p, Then ) ) return Abc_BddLitInvalid();
+  if ( Var >= Abc_BddVar( p, Else ) ) return Abc_BddLitInvalid();
+  if ( Abc_BddLitIsEq( Then, Else ) ) return Else;
+  if ( !Abc_BddLitIsCompl( Else ) ) return Abc_BddUniqueCreateInt( p, Var, Then, Else );
   unsigned r = Abc_BddUniqueCreateInt( p, Var, Abc_BddLitNot( Then ), Abc_BddLitNot( Else ) );
-  return ( Abc_BddLitIsInvalid( r ) ) ? Abc_BddInvalidLit() : Abc_BddLitNot( r );
+  return Abc_BddLitIsInvalid( r ) ? Abc_BddLitInvalid() : Abc_BddLitNot( r );
 }
 
 /**Function*************************************************************
@@ -106,19 +99,20 @@ static inline unsigned Abc_BddCacheLookup( Abc_BddMan * p, unsigned Arg1, unsign
 {
   unsigned * pEnt = p->pCache + 3*(long long)( Abc_BddHash( 0, Arg1, Arg2 ) & p->nCacheMask );
   p->nCacheLookups++;
-  return ( pEnt[0] == Arg1 && pEnt[1] == Arg2 ) ? pEnt[2] : Abc_BddInvalidLit();
+  return ( pEnt[0] == Arg1 && pEnt[1] == Arg2 ) ? pEnt[2] : Abc_BddLitInvalid();
 }
 static inline unsigned Abc_BddCacheInsert( Abc_BddMan * p, unsigned Arg1, unsigned Arg2, unsigned Res )
 {
   unsigned * pEnt = p->pCache + 3*(long long)( Abc_BddHash( 0, Arg1, Arg2 ) & p->nCacheMask );
-  pEnt[0] = Arg1;  pEnt[1] = Arg2;  pEnt[2] = Res;
+  pEnt[0] = Arg1; pEnt[1] = Arg2; pEnt[2] = Res;
   p->nCacheMisses++;
   return Res;
 }
-
 static inline void Abc_BddCacheRemove( Abc_BddMan * p ) {
   ABC_FREE( p->pCache );
   p->pCache = ABC_CALLOC( unsigned, 3 * (long long)( p->nCacheMask + 1 ) );
+  if ( p->nVerbose > 1 )
+    printf( "\t\tCache: Hit = %u  Miss = %u\n", p->nCacheLookups - p->nCacheMisses, p->nCacheMisses );
 }
 
 /**Function*************************************************************
@@ -132,34 +126,33 @@ static inline void Abc_BddCacheRemove( Abc_BddMan * p ) {
    SeeAlso     []
 
 ***********************************************************************/
-Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int fVerbose )
+Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int nVerbose )
 {
+  if ( nVerbose ) printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjs ) );
   Abc_BddMan * p; int i;
   p = ABC_CALLOC( Abc_BddMan, 1 );
   p->nVars       = nVars;
-  assert( nVars <= (int)Abc_BddConstVar() );
+  assert( nVars <= (int)Abc_BddVarConst() );
   p->nObjsAlloc  = nObjs;
   p->nUniqueMask = ( 1 << Abc_Base2Log( nObjs ) ) - 1;
   p->nCacheMask  = ( 1 << Abc_Base2Log( nObjs ) ) - 1;
   p->nRemoved    = nObjs - 1;
-  p->fVerbose    = 0;
+  p->nVerbose    = nVerbose;
   p->pUnique     = ABC_CALLOC( int, p->nUniqueMask + 1 );
-  assert( p->pUnique );
   p->pNexts      = ABC_CALLOC( int, p->nUniqueMask + 1 );
-  assert( p->pNexts );
   p->pCache      = ABC_CALLOC( unsigned, 3 * (long long)( p->nCacheMask + 1 ) );
-  assert( p->pCache );
   p->pObjs       = ABC_CALLOC( unsigned, 2 * (long long)p->nObjsAlloc );
-  assert( p->pObjs );
   p->pMark       = ABC_CALLOC( unsigned char, p->nObjsAlloc );
-  assert( p->pMark );
   p->pVars       = ABC_CALLOC( unsigned char, p->nObjsAlloc );
+  assert( p->pUnique );
+  assert( p->pNexts );
+  assert( p->pCache );
+  assert( p->pObjs );
+  assert( p->pMark );
   assert( p->pVars );
-  p->fVerbose    = fVerbose;
-  p->pVars[0]    = Abc_BddConstVar();
+  p->pVars[0]    = Abc_BddVarConst();
   p->nObjs       = 1;
-  for ( i = 0; i < nVars; i++ )
-    Abc_BddUniqueCreate( p, i, 1, 0 );
+  for ( i = 0; i < nVars; i++ ) Abc_BddUniqueCreate( p, i, 1, 0 );
   assert( p->nObjs == nVars + 1 );
   p->nMemory = sizeof(Abc_BddMan) + 
     ( p->nUniqueMask + 1 ) * sizeof(int) + 
@@ -170,9 +163,9 @@ Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int fVerbose )
 }
 void Abc_BddManFree( Abc_BddMan * p )
 {
-  if ( p->fVerbose )
+  if ( p->nVerbose > 1 )
     {
-      printf( "BDD stats: Var = %u  Obj = %u  Alloc = %u  Hit = %u  Miss = %u  ", p->nVars, p->nObjs, p->nObjsAlloc, p->nCacheLookups-p->nCacheMisses, p->nCacheMisses );
+      printf( "BDD stats: Var = %u  Obj = %u  Alloc = %u  Hit = %u  Miss = %u  ", p->nVars, p->nObjs, p->nObjsAlloc - 1, p->nCacheLookups - p->nCacheMisses, p->nCacheMisses );
       printf( "Mem = %.2lld MB\n", (long long)( p->nMemory / ( 1 << 20 ) ) );
     }
   ABC_FREE( p->pUnique );
@@ -184,71 +177,68 @@ void Abc_BddManFree( Abc_BddMan * p )
 }
 static inline void Abc_BddRehash( Abc_BddMan * p )
 {
-  unsigned i;
+  unsigned i, hash;
+  int * q, * tail, * tail1, * tail2;
   unsigned nObjsAllocOld = p->nObjsAlloc >> 1; // assuming nObjsAlloc has been doubled.
   for ( i = 0; i < nObjsAllocOld; i++ )
     {
-      int * q = p->pUnique + i;
-      int * head1 = q;
-      int * head2 = q + nObjsAllocOld;
+      q = p->pUnique + i;
+      tail1 = q;
+      tail2 = q + nObjsAllocOld;
       while ( *q )
 	{
-	  unsigned hash = Abc_BddHash( (int)p->pVars[*q], p->pObjs[(unsigned)*q + *q], p->pObjs[(unsigned)*q + *q + 1] ) & p->nUniqueMask;
-	  int * head;
-	  if ( hash == i ) head = head1;
-	  else
+	  hash = Abc_BddHash( Abc_BddVarOfBvar( p, *q ), Abc_BddThenOfBvar( p, *q ), Abc_BddElseOfBvar( p, *q ) ) & p->nUniqueMask;
+	  assert( hash == i || hash == i + nObjsAllocOld );
+	  if ( hash == i ) tail = tail1;
+	  else tail = tail2;
+	  if ( tail != q )
 	    {
-	      assert( hash == i + nObjsAllocOld );
-	      head = head2;
-	    }
-	  if ( head != q )
-	    {
-	      *head = *q;
+	      *tail = *q;
 	      *q = 0;
 	    }
-	  q = p->pNexts + *head;
-	  if ( head == head1 ) head1 = q;
-	  else head2 = q;
+	  q = p->pNexts + *tail;
+	  if ( tail == tail1 ) tail1 = q;
+	  else tail2 = q;
 	}
     }
 }
 static inline int Abc_BddManRealloc( Abc_BddMan * p )
 {
-  int * tmp_int;
-  unsigned * tmp_uint;
-  unsigned char * tmp_uchar;
+  unsigned nObjsAllocOld = p->nObjsAlloc;
   p->nObjsAlloc  = p->nObjsAlloc + p->nObjsAlloc;
-  if ( p->nObjsAlloc == 0 ) return 1;
+  assert( p->nObjsAlloc != 0 );
+  if ( p->nVerbose ) printf( "\tReallocate nodes by 2^%d\n", Abc_Base2Log( p->nObjsAlloc ) );
+  int nUniqueMaskOld = p->nUniqueMask;
   p->nUniqueMask = ( 1 << Abc_Base2Log( p->nObjsAlloc ) ) - 1;
   p->nCacheMask  = ( 1 << Abc_Base2Log( p->nObjsAlloc ) ) - 1;
-  tmp_int        = ABC_REALLOC( int, p->pUnique, p->nUniqueMask + 1 );
-  if( !tmp_int ) return 1;
-  memset( tmp_int + ( ( p->nUniqueMask + 1 ) >> 1 ), 0, sizeof(int) * ( ( p->nUniqueMask + 1 ) >> 1 ) );
-  p->pUnique     = tmp_int; 
-  tmp_int        = ABC_REALLOC( int, p->pNexts, p->nUniqueMask + 1 );
-  if( !tmp_int ) return 1;
-  memset( tmp_int + ( ( p->nUniqueMask + 1 ) >> 1 ), 0, sizeof(int) * ( ( p->nUniqueMask + 1 ) >> 1 ) );
-  p->pNexts      = tmp_int;
-  Abc_BddRehash( p );
-  ABC_FREE( p->pCache );
-  p->pCache      = ABC_CALLOC( unsigned, 3 * (long long)( p->nCacheMask + 1 ) );
-  tmp_uint       = ABC_REALLOC( unsigned, p->pObjs, 2 * (long long)p->nObjsAlloc );
-  if( !tmp_uint ) return 1;
-  memset( tmp_uint + p->nObjsAlloc, 0, sizeof(unsigned) * p->nObjsAlloc );
-  p->pObjs       = tmp_uint;
-  tmp_uchar      = ABC_REALLOC( unsigned char, p->pMark, p->nObjsAlloc );
-  if( !tmp_uchar ) return 1;
-  memset( tmp_uchar + ( p->nObjsAlloc >> 1 ), 0, sizeof(unsigned char) * ( p->nObjsAlloc >> 1 ) );
-  p->pMark       = tmp_uchar;
-  tmp_uchar      = ABC_REALLOC( unsigned char, p->pVars, p->nObjsAlloc );
-  if( !tmp_uchar ) return 1;
-  memset( tmp_uchar + ( p->nObjsAlloc >> 1 ), 0, sizeof(unsigned char) * ( p->nObjsAlloc >> 1 ) );
-  p->pVars       = tmp_uchar;
+  p->pUnique     = ABC_REALLOC( int, p->pUnique, p->nUniqueMask + 1 );
+  p->pNexts      = ABC_REALLOC( int, p->pNexts, p->nUniqueMask + 1 );
+  p->pObjs       = ABC_REALLOC( unsigned, p->pObjs, 2 * (long long)p->nObjsAlloc );
+  p->pMark       = ABC_REALLOC( unsigned char, p->pMark, p->nObjsAlloc );
+  p->pVars       = ABC_REALLOC( unsigned char, p->pVars, p->nObjsAlloc );
+  if ( !p->pUnique ) return -1;
+  if ( !p->pNexts  ) return -1;
+  if ( !p->pObjs   ) return -1;
+  if ( !p->pMark   ) return -1;
+  if ( !p->pVars   ) return -1;
+  memset( p->pUnique + ( nUniqueMaskOld + 1 ), 0, sizeof(int) * ( nUniqueMaskOld + 1 ) );
+  memset( p->pNexts + ( nUniqueMaskOld + 1 ), 0, sizeof(int) * ( nUniqueMaskOld + 1 ) );
+  memset( p->pObjs + 2 * (long long)nObjsAllocOld, 0, sizeof(unsigned) * 2 * (long long)nObjsAllocOld );
+  memset( p->pMark + nObjsAllocOld, 0, sizeof(unsigned char) * nObjsAllocOld );
+  memset( p->pVars + nObjsAllocOld, 0, sizeof(unsigned char) * nObjsAllocOld );
+  Abc_BddCacheRemove( p );
   p->nMemory = sizeof(Abc_BddMan) + 
     ( p->nUniqueMask + 1 ) * sizeof(int) + 
     (long long)( p->nCacheMask + 1 ) * 3 * sizeof(int) + 
     (long long)p->nObjsAlloc * 2 * sizeof(int) +
     (long long)p->nObjsAlloc * 3 * sizeof(char);
+  Abc_BddRehash( p );
+  if ( p->pEdges != NULL )
+    {
+      p->pEdges      = ABC_REALLOC( unsigned, p->pEdges, p->nObjsAlloc );
+      if ( !p->pEdges ) return -1;
+      memset ( p->pEdges + nObjsAllocOld, 0, sizeof(unsigned) * nObjsAllocOld );
+    }
   return 0;
 }
 
@@ -265,35 +255,35 @@ static inline int Abc_BddManRealloc( Abc_BddMan * p )
 ***********************************************************************/
 unsigned Abc_BddAnd( Abc_BddMan * p, unsigned a, unsigned b )
 {
-  if ( Abc_BddLitIsInvalid( a ) || Abc_BddLitIsInvalid( b ) ) return Abc_BddInvalidLit();
-  unsigned r0, r1, r;
-  if ( a == 0 ) return 0;
-  if ( b == 0 ) return 0;
-  if ( a == 1 ) return b;
-  if ( b == 1 ) return a;
-  if ( a == b ) return a;
+  if ( Abc_BddLitIsInvalid( a ) || Abc_BddLitIsInvalid( b ) ) return Abc_BddLitInvalid();
+  if ( Abc_BddLitIsConst0( a ) ) return a;
+  if ( Abc_BddLitIsConst0( b ) ) return b;
+  if ( Abc_BddLitIsConst1( a ) ) return b;
+  if ( Abc_BddLitIsConst1( b ) ) return a;
+  if ( Abc_BddLitIsEq( a, b ) ) return a;
   if ( a > b )  return Abc_BddAnd( p, b, a );
+  unsigned r0, r1, r;
+  unsigned s0, s1, t0, t1;
   r = Abc_BddCacheLookup( p, a, b );
-  if ( !Abc_BddLitIsInvalid( r ) )
-    return r;
+  if ( !Abc_BddLitIsInvalid( r ) ) return r;
   if ( Abc_BddVar( p, a ) < Abc_BddVar( p, b ) )
-    r0 = Abc_BddAnd( p, Abc_BddElse( p, a ), b ), 
-      r1 = Abc_BddAnd( p, Abc_BddThen( p, a ), b );
+    s0 = Abc_BddElse( p, a ), t0 = b, s1 = Abc_BddThen( p, a ), t1 = b;
   else if ( Abc_BddVar( p, a ) > Abc_BddVar( p, b ) )
-    r0 = Abc_BddAnd( p, a, Abc_BddElse( p, b ) ), 
-      r1 = Abc_BddAnd( p, a, Abc_BddThen( p, b ) );
+    s0 = a, t0 = Abc_BddElse( p, b ), s1 = a, t1 = Abc_BddThen( p, b );
   else // if ( Abc_BddVar( p, a ) == Abc_BddVar( p, b ) )
-    r0 = Abc_BddAnd( p, Abc_BddElse( p, a ), Abc_BddElse( p, b ) ), 
-      r1 = Abc_BddAnd( p, Abc_BddThen( p, a ), Abc_BddThen( p, b ) );
-  if ( Abc_BddLitIsInvalid( r0 ) || Abc_BddLitIsInvalid( r1 ) ) return Abc_BddInvalidLit();
+    s0 = Abc_BddElse( p, a ), t0 = Abc_BddElse( p, b ), s1 = Abc_BddThen( p, a ), t1 = Abc_BddThen( p, b );
+  r0 = Abc_BddAnd( p, s0, t0 );
+  if ( Abc_BddLitIsInvalid( r0 ) ) return Abc_BddLitInvalid();
+  r1 = Abc_BddAnd( p, s1, t1 );
+  if ( Abc_BddLitIsInvalid( r1 ) ) return Abc_BddLitInvalid();
   r = Abc_BddUniqueCreate( p, Abc_MinInt( Abc_BddVar( p, a ), Abc_BddVar( p, b ) ), r1, r0 );
-  if ( Abc_BddLitIsInvalid( r ) ) return Abc_BddInvalidLit();
+  if ( Abc_BddLitIsInvalid( r ) ) return Abc_BddLitInvalid();
   return Abc_BddCacheInsert( p, a, b, r );
 }
 unsigned Abc_BddOr( Abc_BddMan * p, unsigned a, unsigned b )
 {
   unsigned r = Abc_BddAnd( p, Abc_BddLitNot( a ), Abc_BddLitNot( b ) );
-  return ( Abc_BddLitIsInvalid( r ) ) ? Abc_BddInvalidLit() : Abc_BddLitNot( r );
+  return Abc_BddLitIsInvalid( r ) ? Abc_BddLitInvalid() : Abc_BddLitNot( r );
 }
 
 /**Function*************************************************************
@@ -309,43 +299,55 @@ unsigned Abc_BddOr( Abc_BddMan * p, unsigned a, unsigned b )
 ***********************************************************************/
 int Abc_BddCount_rec( Abc_BddMan * p, unsigned i )
 {
-  if ( i < 2 )
-    return 0;
-  if ( Abc_BddMark( p, i ) )
-    return 0;
+  if ( Abc_BddLitIsConst( i ) ) return 0;
+  if ( Abc_BddMark( p, i ) ) return 0;
   Abc_BddSetMark( p, i, 1 );
   return 1 + Abc_BddCount_rec( p, Abc_BddElse( p, i ) ) + Abc_BddCount_rec( p, Abc_BddThen( p, i ) );
 }
+void Abc_BddMark_rec( Abc_BddMan * p, unsigned i )
+{
+  if ( Abc_BddLitIsConst( i ) ) return;
+  if ( Abc_BddMark( p, i ) ) return;
+  Abc_BddSetMark( p, i, 1 );
+  Abc_BddMark_rec( p, Abc_BddElse( p, i ) );
+  Abc_BddMark_rec( p, Abc_BddThen( p, i ) );
+}
 void Abc_BddUnmark_rec( Abc_BddMan * p, unsigned i )
 {
-  if ( i < 2 )
-    return;
-  if ( !Abc_BddMark( p, i ) )
-    return;
+  if ( Abc_BddLitIsConst( i ) ) return;
+  if ( !Abc_BddMark( p, i ) ) return;
   Abc_BddSetMark( p, i, 0 );
   Abc_BddUnmark_rec( p, Abc_BddElse( p, i ) );
   Abc_BddUnmark_rec( p, Abc_BddThen( p, i ) );
 }
-int Abc_BddCountNodes( Abc_BddMan * p, unsigned i )
+static inline int Abc_BddCountNodes( Abc_BddMan * p, unsigned i )
 {
   int Count = Abc_BddCount_rec( p, i );
   Abc_BddUnmark_rec( p, i );
   return Count;
 }
-int Abc_BddCountNodesArray( Abc_BddMan * p, Vec_Int_t * vNodes )
+int Abc_BddCountNodesArrayShared( Abc_BddMan * p, Vec_Int_t * vNodes )
 {
   int i, a, Count = 0;
   Vec_IntForEachEntry( vNodes, a, i )
     Count += Abc_BddCount_rec( p, (unsigned)a );
+  for ( i = 0; i < p->nVars; i++ )
+    Count += Abc_BddCount_rec( p, Abc_BddLitIthVar( i ) );
   Vec_IntForEachEntry( vNodes, a, i )
     Abc_BddUnmark_rec( p, (unsigned)a );
-  return Count;
+  for ( i = 0; i < p->nVars; i++ )
+    Abc_BddUnmark_rec( p, Abc_BddLitIthVar( i ) );
+  //  return Count;
+  return Count + 4; // add 4 to make the number comparable to command "collapse -v"
 }
-int Abc_BddCountNodesArray2( Abc_BddMan * p, Vec_Int_t * vNodes )
+int Abc_BddCountNodesArrayIndependent( Abc_BddMan * p, Vec_Int_t * vNodes )
 {
   int i, a, Count = 0;
   Vec_IntForEachEntry( vNodes, a, i )
     {
+      // exclude variables to make the number comparable to command "print_stats" after "collapse"
+      if ( Abc_BddLitRegular( a ) <= Abc_BddLitIthVar( p->nVars - 1 ) )
+	continue; 
       Count += Abc_BddCount_rec( p, (unsigned)a );
       Abc_BddUnmark_rec( p, (unsigned)a );
     }
@@ -363,44 +365,121 @@ int Abc_BddCountNodesArray2( Abc_BddMan * p, Vec_Int_t * vNodes )
    SeeAlso     []
 
 ***********************************************************************/
-void Abc_BddPrint_rec( Abc_BddMan * p, unsigned a, int * pPath )
+void Abc_BddPrint_rec( Abc_BddMan * p, unsigned a, int * pPath, int offset, FILE * f )
 {
-  if ( a == 0 ) 
-    return;
-  if ( a == 1 )
+  if ( Abc_BddLitIsConst0( a ) ) return;
+  if ( Abc_BddLitIsConst1( a ) )
     { 
       int i;
       for ( i = 0; i < p->nVars; i++ )
 	if ( pPath[i] == 0 || pPath[i] == 1 )
-	  printf( "%c%d", pPath[i] ? '+' : '-', i );
-      printf( " " );
+	  fprintf( f, "%c%d", pPath[i] ? '+' : '-', i - offset );
+      fprintf( f, "\n" );
       return; 
     }
   pPath[Abc_BddVar( p, a )] =  0;
-  Abc_BddPrint_rec( p, Abc_BddElse( p, a ), pPath );
+  Abc_BddPrint_rec( p, Abc_BddElse( p, a ), pPath, offset, f );
   pPath[Abc_BddVar( p, a )] =  1;
-  Abc_BddPrint_rec( p, Abc_BddThen( p, a ), pPath );
+  Abc_BddPrint_rec( p, Abc_BddThen( p, a ), pPath, offset, f );
   pPath[Abc_BddVar( p, a )] = -1;
 }
-void Abc_BddPrint( Abc_BddMan * p, unsigned a )
+void Abc_BddPrint( Abc_BddMan * p, unsigned a, int offset, FILE * f )
 {
   int * pPath = ABC_FALLOC( int, p->nVars );
-  printf( "BDD %u = ", a );
-  Abc_BddPrint_rec( p, a, pPath );
+  fprintf( f, "BDD %u =\n", a );
+  Abc_BddPrint_rec( p, a, pPath, offset, f );
   ABC_FREE( pPath );
-  printf( "\n" );
 }
-void Abc_BddPrintTest( Abc_BddMan * p )
+
+/**Function*************************************************************
+
+   Synopsis    [Printing BDD.]
+
+   Description []
+               
+   SideEffects []
+
+   SeeAlso     []
+
+***********************************************************************/
+void Abc_BddWriteBlif_rec( Abc_BddMan * p, int x, FILE * f )
 {
-  unsigned bVarA = Abc_BddIthVar( 0 );
-  unsigned bVarB = Abc_BddIthVar( 1 );
-  unsigned bVarC = Abc_BddIthVar( 2 );
-  unsigned bVarD = Abc_BddIthVar( 3 );
-  unsigned bAndAB = Abc_BddAnd( p, bVarA, bVarB );
-  unsigned bAndCD = Abc_BddAnd( p, bVarC, bVarD );
-  unsigned bFunc  = Abc_BddOr( p, bAndAB, bAndCD );
-  Abc_BddPrint( p, bFunc );
-  printf( "Nodes = %d\n", Abc_BddCountNodes( p, bFunc ) );
+  unsigned i = Abc_BddBvar2Lit( x, 0 );
+  if ( Abc_BddLitIsConst( i ) ) return;
+  if ( Abc_BddMark( p, i ) ) return;
+  Abc_BddSetMark( p, i, 1 );
+  Abc_BddWriteBlif_rec( p, Abc_BddLit2Bvar( Abc_BddElse( p, i ) ), f );
+  Abc_BddWriteBlif_rec( p, Abc_BddLit2Bvar( Abc_BddThen( p, i ) ), f );
+  fprintf( f, ".subckt mux" );
+  fprintf( f, " sel=v%d", Abc_BddVar( p, i ) );
+  fprintf( f, " in1=n%d", Abc_BddLit2Bvar( Abc_BddThen( p, i ) ) );
+  fprintf( f, " else=n%d", Abc_BddLit2Bvar( Abc_BddElse( p, i ) ) );
+  if ( Abc_BddLitIsCompl( Abc_BddThen( p, i ) ) ) fprintf( f, " comp1=one" );
+  else fprintf( f, " comp1=zero" );
+  fprintf( f, " out=n%d\n", x );  
+}
+void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName )
+{
+  int i, j, k;
+  unsigned x;
+  FILE * f = fopen( pFileName, "w" );
+  fprintf( f, ".model top\n" );
+  fprintf( f, ".inputs" );
+  for ( i = 0; i < p->nVars; i++ )
+    {
+      for ( j = 0; j < p->nVars; j++ )
+	if ( Abc_BddVar( p, Abc_BddLitIthVar( j ) ) == i ) break;
+      if ( p->nVars <= 10 ) fprintf( f, " pi%d", j );
+      else if ( p->nVars <= 100 ) fprintf( f, " pi%02d", j );
+      else fprintf( f, " pi%03d", j );
+    }
+  printf( "\n" );
+  /*
+  for ( i = 0; i < p->nVars; i++ )
+    if ( p->nVars <= 10 ) fprintf( f, " pi%d ", i );
+    else if ( p->nVars <= 100 ) fprintf( f, " pi%02d ", i );
+    else fprintf( f, " pi%03d ", i );
+  */
+  fprintf( f, "\n.outputs" );
+  for ( i = 0; i < Vec_IntSize( vNodes ); i++ )
+    if ( p->nVars <= 10 ) fprintf( f, " po%d ", i );
+    else if ( p->nVars <= 100 ) fprintf( f, " po%02d ", i );
+    else fprintf( f, " po%03d ", i );
+  fprintf( f, "\n" );
+  fprintf( f, ".names zero\n" );
+  fprintf( f, ".names n0\n" );
+  fprintf( f, ".names one\n1\n" );
+  for ( i = 0; i < p->nVars; i++ )
+    {
+      fprintf( f, ".names" );
+      if ( p->nVars <= 10 ) fprintf( f, " pi%d ", i );
+      else if ( p->nVars <= 100 ) fprintf( f, " pi%02d ", i );
+      else fprintf( f, " pi%03d ", i );
+      fprintf( f, " v%d", Abc_BddVar( p, Abc_BddLitIthVar( i ) ) );
+      fprintf( f, "\n1 1\n" );      
+    }
+  Vec_IntForEachEntry( vNodes, x, i )
+    {
+      fprintf( f, ".names" );
+      fprintf( f, " n%d", Abc_BddLit2Bvar( x ) );
+      if ( p->nVars <= 10 ) fprintf( f, " po%d ", i );
+      else if ( p->nVars <= 100 ) fprintf( f, " po%02d ", i );
+      else fprintf( f, " po%03d ", i );
+      if ( Abc_BddLitIsCompl( x ) ) fprintf( f, "\n0 1\n" );
+      else fprintf( f, "\n1 1\n" );      
+      Abc_BddWriteBlif_rec( p, Abc_BddLit2Bvar( x ), f );
+    }
+  Vec_IntForEachEntry( vNodes, x, i )
+      Abc_BddUnmark_rec( p, x );
+    fprintf( f, ".end\n" );
+  fprintf( f, ".model mux\n" );
+  fprintf( f, ".inputs sel in1 else comp1\n" );
+  fprintf( f, ".outputs out\n" );
+  fprintf( f, ".names in1 comp1 then\n01 1\n10 1\n" );
+  fprintf( f, ".names sel then else out\n" );
+  fprintf( f, "0-1 1\n11- 1\n" );
+  fprintf( f, ".end\n" );
+  fclose( f );
 }
 
 /**Function*************************************************************
@@ -414,78 +493,30 @@ void Abc_BddPrintTest( Abc_BddMan * p )
    SeeAlso     []
 
 ***********************************************************************/
-void Abc_BddMarkChildren ( Abc_BddMan * p, unsigned i )
+static inline void Abc_BddRemoveNodeByBvar( Abc_BddMan * p, int i )
 {
-  unsigned Then = Abc_BddThen( p, i );
-  unsigned Else = Abc_BddElse( p, i );
-  if ( Abc_BddMark( p, Then ) == 0 )
-    {
-      Abc_BddSetMarkInvalid( p, Then );
-      Abc_BddMarkChildren( p, Then );
-    }
-  if ( Abc_BddMark( p, Else ) == 0 )
-    {
-      Abc_BddSetMarkInvalid( p, Else );
-      Abc_BddMarkChildren( p, Else );
-    }
-}
-void Abc_BddUnmarkChildren ( Abc_BddMan * p, unsigned i )
-{
-  unsigned Then = Abc_BddThen( p, i );
-  unsigned Else = Abc_BddElse( p, i );
-  if ( Abc_BddMarkIsInvalid( p, Then ) )
-    {
-      Abc_BddSetMark( p, Then, 0 );
-      Abc_BddUnmarkChildren( p, Then );
-    }
-  if ( Abc_BddMarkIsInvalid( p, Else ) )
-    {
-      Abc_BddSetMark( p, Else , 0 );
-      Abc_BddUnmarkChildren( p, Else );
-    }
-}
-static inline void Abc_BddRemoveNode( Abc_BddMan * p, unsigned i )
-{
-  int Var = Abc_BddVar( p, i );
-  int Then = Abc_BddThen( p, i );
-  int Else = Abc_BddElse( p, i );
-  int *q = p->pUnique + ( Abc_BddHash( Var, Then, Else ) & p->nUniqueMask );
+  int * q = p->pUnique + ( Abc_BddHash( Abc_BddVarOfBvar( p, i ), Abc_BddThenOfBvar( p, i ), Abc_BddElseOfBvar( p, i ) ) & p->nUniqueMask );
   for ( ; *q; q = p->pNexts + *q )
-    if ( *q == Abc_BddLit2Var( i ) )
-      break;
-  int *q_next = p->pNexts + *q;
+    if ( *q == i ) break;
+  int * q_next = p->pNexts + *q;
   *q = *q_next;
   *q_next = 0;
-  Abc_BddSetVarRemoved( p, i );
+  Abc_BddSetBvarRemoved( p, i );
+  if ( p->nRemoved > i ) p->nRemoved = i;
 }
-static inline void Abc_BddRefresh( Abc_BddMan * p )
+static inline void Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFrontiers )
 {
-  if ( p->fVerbose )
-    {
-      printf( "\nRefresh\n" );
-      fflush( stdout );
-    }
-  unsigned i;
-  int pFrontiers[MAX_NUM_FRONTIERS];
-  int nFrontiers = 0;
+  if ( p->nVerbose ) printf("\tGarbage collect\n");
+  int i;
+  unsigned x;
+  Vec_IntForEachEntry( pFrontiers, x, i )
+    Abc_BddMark_rec( p, x );
   for ( i = p->nVars + 1; i < p->nObjs; i++ )
-    if ( p->pMark[i] > 0 )
-      {
-	pFrontiers[nFrontiers] = i;
-	nFrontiers += 1;
-	assert( nFrontiers < MAX_NUM_FRONTIERS );
-      }
-  for ( i = 0; i < nFrontiers; i++ )
-    Abc_BddMarkChildren ( p, Abc_Var2Lit( pFrontiers[i], 0 ) );
-  for ( i = p->nVars + 1; i < p->nObjs; i++ ) 
-    if ( p->pMark[i] == 0 && !Abc_BddVarIsRemoved( p, Abc_BddVar2Lit( (int)i, 0 ) ) )
-      {
-	if ( p->nRemoved > i ) p->nRemoved = i;
-	Abc_BddRemoveNode( p, Abc_BddVar2Lit( (int)i, 0 ) );
-      }
+    if ( !Abc_BddMarkOfBvar( p, i ) && !Abc_BddBvarIsRemoved( p, i ) )
+      Abc_BddRemoveNodeByBvar( p, i );
+  Vec_IntForEachEntry( pFrontiers, x, i )
+    Abc_BddUnmark_rec( p, x );
   Abc_BddCacheRemove( p );
-  for ( i = 0; i < nFrontiers; i++ )
-    Abc_BddUnmarkChildren ( p, Abc_BddVar2Lit( pFrontiers[i], 0 ) );
 }
 
 /**Function*************************************************************
@@ -519,110 +550,169 @@ static inline void Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts )
    SeeAlso     []
 
 ***********************************************************************/
-void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump )
+static inline int Abc_BddRefresh( Abc_BddMan * p, int fGarbage, int fRealloc, int nReorder, int * fRefresh, Vec_Int_t * pFrontiers )
 {
-  abctime clk = Abc_Clock();
+  if ( p->nVerbose > 1 ) printf("\n");
+  if ( p->nVerbose ) printf("Refresh\n");
+  if ( fGarbage )
+    Abc_BddGarbageCollect( p, pFrontiers );
+  if ( !*fRefresh )
+    {
+      *fRefresh = 1;
+      return 0;
+    }
+  if ( *fRefresh < 2 && nReorder )
+    {
+      if ( p->nVerbose ) printf("\tReordering\n");
+      int r = 0;
+      if ( nReorder == 1 ) r = Abc_BddReorder( p, pFrontiers, p->nVerbose - 1 );
+      else if ( nReorder == 2 ) r = Abc_BddReorderConverge( p, pFrontiers, p->nVerbose - 1 );
+      else
+	{
+	  printf("Invalid reordering level %d. It should be at most 2.\n", nReorder);
+	  return -1;
+	}
+      *fRefresh = 2;
+      if ( r == 0 ) return 0;
+    }
+  while ( 1 )
+    {
+      if ( !fRealloc || p->nObjsAlloc >= 1 << 31 )
+	{
+	  printf( "The number of nodes exceeds the limit %u\n", p->nObjsAlloc );
+	  return -1;
+	}
+      if ( Abc_BddManRealloc( p ) )
+	{
+	  printf( "Reallocation failed\n" );
+	  return -1;
+	}
+      int r = 0;
+      if ( nReorder )
+	{
+	  if ( p->nVerbose ) printf("\tReordering\n");
+	  if ( nReorder == 1 ) r = Abc_BddReorder( p, pFrontiers, p->nVerbose - 1 );
+	  else if ( nReorder == 2 ) r = Abc_BddReorderConverge( p, pFrontiers, p->nVerbose - 1 );
+	  else
+	    {
+	      printf("Invalid reordering level %d. It should be at most 2.\n", nReorder);
+	      return -1;
+	    }
+	}
+      if ( r == 0 ) break;
+    }
+  if ( nReorder && fGarbage )
+    Abc_BddGarbageCollect( p, pFrontiers );
+  return 0;
+}
+int Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p, int fRealloc, int fGarbage, int nReorder )
+{
+  Gia_Obj_t * pObj, * pObj0, *pObj1;
+  int i, fRefresh = 0;
+  unsigned Cof0, Cof1;
+  int * pFanouts;
+  Vec_Int_t * pFrontiers;
+  if ( fGarbage )
+    {
+      pFanouts = ABC_CALLOC( int, pGia->nObjs );
+      assert( pFanouts );
+      pFrontiers = Vec_IntAlloc( 1 );
+      Abc_BddGiaCountFanout( pGia, pFanouts );
+    }
+  Gia_ManFillValue( pGia );
+  Gia_ManConst0( pGia )->Value = Abc_BddLitConst0();
+  Gia_ManForEachCi( pGia, pObj, i ) pObj->Value = Abc_BddLitIthVar( i );
+  Gia_ManForEachAnd( pGia, pObj, i )
+    {
+      pObj0 = Gia_ObjFanin0( pObj );
+      pObj1 = Gia_ObjFanin1( pObj );
+      Cof0 = Abc_BddLitNotCond( pObj0->Value, Gia_ObjFaninC0( pObj ) );
+      Cof1 = Abc_BddLitNotCond( pObj1->Value, Gia_ObjFaninC1( pObj ) );
+      pObj->Value = Abc_BddAnd( p, Cof0, Cof1 );
+      if ( Abc_BddLitIsInvalid( pObj->Value ) )
+	{
+	  if ( Abc_BddRefresh( p, fGarbage, fRealloc, nReorder, &fRefresh, pFrontiers ) )
+	    return -1;
+	  i--;
+	  continue;
+	}
+      if ( fGarbage )
+	{
+	  fRefresh = 0;
+	  Vec_IntPush( pFrontiers, pObj->Value );
+	  pFanouts[Gia_ObjId( pGia, pObj0 )] -= 1;
+	  if ( pFanouts[Gia_ObjId( pGia, pObj0 )] == 0 ) Vec_IntRemove( pFrontiers, pObj0->Value );
+	  pFanouts[Gia_ObjId( pGia, pObj1 )] -= 1;
+	  if ( pFanouts[Gia_ObjId( pGia, pObj1 )] == 0 ) Vec_IntRemove( pFrontiers, pObj1->Value );
+	}
+    }
+  Gia_ManForEachCo( pGia, pObj, i )
+    pObj->Value = Abc_BddLitNotCond( Gia_ObjFanin0( pObj )->Value, Gia_ObjFaninC0( pObj ) );
+  if ( fGarbage )
+    {
+      ABC_FREE( pFanouts );
+      Vec_IntFree( pFrontiers );
+    }
+  return 0;
+}
+void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fRealloc, int fGarbage, int nReorder, int nFinalReorder )
+{
+  abctime clk, clk2;
   Abc_BddMan * p;
   Vec_Int_t * vNodes;
   Gia_Obj_t * pObj;
-  int i;
-  int fRefresh = 0;
+  int i, j;
   unsigned nObjsAllocInit = 1 << nMem;
-  while ( nObjsAllocInit < Gia_ManCiNum( pGia ) + 2 )
+  while ( nObjsAllocInit < Gia_ManCiNum( pGia ) + 1 )
     {
       nObjsAllocInit = nObjsAllocInit << 1;
       assert( nObjsAllocInit != 0 );
     }
-  if ( fVerbose ) printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
-  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, fVerbose );
-  int * pFanouts = ABC_CALLOC( int, pGia->nObjs );
-  assert( pFanouts );
-  Abc_BddGiaCountFanout( pGia, pFanouts );
-  Gia_ManFillValue( pGia );
-  Gia_ManConst0( pGia )->Value = 0;
-  Gia_ManForEachCi( pGia, pObj, i )
-    pObj->Value = Abc_BddIthVar( i );
-  vNodes = Vec_IntAlloc( Gia_ManAndNum( pGia ) );
-  Gia_ManForEachAnd( pGia, pObj, i )
-    {
-      Gia_Obj_t * pObj0 = Gia_ObjFanin0( pObj );
-      Gia_Obj_t * pObj1 = Gia_ObjFanin1( pObj );
-      unsigned Cof0 = Abc_BddLitNotCond( pObj0->Value, Gia_ObjFaninC0( pObj ) );
-      unsigned Cof1 = Abc_BddLitNotCond( pObj1->Value, Gia_ObjFaninC1( pObj ) );
-      pObj->Value = Abc_BddAnd( p, Cof0, Cof1 );
-      if ( Abc_BddLitIsInvalid( pObj->Value ) )
-	{
-	  if ( fRefresh )
-	    {
-	      if ( p->nObjsAlloc == 1 << 31 )
-		{
-		  printf( "The number of nodes exceeds the limit 2^31\n" );
-		  assert(0);
-		}
-	      if ( nJump > 0 )
-		{
-		  if ( p->nObjsAlloc >= 1 << nJump )
-		    {
-		      printf( "The number of nodes exceeds the jumped limit 2^%d\n", nJump );
-		      assert(0);
-		    }
-		  Abc_BddManFree( p );
-		  if ( fVerbose ) printf( "Reallocate nodes jump to 2^%d\n", nJump );
-		  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), 1 << nJump, fVerbose );
-		  Abc_BddGiaCountFanout( pGia, pFanouts );
-		  Gia_ManFillValue( pGia );
-		  Gia_ManConst0( pGia )->Value = 0;
-		  Gia_ManForEachCi( pGia, pObj, i )
-		    pObj->Value = Abc_BddIthVar( i );
-		  i = -1;
-		  continue;
-		}
-	      else 
-		{
-		  if( fVerbose ) printf( "\nReallocate nodes by 2^%d\n", Abc_Base2Log( p->nObjsAlloc << 1 ) );
-		  if ( Abc_BddManRealloc( p ) )
-		    {
-		      printf( "error : reallocation failed\n" );
-		      assert(0);
-		    }
-		}
-	    }
-	  else
-	    {
-	      fRefresh = 1;
-	      Abc_BddRefresh( p );
-	    }
-	  i--;
-	  continue;
-	}
-      fRefresh = 0;
-      Abc_BddIncMark( p, pObj->Value );
-      pFanouts[Gia_ObjId( pGia, pObj0 )] -= 1;
-      if ( pFanouts[Gia_ObjId( pGia, pObj0 )] == 0 )
-	Abc_BddDecMark( p, pObj0->Value );
-      pFanouts[Gia_ObjId( pGia, pObj1 )] -= 1;
-      if ( pFanouts[Gia_ObjId( pGia, pObj1 )] == 0 )
-	Abc_BddDecMark( p, pObj1->Value );
-    }
+  clk = Abc_Clock();
+  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, nVerbose );
+  if ( nReorder ) Abc_BddReorderAlloc( p );
+  if ( Abc_BddGia( pGia, p, fRealloc, fGarbage, nReorder ) )
+    return;
+  clk2 = Abc_Clock();
+  vNodes = Vec_IntAlloc( Gia_ManCoNum( pGia ) );
   Gia_ManForEachCo( pGia, pObj, i )
-    pObj->Value = Abc_BddLitNotCond( Gia_ObjFanin0( pObj )->Value, Gia_ObjFaninC0( pObj ) );
-  abctime clk2 = Abc_Clock();
-  Gia_ManForEachCo( pGia, pObj, i )
+    Vec_IntPush( vNodes, pObj->Value );
+  printf( "Shared BDD size = %6d nodes.", Abc_BddCountNodesArrayShared( p, vNodes ) );
+  ABC_PRT( "  BDD construction time", clk2 - clk );
+  printf( "Sum of BDD nodes for each BDD = %d", Abc_BddCountNodesArrayIndependent( p, vNodes ) );
+  printf( "  Used nodes = %d  Allocated nodes = %u\n", p->nObjs, ( p->nObjsAlloc == 1 << 31 ) ? p->nObjsAlloc - 1 : p->nObjsAlloc );
+  if ( nFinalReorder )
     {
-      //      if ( fVerbose )
-      //	Abc_BddPrint( p, pObj->Value );
-      if ( Abc_BddLit2Var( pObj->Value ) > p->nVars )
-	{
-	  Vec_IntPush( vNodes, pObj->Value );
-	  if ( Abc_BddMark( p, pObj->Value ) != 0 )
-	    Abc_BddDecMark( p, pObj->Value );
-	}
+      if ( !nReorder ) Abc_BddReorderAlloc( p );
+      int prev = Abc_BddCountNodesArrayShared( p, vNodes );
+      clk = Abc_Clock();
+      if ( nFinalReorder == 1 ) Abc_BddReorder( p, vNodes, nVerbose - 1 );
+      else if ( nFinalReorder == 2 ) Abc_BddReorderConverge( p, vNodes, nVerbose - 1 );
+      else printf("Invalid reordering level %d. It should be at most 2.\n", nFinalReorder);
+      clk2 = Abc_Clock();
+      int now = Abc_BddCountNodesArrayShared( p, vNodes );
+      printf( "Gain %d -> %d (%d)\n", prev, now, now - prev );
+      printf( "Shared BDD size = %6d nodes.", Abc_BddCountNodesArrayShared( p, vNodes ) );
+      ABC_PRT( "  Final reordering time", clk2 - clk );
+      printf( "Sum of BDD nodes for each BDD = %d", Abc_BddCountNodesArrayIndependent( p, vNodes ) );
+      printf( "  Used nodes = %d  Allocated nodes = %u\n", p->nObjs, ( p->nObjsAlloc == 1 << 31 ) ? p->nObjsAlloc - 1 : p->nObjsAlloc );
     }
-  if( fVerbose ) printf( "\n" );
-  ABC_PRT( "BDD construction time", clk2 - clk );
-  printf( "Shared nodes = %d Allocated nodes = %u\n", Abc_BddCountNodesArray2( p, vNodes ), p->nObjsAlloc );
+  if ( nReorder || nFinalReorder )
+    {
+      printf( "Ordering:\n" );
+      for ( i = 0; i < p->nVars; i++ )
+	{
+	  for ( j = 0; j < p->nVars; j++ )
+	    if ( Abc_BddVar( p, Abc_BddLitIthVar( j ) ) == i ) break;
+	  if ( p->nVars <= 10 ) printf( "pi%d ", j );
+	  else if ( p->nVars <= 100 ) printf( "pi%02d ", j );
+	  else printf( "pi%03d ", j );
+	}
+      printf( "\n" );
+      Abc_BddReorderFree( p );
+    }
+  if ( pFileName != NULL ) Abc_BddWriteBlif( p, vNodes, pFileName );
   Vec_IntFree( vNodes );
-  ABC_FREE( pFanouts );
   Abc_BddManFree( p );
 }
 
@@ -640,11 +730,38 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int fVerbose, int nMem, int nJump )
 int Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth )
 {
   if ( p->nVars - depth < 0 ) return 0;
-  if ( a == 0 ) 
-    return 1 << ( p->nVars - depth );
-  if ( a == 1 )
-    return 0;
+  if ( Abc_BddLitIsConst0( a ) ) return 1 << ( p->nVars - depth );
+  if ( Abc_BddLitIsConst1( a ) ) return 0;
   return Abc_BddCount0s( p, Abc_BddElse( p, a ), depth + 1 ) + Abc_BddCount0s( p, Abc_BddThen( p, a ), depth + 1 );
+}
+int Abc_BddCount1s( Abc_BddMan * p, unsigned a, int depth )
+{
+  if ( p->nVars - depth < 0 ) return 0;
+  if ( Abc_BddLitIsConst0( a ) ) return 0;
+  if ( Abc_BddLitIsConst1( a ) ) return 1 << ( p->nVars - depth );
+  return Abc_BddCount1s( p, Abc_BddElse( p, a ), depth + 1 ) + Abc_BddCount1s( p, Abc_BddThen( p, a ), depth + 1 );
+}
+unsigned __int128 Abc_BddCount1s128( Abc_BddMan * p, unsigned a, int depth )
+{
+  if ( p->nVars - depth < 0 ) return 0;
+  if ( Abc_BddLitIsConst0( a ) ) return 0;
+  if ( Abc_BddLitIsConst1( a ) )
+    {
+      unsigned __int128 i = 1;
+      return i << ( p->nVars - depth );
+    }
+  return Abc_BddCount1s128( p, Abc_BddElse( p, a ), depth + 1 ) + Abc_BddCount1s128( p, Abc_BddThen( p, a ), depth + 1 );
+}
+unsigned __int128 Abc_BddCount0s128( Abc_BddMan * p, unsigned a, int depth )
+{
+  if ( p->nVars - depth < 0 ) return 0;
+  if ( Abc_BddLitIsConst1( a ) ) return 0;
+  if ( Abc_BddLitIsConst0( a ) )
+    {
+      unsigned __int128 i = 1;
+      return i << ( p->nVars - depth );
+    }
+  return Abc_BddCount0s128( p, Abc_BddElse( p, a ), depth + 1 ) + Abc_BddCount0s128( p, Abc_BddThen( p, a ), depth + 1 );
 }
 
 ////////////////////////////////////////////////////////////////////////

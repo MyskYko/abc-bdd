@@ -8,6 +8,7 @@ SRC +=    src/misc/extra/extraUtilBitMatrix.c \
     src/misc/extra/extraUtilEnum.c \
     src/misc/extra/extraUtilFile.c \
     src/misc/extra/extraUtilGen.c \
+    src/misc/extra/extraUtilIig.c \
     src/misc/extra/extraUtilMacc.c \
     src/misc/extra/extraUtilMaj.c \
     src/misc/extra/extraUtilMemory.c \
@@ -17,6 +18,8 @@ SRC +=    src/misc/extra/extraUtilBitMatrix.c \
     src/misc/extra/extraUtilPerm.c \
     src/misc/extra/extraUtilProgress.c \
     src/misc/extra/extraUtilReader.c \
+    src/misc/extra/extraUtilReorder.c \
     src/misc/extra/extraUtilSupp.c \
     src/misc/extra/extraUtilTruth.c \
-    src/misc/extra/extraUtilUtil.c
+    src/misc/extra/extraUtilUtil.c \
+    src/misc/extra/extraUtilVc.c

@@ -540,6 +540,8 @@ static int Abc_CommandAbc9Gen                ( Abc_Frame_t * pAbc, int argc, cha
 static int Abc_CommandAbc9Cfs                ( Abc_Frame_t * pAbc, int argc, char ** argv );
 static int Abc_CommandAbc9Bdd                ( Abc_Frame_t * pAbc, int argc, char ** argv );
 static int Abc_CommandAbc9Cspf               ( Abc_Frame_t * pAbc, int argc, char ** argv );
+static int Abc_CommandAbc9BddMulti           ( Abc_Frame_t * pAbc, int argc, char ** argv );
+static int Abc_CommandAbc9Iig                ( Abc_Frame_t * pAbc, int argc, char ** argv );
 
 static int Abc_CommandAbc9Test               ( Abc_Frame_t * pAbc, int argc, char ** argv );
 
@@ -1245,7 +1247,8 @@ void Abc_Init( Abc_Frame_t * pAbc )
     Cmd_CommandAdd( pAbc, "ABC9",         "&cfs",          Abc_CommandAbc9Cfs,                    0 );
     Cmd_CommandAdd( pAbc, "ABC9",         "&bdd",          Abc_CommandAbc9Bdd,                    0 );
     Cmd_CommandAdd( pAbc, "ABC9",         "&cspf",         Abc_CommandAbc9Cspf,                   0 );
-    
+    Cmd_CommandAdd( pAbc, "ABC9",         "&bddm",         Abc_CommandAbc9BddMulti,               0 );
+    Cmd_CommandAdd( pAbc, "ABC9",         "&iig",          Abc_CommandAbc9Iig,                    0 );
     Cmd_CommandAdd( pAbc, "ABC9",         "&test",         Abc_CommandAbc9Test,         0 );
     {
 //        extern Mf_ManTruthCount();
@@ -45885,24 +45888,36 @@ usage:
 ***********************************************************************/
 int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
 {
-    int c, fVerbose = 0;
+    int c;
+    int nVerbose = 0;
     int nMem = 0;
-    int nJump = 0;
+    int fRealloc = 1;
+    int fGarbage = 1;
+    int nReorder = 0;
+    int nFinalReorder = 0;
+    char * pFileName = NULL;
+    extern void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fRealloc, int fGarbage, int nReorder, int nFinalReorder );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "JMvh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "FMRVWagh" ) ) != EOF )
     {
         switch ( c )
         {
-        case 'J':
-            if ( globalUtilOptind >= argc )
+        case 'a':
+            fRealloc ^= 1;
+            break;
+        case 'g':
+            fGarbage ^= 1;
+            break;
+        case 'F':
+	  if ( globalUtilOptind >= argc )
             {
-                Abc_Print( -1, "Command line switch \"-J\" should be followed by an integer.\n" );
+	        Abc_Print( -1, "Command line switch \"-F\" should be followed by an integer.\n" );
                 goto usage;
             }
-            nJump = atoi(argv[globalUtilOptind]);
+  	    nFinalReorder = atoi(argv[globalUtilOptind]);
             globalUtilOptind++;
-            if ( nJump < 0 )
-                goto usage;
+	    if ( nFinalReorder < 0 )
+	      goto usage;
             break;
         case 'M':
             if ( globalUtilOptind >= argc )
@@ -45915,8 +45930,36 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
             if ( nMem < 0 )
                 goto usage;
             break;
-        case 'v':
-            fVerbose ^= 1;
+        case 'R':
+	  if ( globalUtilOptind >= argc )
+            {
+	        Abc_Print( -1, "Command line switch \"-R\" should be followed by an integer.\n" );
+                goto usage;
+            }
+	    nReorder = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nReorder < 0 )
+                goto usage;
+            break;
+        case 'V':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-V\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nVerbose = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nVerbose < 0 )
+                goto usage;
+            break;
+        case 'W':
+	  if ( globalUtilOptind >= argc )
+            {
+	        Abc_Print( -1, "Command line switch \"-W\" should be followed by a blif filename.\n" );
+                goto usage;
+            }
+            pFileName = argv[globalUtilOptind];
+            globalUtilOptind++;
             break;
         case 'h':
             goto usage;
@@ -45926,18 +45969,22 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
     }
     if ( pAbc->pGia == NULL )
     {
-        Abc_Print( -1, "Abc_CommandAbc9Test(): There is no AIG.\n" );
+        Abc_Print( -1, "Abc_CommandAbc9Bdd(): There is no AIG.\n" );
         return 1;
     }
-    Abc_BddGiaTest( pAbc->pGia, fVerbose, nMem, nJump );
+    Abc_BddGiaTest( pAbc->pGia, nVerbose, nMem, pFileName, fRealloc, fGarbage, nReorder, nFinalReorder );
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &bdd [-JM num] [-vh]\n" );
-    Abc_Print( -2, "\t        simple bdd construction with garbage collection\n" );
-    Abc_Print( -2, "\t-J num: memory reallocation jump to 2^num, 0 is incremental reallocation [default = %d]\n", nJump );
-    Abc_Print( -2, "\t-M num: memory size to allocate 2^? BDD varialbe [default = %d]\n", nMem );
-    Abc_Print( -2, "\t-v    : toggle printing verbose information [default = %s]\n", fVerbose? "yes": "no" );
+    Abc_Print( -2, "usage: &bdd [-W <file>] [-FMRV num] [-agh]\n" );
+    Abc_Print( -2, "\t        BDD construction with simple BDD package\n" );
+    Abc_Print( -2, "\t-a    : toggle reallocating by double when nodes reach the limit (after garbage collection) [default = %s]\n", fRealloc? "yes": "no" );
+    Abc_Print( -2, "\t-g    : toggle garbage collecting when nodes reach the limit [default = %s]\n", fGarbage? "yes": "no" );
+    Abc_Print( -2, "\t-F num: toggel reordering after building BDDs. 0=off, 1=shift, 2=shift_converge [default = %d]\n", nFinalReorder );
+    Abc_Print( -2, "\t-M num: memory size to allocate (2^num nodes) [default = %d]\n", nMem );
+    Abc_Print( -2, "\t-R num: toggle reordering. 0=off, 1=shift, 2=shift_converge [default = %d]\n", nReorder );
+    Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
+    Abc_Print( -2, "\t-W <file>: file to write blif of constructed BDDs\n" );
     Abc_Print( -2, "\t-h    : print the command usage\n");
     return 1;
 }
@@ -45964,20 +46011,25 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     int nMemMax = 31;
     int fDvr = 0;
     int fCudd = 0;
+    int fRep = 0;
+    int nGate;
     char * FileName;
     char Command[1000];
     extern void Abc_BddNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nMemMax, int nType, int nIte, int nOpt, int nVerbose );
     extern void Abc_DdNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nMemMax, int nType, int nIte, int nOpt, int fDvr, int nVerbose );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "GNOMUVcrh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "GNOMUVcdrh" ) ) != EOF )
     {
         switch ( c )
         {
 	case 'c':
             fCudd ^= 1;
             break;
-	case 'r':
+	case 'd':
             fDvr ^= 1;
+            break;
+	case 'r':
+            fRep ^= 1;
             break;
         case 'G':
             if ( globalUtilOptind >= argc )
@@ -46053,7 +46105,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     }
     if ( pAbc->pGia == NULL )
     {
-        Abc_Print( -1, "Abc_CommandAbc9Test(): There is no AIG.\n" );
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): There is no AIG.\n" );
         return 1;
     }
     if ( argc != globalUtilOptind + 1 )
@@ -46062,20 +46114,24 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     }
     // get the input file name
     FileName = argv[globalUtilOptind];
-    if ( fCudd )
-      Abc_DdNandGiaTest( pAbc->pGia, FileName, nMem, nMemMax, nType, nIte, nOpt, fDvr, nVerbose );
-    else
-      Abc_BddNandGiaTest( pAbc->pGia, FileName, nMem, nMemMax, nType, nIte, nOpt, nVerbose );
-    // read the file just produced
-    sprintf(Command, "read %s; strash; &get", FileName );
-    Cmd_CommandExecute( pAbc, Command );
+    do
+      {
+	nGate = Gia_ManAndNum( pAbc->pGia );
+	if ( fCudd )
+	  Abc_DdNandGiaTest( pAbc->pGia, FileName, nMem, nMemMax, nType, nIte, nOpt, fDvr, nVerbose );
+	else
+	  Abc_BddNandGiaTest( pAbc->pGia, FileName, nMem, nMemMax, nType, nIte, nOpt, nVerbose );
+	sprintf(Command, "read %s; strash; &get", FileName );
+	Cmd_CommandExecute( pAbc, Command );
+      } while ( fRep && nGate != Gia_ManAndNum( pAbc->pGia ) );
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &cspf [-GNOMUV num] [-crh] <file>\n" );
+    Abc_Print( -2, "usage: &cspf [-GNOMUV num] [-cdrh] <file>\n" );
     Abc_Print( -2, "\t        nand circuit minimization by permissible function using simple bdd\n" );
-    Abc_Print( -2, "\t-c    : toggle CUDD not simple BDD [default = %s]\n", fCudd? "yes": "no" );
-    Abc_Print( -2, "\t-r    : toggle dynamic variable reoredering only in CUDD [default = %s]\n", fDvr? "yes": "no" );
+    Abc_Print( -2, "\t-c    : toggle using CUDD not simple BDD [default = %s]\n", fCudd? "yes": "no" );
+    Abc_Print( -2, "\t-d    : toggle dynamic variable reoredering only in CUDD [default = %s]\n", fDvr? "yes": "no" );
+    Abc_Print( -2, "\t-r    : toggle repeating optimization while it is effectie [default = %s]\n", fRep? "yes": "no" );
     Abc_Print( -2, "\t-G num: optimization type [default = %d]\n", nType );
     Abc_Print( -2, "\t-N num: max iteration (0 is no limit) [default = %d]\n", nIte );
     Abc_Print( -2, "\t-O num: option to minimization [default = %d]\n", nOpt );
@@ -46084,6 +46140,236 @@ usage:
     Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
     Abc_Print( -2, "\t-h    : print the command usage\n");
     Abc_Print( -2, "\t<file> : output file name\n");
+    return 1;
+}
+
+/**Function*************************************************************
+
+  Synopsis    []
+
+  Description []
+
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+int Abc_CommandAbc9BddMulti( Abc_Frame_t * pAbc, int argc, char ** argv )
+{
+    int c;
+    int nVerbose = 0;
+    int nMem = 21;
+    int nSize = 4;
+    int fReverse = 0;
+    int fColumn = 0;
+    int fSwap = 0;
+    char * FileName;
+    char Command[1000];
+    extern void Abc_GenMultiAdderTree( char * pFileName, int nVars, int fReverse, int fColumn );
+    extern void Abc_BddMulti( Gia_Man_t * pGia, int nVerbose, int nMem, int nSize, int fReverse, int fColumn, int fSwap );
+    Extra_UtilGetoptReset();
+    while ( ( c = Extra_UtilGetopt( argc, argv, "MNVcrsh" ) ) != EOF )
+    {
+        switch ( c )
+        {
+        case 'M':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-M\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nMem = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nMem < 0 )
+                goto usage;
+            break;
+	case 'N':
+	    if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-N\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nSize = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nSize <= 0 )
+                goto usage;
+            break;
+	case 'V':
+	    if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-V\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nVerbose = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nVerbose < 0 )
+                goto usage;
+            break;
+        case 'c':
+            fColumn ^= 1;
+            break;
+        case 'r':
+            fReverse ^= 1;
+            break;
+        case 's':
+            fSwap ^= 1;
+            break;
+        case 'h':
+            goto usage;
+        default:
+            goto usage;
+        }
+    }
+    if ( argc != globalUtilOptind + 1 )
+    {
+        goto usage;
+    }
+    // get the input file name
+    FileName = argv[globalUtilOptind];
+    Abc_GenMultiAdderTree( FileName, nSize, fReverse, fColumn );
+    sprintf(Command, "read %s; st; &get", FileName );
+    Cmd_CommandExecute( pAbc, Command );
+    Abc_BddMulti( pAbc->pGia, nVerbose, nMem, nSize, fReverse, fColumn, fSwap );
+    return 0;
+    
+usage:
+    Abc_Print( -2, "usage: &bddm [-MNV num] [-crsh] <file>\n" );
+    Abc_Print( -2, "\t        simple bdd construction for multiplier\n" );
+    Abc_Print( -2, "\t-M num: memory size to allocate 2^? BDD varialbe [default = %d]\n", nMem );
+    Abc_Print( -2, "\t-N num: size of multiplier NxN bit [default = %d]\n", nSize );
+    Abc_Print( -2, "\t-V    : level of printing verbose information [default = %d]\n", nVerbose );
+    Abc_Print( -2, "\t-c    : toggle using column based variable ordering for adder tree [default = %s]\n", fColumn? "yes": "no" );
+    Abc_Print( -2, "\t-r    : toggle reversing the variable ordering for adder tree [default = %s]\n", fReverse? "yes": "no" );
+    Abc_Print( -2, "\t-s    : toggle swapping a and b, which are inputs of multiplier [default = %s]\n", fSwap? "yes": "no" );
+    Abc_Print( -2, "\t-h    : print the command usage\n");
+    Abc_Print( -2, "\t<file> : intermediate file name for adder tree\n");
+    return 1;
+}
+
+/**Function*************************************************************
+
+  Synopsis    []
+
+  Description []
+
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+int Abc_CommandAbc9Iig( Abc_Frame_t * pAbc, int argc, char ** argv )
+{
+    int c, nVerbose = 0;
+    int i;
+    int nMem = 21;
+    int fDump = 0;
+    int nPat = 1;
+    int fConv = 1;
+    int fRep = 0;
+    char * FileName = NULL;
+    FILE * pFile = NULL;
+    char Command[1000];
+    extern void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int nPat, int frep );
+    Extra_UtilGetoptReset();
+    while ( ( c = Extra_UtilGetopt( argc, argv, "FMNVcdrh" ) ) != EOF )
+    {
+        switch ( c )
+        {
+        case 'F':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-F\" should be followed by a filename.\n" );
+                goto usage;
+            }
+            FileName = argv[globalUtilOptind];
+            globalUtilOptind++;
+            break;
+        case 'M':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-M\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nMem = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nMem < 0 )
+                goto usage;
+            break;
+        case 'N':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-N\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nPat = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nPat <= 0 )
+                goto usage;
+            break;
+        case 'V':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-V\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nVerbose = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nVerbose < 0 )
+                goto usage;
+            break;
+        case 'c':
+            fConv ^= 1;
+            break;
+        case 'd':
+            fDump ^= 1;
+            break;
+        case 'r':
+            fRep ^= 1;
+            break;
+        case 'h':
+            goto usage;
+        default:
+            goto usage;
+        }
+    }
+    if ( pAbc->pGia == NULL )
+    {
+        Abc_Print( -1, "Abc_CommandAbc9Iig(): There is no AIG.\n" );
+        return 1;
+    }
+    if ( fDump ) pFile = stdout;
+    if ( FileName != NULL ) pFile = fopen( FileName, "w" );
+    if ( fConv )
+      {
+	if( Gia_ManRegNum( pAbc->pGia ) == 0 )
+	  {
+	    Abc_Print( -1, "Abc_CommandAbc9Iig(): The circuit is not sequential. Please use \"-c\".\n" );
+	    return 1;
+	  }
+	sprintf(Command, "&put; comb" );
+	Cmd_CommandExecute( pAbc, Command );
+	sprintf(Command, "zeropo -N 0; removepo -N 0" );
+	for ( i = 0; i < Gia_ManPoNum( pAbc->pGia ); i++ )
+	  Cmd_CommandExecute( pAbc, Command );
+	sprintf(Command, "&get" );
+	Cmd_CommandExecute( pAbc, Command );
+      }
+    Abc_BddGiaIig( pAbc->pGia, nVerbose, nMem, pFile, nPat, fRep );
+    if ( FileName != NULL ) fclose( pFile );
+    return 0;
+    
+usage:
+    Abc_Print( -2, "usage: &iig [-F <file>] [-MNV num] [-cdrh]\n" );
+    Abc_Print( -2, "\t        inductive invariant generation using BDD\n" );
+    Abc_Print( -2, "\t-F <file>: dump the resulting inductive invariant to the file without printing [default = %d]\n", FileName );
+    //    Abc_Print( -2, "\t-L num: number of latches [default = %d]\n", nLatch );
+    Abc_Print( -2, "\t-M num: memory size to allocate 2^? BDD nodes [default = %d]\n", nMem );
+    Abc_Print( -2, "\t-N num: initial number of states for F to be 0 [default = %d]\n", nPat );
+    Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
+    Abc_Print( -2, "\t-c    : toggle converting circuit [default = %s]\n", fConv? "yes": "no" );
+    Abc_Print( -2, "\t-d    : toggle dumping resulting inductive invariant [default = %s]\n", fDump? "yes": "no" );
+    Abc_Print( -2, "\t-r    : toggle repeating if it fails [default = %s]\n", fRep? "yes": "no" );
+    Abc_Print( -2, "\t-h    : print the command usage\n");
     return 1;
 }
 
