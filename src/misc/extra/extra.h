@@ -428,7 +428,8 @@ struct Abc_BddMan_
   int                nCacheLookups; // the number of computed table lookups
   int                nCacheMisses;  // the number of computed table misses
   long long          nMemory;       // total amount of memory used (in bytes)
-  int                nRemoved;      // the minimum int of removed node
+  int                nMinRemoved;   // the minimum int of removed nodes
+  int                nRemoved;      // the number of removed nodes
   int                nVerbose;
 
   unsigned *         pEdges;        // array of number of incoming edges for each BDD node. used for reordering
@@ -502,6 +503,7 @@ extern void            Abc_BddUnmark_rec( Abc_BddMan * p, unsigned i );
 extern int             Abc_BddCountNodesArrayShared( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern int             Abc_BddCountNodesArrayIndependent( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern void            Abc_BddPrint( Abc_BddMan * p, unsigned a, int offset, FILE * f );
+extern void            Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFrontiers );
 extern int             Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p, int fRealloc, int fGarbage, int nReorder );
 
 extern int             Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth );
@@ -519,12 +521,11 @@ extern unsigned        Abc_BddVectorCompose( Abc_BddMan * p, unsigned F,  Vec_In
 extern void           Abc_BddCountEdge( Abc_BddMan * p, Vec_Int_t * pFunctions );
 extern void           Abc_BddUncountEdge( Abc_BddMan * p, Vec_Int_t * pFunctions );
 extern void           Abc_BddCountEdgeAndBvar( Abc_BddMan * p, Vec_Int_t * pFunctions );
-extern void           Abc_BddShiftBvar( Abc_BddMan * p, int i, int d );
-extern int            Abc_BddShift( Abc_BddMan * p, int * pos, int * diff, int distance, int fUp, int * bestPos, int * bestDiff, int * new2old, int fVerbose );
+
 extern void           Abc_BddReorderAlloc( Abc_BddMan * p );
 extern void           Abc_BddReorderFree( Abc_BddMan * p );
-extern int            Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int fVerbose );
-extern int            Abc_BddReorderConverge( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose );
+extern void           Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int fVerbose );
+extern void           Abc_BddReorderConverge( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose );
 
 /**AutomaticEnd***************************************************************/
 

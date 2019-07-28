@@ -45972,6 +45972,11 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
         Abc_Print( -1, "Abc_CommandAbc9Bdd(): There is no AIG.\n" );
         return 1;
     }
+    if ( !fGarbage && nReorder )
+    {
+        Abc_Print( -1, "Abc_CommandAbc9Bdd(): GC should be enabled if you use reorder.\n" );
+        return 1;
+    }
     Abc_BddGiaTest( pAbc->pGia, nVerbose, nMem, pFileName, fRealloc, fGarbage, nReorder, nFinalReorder );
     return 0;
     
