@@ -503,6 +503,7 @@ extern void            Abc_BddUnmark_rec( Abc_BddMan * p, unsigned i );
 extern int             Abc_BddCountNodesArrayShared( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern int             Abc_BddCountNodesArrayIndependent( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern void            Abc_BddPrint( Abc_BddMan * p, unsigned a, int offset, FILE * f );
+extern void            Abc_BddRemoveNodeByBvar( Abc_BddMan * p, int i );
 extern void            Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFrontiers );
 extern int             Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p, int fRealloc, int fGarbage, int nReorder );
 

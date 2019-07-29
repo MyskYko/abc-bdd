@@ -495,7 +495,7 @@ void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName )
    SeeAlso     []
 
 ***********************************************************************/
-static inline void Abc_BddRemoveNodeByBvar( Abc_BddMan * p, int i )
+void Abc_BddRemoveNodeByBvar( Abc_BddMan * p, int i )
 {
   int * q = p->pUnique + ( Abc_BddHash( Abc_BddVarOfBvar( p, i ), Abc_BddThenOfBvar( p, i ), Abc_BddElseOfBvar( p, i ) ) & p->nUniqueMask );
   for ( ; *q; q = p->pNexts + *q )
@@ -557,14 +557,7 @@ static inline int Abc_BddRefresh( Abc_BddMan * p, int fGarbage, int fRealloc, in
 {
   if ( p->nVerbose > 1 ) printf("\n");
   if ( p->nVerbose ) printf("Refresh\n");
-  if ( fGarbage )
-    Abc_BddGarbageCollect( p, pFrontiers );
-  if ( !*fRefresh )
-    {
-      *fRefresh = 1;
-      return 0;
-    }
-  if ( nReorder && *fRefresh < 2 && ( p->nObjsAlloc >> 1 ) + (unsigned)p->nRemoved > p->nObjs  )
+  if ( nReorder )
     {
       if ( p->nVerbose ) printf("\tReordering\n");
       if ( nReorder == 1 ) Abc_BddReorder( p, pFrontiers, p->nVerbose - 1 );
@@ -574,8 +567,12 @@ static inline int Abc_BddRefresh( Abc_BddMan * p, int fGarbage, int fRealloc, in
 	  printf("Invalid reordering level %d. It should be at most 2.\n", nReorder);
 	  return -1;
 	}
-      Abc_BddGarbageCollect( p, pFrontiers );
-      *fRefresh = 2;
+    }
+  if ( fGarbage )
+    Abc_BddGarbageCollect( p, pFrontiers );
+  if ( *fRefresh < 1 )
+    {
+      *fRefresh += 1;
       return 0;
     }
   if ( !fRealloc || p->nObjsAlloc >= 1 << 31 )
@@ -587,18 +584,6 @@ static inline int Abc_BddRefresh( Abc_BddMan * p, int fGarbage, int fRealloc, in
     {
       printf( "Reallocation failed\n" );
       return -1;
-    }
-  if ( nReorder && *fRefresh < 2 )
-    {
-      if ( p->nVerbose ) printf("\tReordering\n");
-      if ( nReorder == 1 ) Abc_BddReorder( p, pFrontiers, p->nVerbose - 1 );
-      else if ( nReorder == 2 ) Abc_BddReorderConverge( p, pFrontiers, p->nVerbose - 1 );
-      else
-	{
-	  printf("Invalid reordering level %d. It should be at most 2.\n", nReorder);
-	  return -1;
-	}
-      Abc_BddGarbageCollect( p, pFrontiers );
     }
   return 0;
 }
@@ -684,8 +669,8 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
       if ( !nReorder ) Abc_BddReorderAlloc( p );
       int prev = Abc_BddCountNodesArrayShared( p, vNodes );
       clk = Abc_Clock();
-      if ( nFinalReorder == 1 ) Abc_BddReorder( p, vNodes, nVerbose - 1 );
-      else if ( nFinalReorder == 2 ) Abc_BddReorderConverge( p, vNodes, nVerbose - 1 );
+      if ( nFinalReorder == 1 ) Abc_BddReorder( p, vNodes, nVerbose );
+      else if ( nFinalReorder == 2 ) Abc_BddReorderConverge( p, vNodes, nVerbose );
       else printf("Invalid reordering level %d. It should be at most 2.\n", nFinalReorder);
       clk2 = Abc_Clock();
       int now = Abc_BddCountNodesArrayShared( p, vNodes );
