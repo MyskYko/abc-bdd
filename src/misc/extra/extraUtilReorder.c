@@ -417,7 +417,7 @@ static inline void Abc_BddShift( Abc_BddMan * p, int * pos, int * nNode, int dis
   int fRefresh = 0;
   for ( j = 0; j < distance; j++ )
     {
-      int nLimit = *nNode * 0.1;
+      int nLimit = *nNode * p->fReorderThreshold;
       if ( fNoLimit ) nLimit = 0x0fffffff;
       if ( fUp ) *pos -= 1;
       int r = Abc_BddSwap( p, *pos, nNode, nLimit );
@@ -430,8 +430,7 @@ static inline void Abc_BddShift( Abc_BddMan * p, int * pos, int * nNode, int dis
 	{
 	  if ( fUp ) *pos += 1;
 	  assert( !fNoLimit || !fRefresh );
-	  if ( fRefresh )
-	    return;
+	  if ( fRefresh ) return;
 	  if ( nVerbose ) printf( "\n" );
 	  Abc_BddGarbageCollect( p, pFrontiers );
 	  fRefresh = 1;
@@ -468,7 +467,7 @@ static inline void Abc_BddShift( Abc_BddMan * p, int * pos, int * nNode, int dis
    SeeAlso     []
 
 ***********************************************************************/
-void Abc_BddReorderAlloc( Abc_BddMan * p )
+void Abc_BddReorderAlloc( Abc_BddMan * p, int nReorderThreshold )
 {
   int i;
   p->liveBvars = ABC_ALLOC( Vec_Int_t *, p->nVars + 2);
@@ -476,6 +475,7 @@ void Abc_BddReorderAlloc( Abc_BddMan * p )
     p->liveBvars[i] = Vec_IntAlloc( p->nObjsAlloc / p->nVars );
   p->pEdges = ABC_CALLOC( unsigned, p->nObjsAlloc );
   assert( p->pEdges );
+  p->fReorderThreshold = 0.01 * nReorderThreshold;
 }
 void Abc_BddReorderFree( Abc_BddMan * p )
 {

@@ -134,7 +134,7 @@ void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int 
     }
   if ( nVerbose ) printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
   p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, nVerbose > 2 );
-  Abc_BddGia( pGia, p, 0, 0, 0 );
+  Abc_BddGia( pGia, p, 0, 0 );
   abctime clk1 = Abc_Clock();
   if ( nVerbose ) ABC_PRT( "BDD (latch) construction time", clk1 - clk );
   cache = ABC_CALLOC( unsigned, (long long)p->nObjsAlloc );
@@ -244,7 +244,7 @@ void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFil
     }
   if ( nVerbose ) printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
   p = Abc_BddManAlloc( Gia_ManCiNum( pGia ) + nLatch, nObjsAllocInit, nVerbose > 2 );
-  Abc_BddGia( pGia, p, 0, 0, 0 );
+  Abc_BddGia( pGia, p, 0, 0 );
   abctime clk1 = Abc_Clock();
   if ( nVerbose ) ABC_PRT( "BDD (latch) construction time", clk1 - clk );
   cache = ABC_CALLOC( unsigned, (long long)p->nObjsAlloc );

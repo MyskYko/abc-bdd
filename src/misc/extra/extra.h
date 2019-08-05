@@ -432,6 +432,7 @@ struct Abc_BddMan_
   int                nRemoved;      // the number of removed nodes
   int                nVerbose;
 
+  float              fReorderThreshold; // threshold to terminate reordering. 0=off.
   unsigned *         pEdges;        // array of number of incoming edges for each BDD node. used for reordering
   Vec_Int_t **       liveBvars;     // array of live bvars for each layer. used for reordering
 };
@@ -505,7 +506,7 @@ extern int             Abc_BddCountNodesArrayIndependent( Abc_BddMan * p, Vec_In
 extern void            Abc_BddPrint( Abc_BddMan * p, unsigned a, int offset, FILE * f );
 extern void            Abc_BddRemoveNodeByBvar( Abc_BddMan * p, int i );
 extern void            Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFrontiers );
-extern int             Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p, int fRealloc, int fGarbage, int nReorder );
+extern int             Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p, int fRealloc, int fGarbage );
 
 extern int             Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth );
 extern int             Abc_BddCount1s( Abc_BddMan * p, unsigned a, int depth );
@@ -523,7 +524,7 @@ extern void           Abc_BddCountEdge( Abc_BddMan * p, Vec_Int_t * pFunctions )
 extern void           Abc_BddUncountEdge( Abc_BddMan * p, Vec_Int_t * pFunctions );
 extern void           Abc_BddCountEdgeAndBvar( Abc_BddMan * p, Vec_Int_t * pFunctions );
 
-extern void           Abc_BddReorderAlloc( Abc_BddMan * p );
+extern void           Abc_BddReorderAlloc( Abc_BddMan * p, int nReorderThreshold );
 extern void           Abc_BddReorderFree( Abc_BddMan * p );
 extern void           Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int fVerbose );
 extern void           Abc_BddReorderConverge( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose );

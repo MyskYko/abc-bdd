@@ -161,6 +161,7 @@ Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int nVerbose )
     (long long)( p->nCacheMask + 1 ) * 3 * sizeof(int) + 
     (long long)p->nObjsAlloc * 2 * sizeof(int) +
     (long long)p->nObjsAlloc * 3 * sizeof(char);
+  p->fReorderThreshold = 0;
   return p;
 }
 void Abc_BddManFree( Abc_BddMan * p )
@@ -553,25 +554,17 @@ static inline void Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts )
    SeeAlso     []
 
 ***********************************************************************/
-static inline int Abc_BddRefresh( Abc_BddMan * p, int fGarbage, int fRealloc, int nReorder, int * fRefresh, Vec_Int_t * pFrontiers )
+static inline int Abc_BddRefresh( Abc_BddMan * p, int fGarbage, int fRealloc, int * fRefresh, Vec_Int_t * pFrontiers )
 {
   *fRefresh += 1;
   if ( p->nVerbose > 1 ) printf( "\n" );
   if ( p->nVerbose ) printf( "Refresh %d\n", *fRefresh );
-  if ( fGarbage )
-    Abc_BddGarbageCollect( p, pFrontiers );
-  if ( *fRefresh <= 1 )
-    return 0;
-  if ( nReorder && p->nObjsAlloc >= 4001 && *fRefresh <= 2 )
+  if ( fGarbage ) Abc_BddGarbageCollect( p, pFrontiers );
+  if ( *fRefresh <= 1 ) return 0;
+  if ( p->fReorderThreshold != 0 && p->nObjsAlloc >= 4001 && *fRefresh <= 2 )
     {
       if ( p->nVerbose ) printf("\tReordering\n");
-      if ( nReorder == 1 ) Abc_BddReorder( p, pFrontiers, p->nVerbose - 1 );
-      else if ( nReorder == 2 ) Abc_BddReorderConverge( p, pFrontiers, p->nVerbose - 1 );
-      else
-	{
-	  printf("Invalid reordering level %d. It should be at most 2.\n", nReorder);
-	  return -1;
-	}
+      Abc_BddReorder( p, pFrontiers, p->nVerbose - 1 );
       Abc_BddGarbageCollect( p, pFrontiers );
       return 0;
     }
@@ -585,21 +578,15 @@ static inline int Abc_BddRefresh( Abc_BddMan * p, int fGarbage, int fRealloc, in
       printf( "Reallocation failed\n" );
       return -1;
     }
-  if ( nReorder && p->nObjsAlloc >= 4001 )
+  if ( p->fReorderThreshold != 0 && p->nObjsAlloc >= 4001 )
     {
       if ( p->nVerbose ) printf("\tReordering\n");
-      if ( nReorder == 1 ) Abc_BddReorder( p, pFrontiers, p->nVerbose - 1 );
-      else if ( nReorder == 2 ) Abc_BddReorderConverge( p, pFrontiers, p->nVerbose - 1 );
-      else
-	{
-	  printf("Invalid reordering level %d. It should be at most 2.\n", nReorder);
-	  return -1;
-	}
+      Abc_BddReorder( p, pFrontiers, p->nVerbose - 1 );
       Abc_BddGarbageCollect( p, pFrontiers );
     }
   return 0;
 }
-int Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p, int fRealloc, int fGarbage, int nReorder )
+int Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p, int fRealloc, int fGarbage )
 {
   Gia_Obj_t * pObj, * pObj0, *pObj1;
   int i, fRefresh = 0;
@@ -625,7 +612,7 @@ int Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p, int fRealloc, int fGarbage, in
       pObj->Value = Abc_BddAnd( p, Cof0, Cof1 );
       if ( Abc_BddLitIsInvalid( pObj->Value ) )
 	{
-	  if ( Abc_BddRefresh( p, fGarbage, fRealloc, nReorder, &fRefresh, pFrontiers ) )
+	  if ( Abc_BddRefresh( p, fGarbage, fRealloc, &fRefresh, pFrontiers ) )
 	    return -1;
 	  i--;
 	  continue;
@@ -649,7 +636,7 @@ int Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p, int fRealloc, int fGarbage, in
     }
   return 0;
 }
-void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fRealloc, int fGarbage, int nReorder, int nFinalReorder )
+void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fRealloc, int fGarbage, int nReorderThreshold, int nFinalReorder )
 {
   abctime clk, clk2;
   Abc_BddMan * p;
@@ -664,13 +651,11 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
     }
   clk = Abc_Clock();
   p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, nVerbose );
-  if ( nReorder ) Abc_BddReorderAlloc( p );
-  if ( Abc_BddGia( pGia, p, fRealloc, fGarbage, nReorder ) )
-    return;
+  if ( nReorderThreshold ) Abc_BddReorderAlloc( p, nReorderThreshold );
+  if ( Abc_BddGia( pGia, p, fRealloc, fGarbage ) ) return;
   clk2 = Abc_Clock();
   vNodes = Vec_IntAlloc( Gia_ManCoNum( pGia ) );
-  Gia_ManForEachCo( pGia, pObj, i )
-    Vec_IntPush( vNodes, pObj->Value );
+  Gia_ManForEachCo( pGia, pObj, i ) Vec_IntPush( vNodes, pObj->Value );
   if ( nVerbose > 1 ) printf("\n");
   printf( "Shared BDD size = %6d nodes.", Abc_BddCountNodesArrayShared( p, vNodes ) );
   ABC_PRT( "  BDD construction time", clk2 - clk );
@@ -678,12 +663,11 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
   printf( "  Used nodes = %d  Allocated nodes = %u\n", p->nObjs, ( p->nObjsAlloc == 1 << 31 ) ? p->nObjsAlloc - 1 : p->nObjsAlloc );
   if ( nFinalReorder )
     {
-      if ( !nReorder ) Abc_BddReorderAlloc( p );
+      if ( p->fReorderThreshold == 0 ) Abc_BddReorderFree( p );
+      Abc_BddReorderAlloc( p, nFinalReorder );
       int prev = Abc_BddCountNodesArrayShared( p, vNodes );
       clk = Abc_Clock();
-      if ( nFinalReorder == 1 ) Abc_BddReorder( p, vNodes, nVerbose );
-      else if ( nFinalReorder == 2 ) Abc_BddReorderConverge( p, vNodes, nVerbose );
-      else printf("Invalid reordering level %d. It should be at most 2.\n", nFinalReorder);
+      Abc_BddReorder( p, vNodes, nVerbose );
       clk2 = Abc_Clock();
       int now = Abc_BddCountNodesArrayShared( p, vNodes );
       printf( "Gain %d -> %d (%d)\n", prev, now, now - prev );
@@ -692,7 +676,7 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
       printf( "Sum of BDD nodes for each BDD = %d", Abc_BddCountNodesArrayIndependent( p, vNodes ) );
       printf( "  Used nodes = %d  Allocated nodes = %u\n", p->nObjs, ( p->nObjsAlloc == 1 << 31 ) ? p->nObjsAlloc - 1 : p->nObjsAlloc );
     }
-  if ( nReorder || nFinalReorder )
+  if ( p->fReorderThreshold != 0 )
     {
       printf( "Ordering:\n" );
       for ( i = 0; i < p->nVars; i++ )
