@@ -555,9 +555,14 @@ static inline void Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts )
 ***********************************************************************/
 static inline int Abc_BddRefresh( Abc_BddMan * p, int fGarbage, int fRealloc, int nReorder, int * fRefresh, Vec_Int_t * pFrontiers )
 {
-  if ( p->nVerbose > 1 ) printf("\n");
-  if ( p->nVerbose ) printf("Refresh\n");
-  if ( nReorder )
+  *fRefresh += 1;
+  if ( p->nVerbose > 1 ) printf( "\n" );
+  if ( p->nVerbose ) printf( "Refresh %d\n", *fRefresh );
+  if ( fGarbage )
+    Abc_BddGarbageCollect( p, pFrontiers );
+  if ( *fRefresh <= 1 )
+    return 0;
+  if ( nReorder && p->nObjsAlloc >= 4001 && *fRefresh <= 2 )
     {
       if ( p->nVerbose ) printf("\tReordering\n");
       if ( nReorder == 1 ) Abc_BddReorder( p, pFrontiers, p->nVerbose - 1 );
@@ -567,12 +572,7 @@ static inline int Abc_BddRefresh( Abc_BddMan * p, int fGarbage, int fRealloc, in
 	  printf("Invalid reordering level %d. It should be at most 2.\n", nReorder);
 	  return -1;
 	}
-    }
-  if ( fGarbage )
-    Abc_BddGarbageCollect( p, pFrontiers );
-  if ( *fRefresh < 1 )
-    {
-      *fRefresh += 1;
+      Abc_BddGarbageCollect( p, pFrontiers );
       return 0;
     }
   if ( !fRealloc || p->nObjsAlloc >= 1 << 31 )
@@ -584,6 +584,18 @@ static inline int Abc_BddRefresh( Abc_BddMan * p, int fGarbage, int fRealloc, in
     {
       printf( "Reallocation failed\n" );
       return -1;
+    }
+  if ( nReorder && p->nObjsAlloc >= 4001 )
+    {
+      if ( p->nVerbose ) printf("\tReordering\n");
+      if ( nReorder == 1 ) Abc_BddReorder( p, pFrontiers, p->nVerbose - 1 );
+      else if ( nReorder == 2 ) Abc_BddReorderConverge( p, pFrontiers, p->nVerbose - 1 );
+      else
+	{
+	  printf("Invalid reordering level %d. It should be at most 2.\n", nReorder);
+	  return -1;
+	}
+      Abc_BddGarbageCollect( p, pFrontiers );
     }
   return 0;
 }
