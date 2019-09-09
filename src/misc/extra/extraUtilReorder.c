@@ -411,29 +411,38 @@ static inline int Abc_BddSwap( Abc_BddMan * p, int x, int * nNode, int nLimit )
    SeeAlso     []
 
 ***********************************************************************/
-static inline void Abc_BddShift( Abc_BddMan * p, int * pos, int * nNode, int distance, int fUp, int * bestPos, int * bestNode, int * new2old, int nVerbose , Vec_Int_t * pFrontiers, int fNoLimit )
+static inline int Abc_BddShift( Abc_BddMan * p, int * pos, int * nNode, int distance, int fUp, int * bestPos, int * bestNode, int * new2old, int nVerbose , Vec_Int_t * pFrontiers, int fNoLimit )
 {
   int j;
   int fRefresh = 0;
   for ( j = 0; j < distance; j++ )
     {
-      int nLimit = *nNode * p->fReorderThreshold;
+      int nLimit = *nNode * p->ReorderThreshold;
       if ( fNoLimit ) nLimit = 0x0fffffff;
       if ( fUp ) *pos -= 1;
       int r = Abc_BddSwap( p, *pos, nNode, nLimit );
       if ( r == 1 )
 	{
 	  if ( fUp ) *pos += 1;
-	  return;
+	  return 1;
 	}
       if ( r == -1 )
 	{
+	  //assert( !fNoLimit || !fRefresh );
+	  if ( !p->fGC ) return -1;
 	  if ( fUp ) *pos += 1;
-	  assert( !fNoLimit || !fRefresh );
-	  if ( fRefresh ) return;
+	  if ( !fRefresh )
+	    {
+	      Abc_BddGarbageCollect( p, pFrontiers );
+	      fRefresh = 1;
+	    }
+	  else
+	    {
+	      if ( !p->fRealloc ) return -1;
+	      if ( Abc_BddManRealloc( p ) ) return -1;
+	      fRefresh = 0;
+	    }
 	  if ( nVerbose ) printf( "\n" );
-	  Abc_BddGarbageCollect( p, pFrontiers );
-	  fRefresh = 1;
 	  j--;
 	  continue;
 	}
@@ -454,6 +463,7 @@ static inline void Abc_BddShift( Abc_BddMan * p, int * pos, int * nNode, int dis
 	  printf("  current position %d  node %d\n", *pos, *nNode);
 	}
     }
+  return 0;
 }
 
 /**Function*************************************************************
@@ -467,37 +477,7 @@ static inline void Abc_BddShift( Abc_BddMan * p, int * pos, int * nNode, int dis
    SeeAlso     []
 
 ***********************************************************************/
-void Abc_BddReorderAlloc( Abc_BddMan * p, int nReorderThreshold )
-{
-  int i;
-  p->liveBvars = ABC_ALLOC( Vec_Int_t *, p->nVars + 2);
-  for ( i = 0; i < p->nVars + 2; i++ )
-    p->liveBvars[i] = Vec_IntAlloc( p->nObjsAlloc / p->nVars );
-  p->pEdges = ABC_CALLOC( unsigned, p->nObjsAlloc );
-  assert( p->pEdges );
-  p->fReorderThreshold = 0.01 * nReorderThreshold;
-}
-void Abc_BddReorderFree( Abc_BddMan * p )
-{
-  int i;
-  ABC_FREE( p->pEdges );
-  for ( i = 0; i < p->nVars + 2; i++ )
-    Vec_IntFree( p->liveBvars[i] );
-  ABC_FREE( p->liveBvars );
-}
-
-/**Function*************************************************************
-   
-   Synopsis    []
-
-   Description []
-               
-   SideEffects []
-
-   SeeAlso     []
-
-***********************************************************************/
-void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
+int Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 {
   if ( nVerbose < 0 ) nVerbose = 0;
   int i, j, best_i;
@@ -557,13 +537,16 @@ void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 	  printf( "###############################\n" );
 	  printf( "\t%d goes %s by %d\n", descendingOrder[i], goUp? "up": "down", distance );
 	}
-      Abc_BddShift( p, &pos, &nNode, distance, goUp, &bestPos, &bestNode, new2old, nVerbose, pFunctions, 0 );
+      int fOutOfNodes;
+      fOutOfNodes = Abc_BddShift( p, &pos, &nNode, distance, goUp, &bestPos, &bestNode, new2old, nVerbose, pFunctions, 0 );
+      if ( fOutOfNodes == -1 ) return -1;
       goUp ^= 1;
       if ( goUp ) distance = pos;
       else distance = p->nVars - pos - 1;
       if ( nVerbose )
 	printf( "\n\t%d goes %s by %d\n", descendingOrder[i], goUp? "up": "down", distance );
-      Abc_BddShift( p, &pos, &nNode, distance, goUp, &bestPos, &bestNode, new2old, nVerbose, pFunctions, 0 );
+      fOutOfNodes = Abc_BddShift( p, &pos, &nNode, distance, goUp, &bestPos, &bestNode, new2old, nVerbose, pFunctions, 0 );
+      if ( fOutOfNodes == -1 ) return -1;
       if ( pos < bestPos )
 	{
 	  goUp = 0;
@@ -579,7 +562,8 @@ void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 	  printf( "\n\tbest position %d, nNode %d\n", bestPos, bestNode );
 	  printf( "\t%d goes %s by %d\n", descendingOrder[i], goUp? "up": "down", distance );
         }
-      Abc_BddShift( p, &pos, &nNode, distance, goUp, &bestPos, &bestNode, new2old, nVerbose , pFunctions, 1 );
+      fOutOfNodes = Abc_BddShift( p, &pos, &nNode, distance, goUp, &bestPos, &bestNode, new2old, nVerbose , pFunctions, 1 );
+      if ( fOutOfNodes == -1 ) return -1;
       assert( pos == bestPos );
       if ( nVerbose )
 	{
@@ -592,11 +576,12 @@ void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
   Abc_BddUncountEdge( p, pFunctions );
   ABC_FREE( new2old );
   ABC_FREE( descendingOrder );
+  return 0;
 }
 
+/*
 void Abc_BddReorderConverge( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 {
-  /*
   if ( nVerbose < 0 ) nVerbose = 0;
   int i, j, best_i;
   for ( i = 0; i < p->nVars + 2; i++ )
@@ -687,8 +672,8 @@ void Abc_BddReorderConverge( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbos
   Abc_BddUncountEdge( p, pFunctions );
   ABC_FREE( new2old );
   ABC_FREE( descendingOrder );
-  */
 }
+*/
 
 ////////////////////////////////////////////////////////////////////////
 ///                       END OF FILE                                ///

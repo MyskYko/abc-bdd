@@ -70,7 +70,7 @@ static inline unsigned Abc_BddUniqueCreateInt( Abc_BddMan * p, int Var, unsigned
   Abc_BddSetThenOfBvar( p, *q, Then );
   Abc_BddSetElseOfBvar( p, *q, Else );
   Abc_BddSetNextOfBvar( p, *q, headBvar );
-  if ( p->nVerbose > 1 )
+  if ( p->nVerbose > 2 )
     printf( "\rAdded node %10d: Var = %3d  Then = %10u  Else = %10u  Removed = %10u", *q, Var, Then, Else, p->nRemoved );
   return Abc_BddBvar2Lit( *q, 0 );
 }
@@ -112,8 +112,28 @@ static inline unsigned Abc_BddCacheInsert( Abc_BddMan * p, unsigned Arg1, unsign
 static inline void Abc_BddCacheRemove( Abc_BddMan * p ) {
   ABC_FREE( p->pCache );
   p->pCache = ABC_CALLOC( unsigned, 3 * (long long)( p->nCacheMask + 1 ) );
-  if ( p->nVerbose > 1 )
+  if ( p->nVerbose > 2 )
     printf( "\t\tCache: Hit = %u  Miss = %u\n", p->nCacheLookups - p->nCacheMisses, p->nCacheMisses );
+}
+
+/**Function*************************************************************
+
+   Synopsis    [Count fanout of gates.]
+
+   Description []
+               
+   SideEffects []
+
+   SeeAlso     []
+
+***********************************************************************/
+static inline void Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts )
+{
+  Gia_Obj_t * pObj; int i;
+  Gia_ManStaticFanoutStart( pGia );
+  Gia_ManForEachAnd( pGia, pObj, i )
+    pFanouts[Gia_ObjId( pGia, pObj )] = Gia_ObjFanoutNum( pGia, pObj );
+  Gia_ManStaticFanoutStop( pGia );
 }
 
 /**Function*************************************************************
@@ -161,12 +181,40 @@ Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int nVerbose )
     (long long)( p->nCacheMask + 1 ) * 3 * sizeof(int) + 
     (long long)p->nObjsAlloc * 2 * sizeof(int) +
     (long long)p->nObjsAlloc * 3 * sizeof(char);
-  p->fReorderThreshold = 0;
+  p->fRealloc = 0;
+  p->fGC = 0;
+  p->ReorderThreshold = 0;
+  p->pFanouts = NULL;
+  p->pFrontiers = NULL;
+  p->pEdges = NULL;
+  p->liveBvars = NULL;
   return p;
+}
+void Abc_BddRefreshConfig( Abc_BddMan * p, Gia_Man_t * pGia, int fRealloc, int fGC, int nReorderThreshold )
+{
+  p->fRealloc = fRealloc;
+  p->fGC = fGC;
+  p->ReorderThreshold = 0.01 * nReorderThreshold;
+  if ( fGC || p->ReorderThreshold != 0 )
+    {
+      p->pFanouts = ABC_CALLOC( int, pGia->nObjs );
+      assert( p->pFanouts );
+      p->pFrontiers = Vec_IntAlloc( 1 );
+      Abc_BddGiaCountFanout( pGia, p->pFanouts );
+    }
+  if ( p->ReorderThreshold != 0 )
+    {
+      p->pEdges = ABC_CALLOC( unsigned, p->nObjsAlloc );
+      assert( p->pEdges );
+      int i;
+      p->liveBvars = ABC_ALLOC( Vec_Int_t *, p->nVars + 2);
+      for ( i = 0; i < p->nVars + 2; i++ )
+	p->liveBvars[i] = Vec_IntAlloc( p->nObjsAlloc / p->nVars );
+    }
 }
 void Abc_BddManFree( Abc_BddMan * p )
 {
-  if ( p->nVerbose > 1 )
+  if ( p->nVerbose > 2 )
     {
       printf( "BDD stats: Var = %u  Obj = %u  Alloc = %u  Hit = %u  Miss = %u  ", p->nVars, p->nObjs, p->nObjsAlloc - 1, p->nCacheLookups - p->nCacheMisses, p->nCacheMisses );
       printf( "Mem = %.2lld MB\n", (long long)( p->nMemory / ( 1 << 20 ) ) );
@@ -176,6 +224,19 @@ void Abc_BddManFree( Abc_BddMan * p )
   ABC_FREE( p->pCache );
   ABC_FREE( p->pObjs );
   ABC_FREE( p->pVars );
+  if ( p->pFanouts != NULL )
+    ABC_FREE( p->pFanouts );
+  if ( p->pFrontiers != NULL) 
+    Vec_IntFree( p->pFrontiers );
+  if ( p->pEdges != NULL)
+    ABC_FREE( p->pEdges );
+  if ( p->liveBvars != NULL)
+    {
+      int i;
+      for ( i = 0; i < p->nVars + 2; i++ )
+	Vec_IntFree( p->liveBvars[i] );
+      ABC_FREE( p->liveBvars );
+    }
   ABC_FREE( p );
 }
 static inline void Abc_BddRehash( Abc_BddMan * p )
@@ -205,7 +266,7 @@ static inline void Abc_BddRehash( Abc_BddMan * p )
 	}
     }
 }
-static inline int Abc_BddManRealloc( Abc_BddMan * p )
+int Abc_BddManRealloc( Abc_BddMan * p )
 {
   unsigned nObjsAllocOld = p->nObjsAlloc;
   p->nObjsAlloc  = p->nObjsAlloc + p->nObjsAlloc;
@@ -423,7 +484,7 @@ void Abc_BddWriteBlif_rec( Abc_BddMan * p, int x, FILE * f )
 }
 void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName )
 {
-  int i, j, k;
+  int i, j;
   unsigned x;
   FILE * f = fopen( pFileName, "w" );
   fprintf( f, ".model top\n" );
@@ -525,7 +586,7 @@ void Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFrontiers )
 
 /**Function*************************************************************
 
-   Synopsis    [Count fanout of gates.]
+   Synopsis    [Refresh]
 
    Description []
                
@@ -534,41 +595,22 @@ void Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFrontiers )
    SeeAlso     []
 
 ***********************************************************************/
-static inline void Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts )
+static inline int Abc_BddRefresh( Abc_BddMan * p, int * nRefresh )
 {
-  Gia_Obj_t * pObj; int i;
-  Gia_ManStaticFanoutStart( pGia );
-  Gia_ManForEachAnd( pGia, pObj, i )
-    pFanouts[Gia_ObjId( pGia, pObj )] = Gia_ObjFanoutNum( pGia, pObj );
-  Gia_ManStaticFanoutStop( pGia );
-}
-
-/**Function*************************************************************
-
-   Synopsis    [Main for bdd with garbage collection]
-
-   Description []
-               
-   SideEffects []
-
-   SeeAlso     []
-
-***********************************************************************/
-static inline int Abc_BddRefresh( Abc_BddMan * p, int fGarbage, int fRealloc, int * fRefresh, Vec_Int_t * pFrontiers )
-{
-  *fRefresh += 1;
+  *nRefresh += 1;
   if ( p->nVerbose > 1 ) printf( "\n" );
-  if ( p->nVerbose ) printf( "Refresh %d\n", *fRefresh );
-  if ( fGarbage ) Abc_BddGarbageCollect( p, pFrontiers );
-  if ( *fRefresh <= 1 ) return 0;
-  if ( p->fReorderThreshold != 0 && p->nObjsAlloc >= 4001 && *fRefresh <= 2 )
+  if ( p->nVerbose ) printf( "Refresh %d\n", *nRefresh );
+  if ( p->fGC ) Abc_BddGarbageCollect( p, p->pFrontiers );
+  if ( *nRefresh <= 1 ) return 0;
+  if ( p->ReorderThreshold != 0 && p->nObjsAlloc > 4000 && *nRefresh <= 2 )
     {
       if ( p->nVerbose ) printf("\tReordering\n");
-      Abc_BddReorder( p, pFrontiers, p->nVerbose - 1 );
-      Abc_BddGarbageCollect( p, pFrontiers );
+      if ( Abc_BddReorder( p, p->pFrontiers, p->nVerbose - 1 ) )
+	return -1;
+      Abc_BddGarbageCollect( p, p->pFrontiers );
       return 0;
     }
-  if ( !fRealloc || p->nObjsAlloc >= 1 << 31 )
+  if ( !p->fRealloc || p->nObjsAlloc >= 1 << 31 )
     {
       printf( "The number of nodes exceeds the limit %u\n", p->nObjsAlloc );
       return -1;
@@ -578,28 +620,13 @@ static inline int Abc_BddRefresh( Abc_BddMan * p, int fGarbage, int fRealloc, in
       printf( "Reallocation failed\n" );
       return -1;
     }
-  if ( p->fReorderThreshold != 0 && p->nObjsAlloc >= 4001 )
-    {
-      if ( p->nVerbose ) printf("\tReordering\n");
-      Abc_BddReorder( p, pFrontiers, p->nVerbose - 1 );
-      Abc_BddGarbageCollect( p, pFrontiers );
-    }
   return 0;
 }
-int Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p, int fRealloc, int fGarbage )
+int Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p )
 {
   Gia_Obj_t * pObj, * pObj0, *pObj1;
-  int i, fRefresh = 0;
+  int i, nRefresh = 0;
   unsigned Cof0, Cof1;
-  int * pFanouts;
-  Vec_Int_t * pFrontiers;
-  if ( fGarbage )
-    {
-      pFanouts = ABC_CALLOC( int, pGia->nObjs );
-      assert( pFanouts );
-      pFrontiers = Vec_IntAlloc( 1 );
-      Abc_BddGiaCountFanout( pGia, pFanouts );
-    }
   Gia_ManFillValue( pGia );
   Gia_ManConst0( pGia )->Value = Abc_BddLitConst0();
   Gia_ManForEachCi( pGia, pObj, i ) pObj->Value = Abc_BddLitIthVar( i );
@@ -612,31 +639,26 @@ int Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p, int fRealloc, int fGarbage )
       pObj->Value = Abc_BddAnd( p, Cof0, Cof1 );
       if ( Abc_BddLitIsInvalid( pObj->Value ) )
 	{
-	  if ( Abc_BddRefresh( p, fGarbage, fRealloc, &fRefresh, pFrontiers ) )
+	  if ( Abc_BddRefresh( p, &nRefresh ) )
 	    return -1;
 	  i--;
 	  continue;
 	}
-      if ( fGarbage )
+      if ( p->pFrontiers != NULL )
 	{
-	  fRefresh = 0;
-	  Vec_IntPush( pFrontiers, pObj->Value );
-	  pFanouts[Gia_ObjId( pGia, pObj0 )] -= 1;
-	  if ( pFanouts[Gia_ObjId( pGia, pObj0 )] == 0 ) Vec_IntRemove( pFrontiers, pObj0->Value );
-	  pFanouts[Gia_ObjId( pGia, pObj1 )] -= 1;
-	  if ( pFanouts[Gia_ObjId( pGia, pObj1 )] == 0 ) Vec_IntRemove( pFrontiers, pObj1->Value );
+	  nRefresh = 0;
+	  Vec_IntPush( p->pFrontiers, pObj->Value );
+	  p->pFanouts[Gia_ObjId( pGia, pObj0 )] -= 1;
+	  if ( p->pFanouts[Gia_ObjId( pGia, pObj0 )] == 0 ) Vec_IntRemove( p->pFrontiers, pObj0->Value );
+	  p->pFanouts[Gia_ObjId( pGia, pObj1 )] -= 1;
+	  if ( p->pFanouts[Gia_ObjId( pGia, pObj1 )] == 0 ) Vec_IntRemove( p->pFrontiers, pObj1->Value );
 	}
     }
   Gia_ManForEachCo( pGia, pObj, i )
     pObj->Value = Abc_BddLitNotCond( Gia_ObjFanin0( pObj )->Value, Gia_ObjFaninC0( pObj ) );
-  if ( fGarbage )
-    {
-      ABC_FREE( pFanouts );
-      Vec_IntFree( pFrontiers );
-    }
   return 0;
 }
-void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fRealloc, int fGarbage, int nReorderThreshold, int nFinalReorder )
+void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fRealloc, int fGC, int nReorderThreshold, int nFinalReorder )
 {
   abctime clk, clk2;
   Abc_BddMan * p;
@@ -651,8 +673,8 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
     }
   clk = Abc_Clock();
   p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, nVerbose );
-  if ( nReorderThreshold ) Abc_BddReorderAlloc( p, nReorderThreshold );
-  if ( Abc_BddGia( pGia, p, fRealloc, fGarbage ) ) return;
+  Abc_BddRefreshConfig( p, pGia, fRealloc, fGC, nReorderThreshold );
+  if ( Abc_BddGia( pGia, p ) ) return;
   clk2 = Abc_Clock();
   vNodes = Vec_IntAlloc( Gia_ManCoNum( pGia ) );
   Gia_ManForEachCo( pGia, pObj, i ) Vec_IntPush( vNodes, pObj->Value );
@@ -663,8 +685,7 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
   printf( "  Used nodes = %d  Allocated nodes = %u\n", p->nObjs, ( p->nObjsAlloc == 1 << 31 ) ? p->nObjsAlloc - 1 : p->nObjsAlloc );
   if ( nFinalReorder )
     {
-      if ( p->fReorderThreshold == 0 ) Abc_BddReorderFree( p );
-      Abc_BddReorderAlloc( p, nFinalReorder );
+      p->ReorderThreshold = 0.01 * nFinalReorder;
       int prev = Abc_BddCountNodesArrayShared( p, vNodes );
       clk = Abc_Clock();
       Abc_BddReorder( p, vNodes, nVerbose );
@@ -676,7 +697,7 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
       printf( "Sum of BDD nodes for each BDD = %d", Abc_BddCountNodesArrayIndependent( p, vNodes ) );
       printf( "  Used nodes = %d  Allocated nodes = %u\n", p->nObjs, ( p->nObjsAlloc == 1 << 31 ) ? p->nObjsAlloc - 1 : p->nObjsAlloc );
     }
-  if ( p->fReorderThreshold != 0 )
+  if ( p->ReorderThreshold != 0 )
     {
       printf( "Ordering:\n" );
       for ( i = 0; i < p->nVars; i++ )
@@ -688,7 +709,6 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
 	  else printf( "pi%03d ", j );
 	}
       printf( "\n" );
-      Abc_BddReorderFree( p );
     }
   if ( pFileName != NULL ) Abc_BddWriteBlif( p, vNodes, pFileName );
   Vec_IntFree( vNodes );
