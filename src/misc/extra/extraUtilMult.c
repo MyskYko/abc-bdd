@@ -482,28 +482,27 @@ void Abc_BddWriteBlif_rec( Abc_BddMan * p, int x, FILE * f )
   else fprintf( f, " comp1=zero" );
   fprintf( f, " out=n%d\n", x );  
 }
-void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName )
+void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName, int fName )
 {
   int i, j;
   unsigned x;
   FILE * f = fopen( pFileName, "w" );
   fprintf( f, ".model top\n" );
   fprintf( f, ".inputs" );
-  for ( i = 0; i < p->nVars; i++ )
-    {
-      for ( j = 0; j < p->nVars; j++ )
-	if ( Abc_BddVar( p, Abc_BddLitIthVar( j ) ) == i ) break;
-      if ( p->nVars <= 10 ) fprintf( f, " pi%d", j );
-      else if ( p->nVars <= 100 ) fprintf( f, " pi%02d", j );
-      else fprintf( f, " pi%03d", j );
-    }
-  printf( "\n" );
-  /*
-  for ( i = 0; i < p->nVars; i++ )
-    if ( p->nVars <= 10 ) fprintf( f, " pi%d ", i );
-    else if ( p->nVars <= 100 ) fprintf( f, " pi%02d ", i );
-    else fprintf( f, " pi%03d ", i );
-  */
+  if ( fName )
+    for ( i = 0; i < p->nVars; i++ )
+      {
+	for ( j = 0; j < p->nVars; j++ )
+	  if ( Abc_BddVar( p, Abc_BddLitIthVar( j ) ) == i ) break;
+	if ( p->nVars <= 10 ) fprintf( f, " pi%d", j );
+	else if ( p->nVars <= 100 ) fprintf( f, " pi%02d", j );
+	else fprintf( f, " pi%03d", j );
+      }
+  else
+    for ( i = 0; i < p->nVars; i++ )
+      if ( p->nVars <= 10 ) fprintf( f, " pi%d ", i );
+      else if ( p->nVars <= 100 ) fprintf( f, " pi%02d ", i );
+      else fprintf( f, " pi%03d ", i );
   fprintf( f, "\n.outputs" );
   for ( i = 0; i < Vec_IntSize( vNodes ); i++ )
     if ( p->nVars <= 10 ) fprintf( f, " po%d ", i );
@@ -658,7 +657,7 @@ int Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p )
     pObj->Value = Abc_BddLitNotCond( Gia_ObjFanin0( pObj )->Value, Gia_ObjFaninC0( pObj ) );
   return 0;
 }
-void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fRealloc, int fGC, int nReorderThreshold, int nFinalReorder )
+void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fName, int fRealloc, int fGC, int nReorderThreshold, int nFinalReorder )
 {
   abctime clk, clk2;
   Abc_BddMan * p;
@@ -710,7 +709,7 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
 	}
       printf( "\n" );
     }
-  if ( pFileName != NULL ) Abc_BddWriteBlif( p, vNodes, pFileName );
+  if ( pFileName != NULL ) Abc_BddWriteBlif( p, vNodes, pFileName, fName );
   Vec_IntFree( vNodes );
   Abc_BddManFree( p );
 }
