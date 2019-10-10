@@ -131,7 +131,7 @@ void Abc_NtkShowBdd( Abc_Ntk_t * pNtk, int fCompl )
     FILE * pFile;
 
     assert( Abc_NtkIsStrash(pNtk) );
-    dd = (DdManager *)Abc_NtkBuildGlobalBdds( pNtk, 10000000, 1, 1, 0, 0 );
+    dd = (DdManager *)Abc_NtkBuildGlobalBdds( pNtk, 10000000, 1, 1, 10, 0, 0 );
     if ( dd == NULL )
     {
         printf( "Construction of global BDDs has failed.\n" );

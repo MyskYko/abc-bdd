@@ -3278,6 +3278,7 @@ int Abc_CommandCollapse( Abc_Frame_t * pAbc, int argc, char ** argv )
     int fBddSizeMax;
     int fDualRail;
     int fReorder;
+    int nReorderThreshold;
     int fReverse;
     int c;
     char * pLogFileName = NULL;
@@ -3286,11 +3287,12 @@ int Abc_CommandCollapse( Abc_Frame_t * pAbc, int argc, char ** argv )
     // set defaults
     fVerbose = 0;
     fReorder = 1;
+    nReorderThreshold = 10;
     fReverse = 0;
     fDualRail = 0;
     fBddSizeMax = ABC_INFINITY;
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "BLrodvh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "BLRrodvh" ) ) != EOF )
     {
         switch ( c )
         {
@@ -3314,8 +3316,19 @@ int Abc_CommandCollapse( Abc_Frame_t * pAbc, int argc, char ** argv )
             pLogFileName = argv[globalUtilOptind];
             globalUtilOptind++;
             break;
+        case 'R':
+	    if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-R\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nReorderThreshold = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nReorderThreshold < 0 )
+                goto usage;
+            break;
         case 'r':
-            fReorder ^= 1;
+	     fReorder ^= 1;
             break;
         case 'o':
             fReverse ^= 1;
@@ -3347,11 +3360,11 @@ int Abc_CommandCollapse( Abc_Frame_t * pAbc, int argc, char ** argv )
 
     // get the new network
     if ( Abc_NtkIsStrash(pNtk) )
-        pNtkRes = Abc_NtkCollapse( pNtk, fBddSizeMax, fDualRail, fReorder, fReverse, fVerbose );
+        pNtkRes = Abc_NtkCollapse( pNtk, fBddSizeMax, fDualRail, fReorder, nReorderThreshold, fReverse, fVerbose );
     else
     {
         pNtk = Abc_NtkStrash( pNtk, 0, 0, 0 );
-        pNtkRes = Abc_NtkCollapse( pNtk, fBddSizeMax, fDualRail, fReorder, fReverse, fVerbose );
+        pNtkRes = Abc_NtkCollapse( pNtk, fBddSizeMax, fDualRail, fReorder, nReorderThreshold, fReverse, fVerbose );
         Abc_NtkDelete( pNtk );
     }
     if ( pNtkRes == NULL )
@@ -3374,9 +3387,10 @@ int Abc_CommandCollapse( Abc_Frame_t * pAbc, int argc, char ** argv )
     return 0;
 
 usage:
-    Abc_Print( -2, "usage: collapse [-B <num>] [-L file] [-rodvh]\n" );
+    Abc_Print( -2, "usage: collapse [-BR <num>] [-L file] [-rodvh]\n" );
     Abc_Print( -2, "\t          collapses the network by constructing global BDDs\n" );
     Abc_Print( -2, "\t-B <num>: limit on live BDD nodes during collapsing [default = %d]\n", fBddSizeMax );
+    Abc_Print( -2, "\t-R num: threshold to terminate reordering while building BDDs. (num)%% more nodes than before reordering. [default = %d]\n", nReorderThreshold );
     Abc_Print( -2, "\t-L file : the log file name [default = %s]\n",  pLogFileName ? pLogFileName : "no logging" );
     Abc_Print( -2, "\t-r      : toggles dynamic variable reordering [default = %s]\n", fReorder? "yes": "no" );
     Abc_Print( -2, "\t-o      : toggles reverse variable ordering [default = %s]\n", fReverse? "yes": "no" );

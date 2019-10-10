@@ -254,7 +254,7 @@ Abc_Obj_t * Abc_NodeBddToMuxes_rec( DdManager * dd, DdNode * bFunc, Abc_Ntk_t * 
   SeeAlso     []
 
 ***********************************************************************/
-void * Abc_NtkBuildGlobalBdds( Abc_Ntk_t * pNtk, int nBddSizeMax, int fDropInternal, int fReorder, int fReverse, int fVerbose )
+void * Abc_NtkBuildGlobalBdds( Abc_Ntk_t * pNtk, int nBddSizeMax, int fDropInternal, int fReorder, int nReorderThreshold, int fReverse, int fVerbose )
 {
     ProgressBar * pProgress;
     Abc_Obj_t * pObj, * pFanin;
@@ -274,9 +274,13 @@ void * Abc_NtkBuildGlobalBdds( Abc_Ntk_t * pNtk, int nBddSizeMax, int fDropInter
 
     // set reordering
     if ( fReorder )
-        Cudd_AutodynEnable( dd, CUDD_REORDER_SIFT );
-    //    printf("mg %f\n",Cudd_ReadMaxGrowth( dd ));
-    //    Cudd_SetMaxGrowth( dd, 1.01 );
+      {
+	//        Cudd_AutodynEnable( dd, CUDD_REORDER_SYMM_SIFT );
+	Cudd_AutodynEnable( dd, CUDD_REORDER_SIFT );
+	float mg = 1 + 0.01 * nReorderThreshold;
+	Cudd_SetMaxGrowth( dd, mg );
+	printf("mg %f\n",Cudd_ReadMaxGrowth( dd ));
+      }
 
     // assign the constant node BDD
     pObj = Abc_AigConst1(pNtk);

@@ -390,7 +390,7 @@ int Io_WriteMoPlaOne( FILE * pFile, Abc_Ntk_t * pNtk )
     Abc_Obj_t * pObj;
     int i;
     assert( Abc_NtkIsStrash(pNtk) );
-    dd = (DdManager *)Abc_NtkBuildGlobalBdds( pNtk, 10000000, 1, 1, 0, fVerbose );
+    dd = (DdManager *)Abc_NtkBuildGlobalBdds( pNtk, 10000000, 1, 1, 10, 0, fVerbose );
     if ( dd == NULL )
         return 0;
     if ( fVerbose )
@@ -512,7 +512,7 @@ int Io_WriteMoPlaOneM( FILE * pFile, Abc_Ntk_t * pNtk, int nMints )
     if ( Abc_NtkIsStrash(pNtk) )
     {
         assert( Abc_NtkIsStrash(pNtk) );
-        dd = (DdManager *)Abc_NtkBuildGlobalBdds( pNtk, 10000000, 1, 1, 0, fVerbose );
+        dd = (DdManager *)Abc_NtkBuildGlobalBdds( pNtk, 10000000, 1, 1, 10, 0, fVerbose );
         if ( dd == NULL )
             return 0;
         if ( fVerbose )

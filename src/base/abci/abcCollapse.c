@@ -147,7 +147,7 @@ Abc_Ntk_t * Abc_NtkFromGlobalBdds( Abc_Ntk_t * pNtk, int fReverse )
         assert( Abc_NtkIsStrash(pNtk->pExdc) );
         assert( Abc_NtkCoNum(pNtk->pExdc) == 1 );
         // compute the global BDDs
-        if ( Abc_NtkBuildGlobalBdds(pNtk->pExdc, 10000000, 1, 1, 0, 0) == NULL )
+        if ( Abc_NtkBuildGlobalBdds(pNtk->pExdc, 10000000, 1, 1, 10, 0, 0) == NULL )
             return NULL;
         // transfer tot the same manager
         ddExdc = (DdManager *)Abc_NtkGlobalBddMan( pNtk->pExdc );
@@ -195,14 +195,14 @@ Abc_Ntk_t * Abc_NtkFromGlobalBdds( Abc_Ntk_t * pNtk, int fReverse )
     Extra_ProgressBarStop( pProgress );
     return pNtkNew;
 }
-Abc_Ntk_t * Abc_NtkCollapse( Abc_Ntk_t * pNtk, int fBddSizeMax, int fDualRail, int fReorder, int fReverse, int fVerbose )
+Abc_Ntk_t * Abc_NtkCollapse( Abc_Ntk_t * pNtk, int fBddSizeMax, int fDualRail, int fReorder, int nReorderThreshold, int fReverse, int fVerbose )
 {
     Abc_Ntk_t * pNtkNew;
     abctime clk = Abc_Clock();
 
     assert( Abc_NtkIsStrash(pNtk) );
     // compute the global BDDs
-    if ( Abc_NtkBuildGlobalBdds(pNtk, fBddSizeMax, 1, fReorder, fReverse, fVerbose) == NULL )
+    if ( Abc_NtkBuildGlobalBdds(pNtk, fBddSizeMax, 1, fReorder, nReorderThreshold, fReverse, fVerbose) == NULL )
         return NULL;
     if ( fVerbose )
     {
@@ -236,7 +236,7 @@ Abc_Ntk_t * Abc_NtkCollapse( Abc_Ntk_t * pNtk, int fBddSizeMax, int fDualRail, i
 
 #else
 
-Abc_Ntk_t * Abc_NtkCollapse( Abc_Ntk_t * pNtk, int fBddSizeMax, int fDualRail, int fReorder, int fReverse, int fVerbose )
+Abc_Ntk_t * Abc_NtkCollapse( Abc_Ntk_t * pNtk, int fBddSizeMax, int fDualRail, int fReorder, int nReorderThreshold, int fReverse, int fVerbose )
 {
     return NULL;
 }
