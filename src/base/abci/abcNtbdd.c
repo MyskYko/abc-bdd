@@ -274,9 +274,7 @@ void * Abc_NtkBuildGlobalBdds( Abc_Ntk_t * pNtk, int nBddSizeMax, int fDropInter
 
     // set reordering
     if ( fReorder )
-        Cudd_AutodynEnable( dd, CUDD_REORDER_SIFT );
-    //    printf("mg %f\n",Cudd_ReadMaxGrowth( dd ));
-    //    Cudd_SetMaxGrowth( dd, 1.01 );
+        Cudd_AutodynEnable( dd, CUDD_REORDER_SYMM_SIFT );
 
     // assign the constant node BDD
     pObj = Abc_AigConst1(pNtk);
