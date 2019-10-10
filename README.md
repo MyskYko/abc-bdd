@@ -5,7 +5,7 @@ Send email to miyasaka@cad.t.u-tokyo.ac.jp for questions or comments
  
 The simplest package (without garbage collection and reallocation) can be found at https://github.com/MyskYko/abc/commit/8cb55037cb7ed745e06256ff8426cfa569dde40f and its command is "&test" at that commit.
 
-Dynamic Variable Reordering is now available at the branch "dev".
+Dynamic Variable Reordering is now available.
 
 # ABC: System for Sequential Logic Synthesis and Formal Verification
 
