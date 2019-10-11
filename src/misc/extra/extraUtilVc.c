@@ -49,14 +49,12 @@ ABC_NAMESPACE_IMPL_START
 static inline unsigned Abc_BddIteCacheLookup( Abc_BddMan * p, unsigned Arg1, unsigned Arg2, unsigned Arg3 )
 {
   unsigned * pEnt = p->pCache + 4 * (long long)( Abc_BddHash( Arg1, Arg2, Arg3 ) & p->nCacheMask );
-  p->nCacheLookups++;
   return ( pEnt[0] == Arg1 && pEnt[1] == Arg2 && pEnt[2] == Arg3 ) ? pEnt[3] : Abc_BddLitInvalid();
 }
 static inline unsigned Abc_BddIteCacheInsert( Abc_BddMan * p, unsigned Arg1, unsigned Arg2, unsigned Arg3, unsigned Res )
 {
   unsigned * pEnt = p->pCache + 4 * (long long)( Abc_BddHash( Arg1, Arg2, Arg3 ) & p->nCacheMask );
   pEnt[0] = Arg1; pEnt[1] = Arg2; pEnt[2] = Arg3; pEnt[3] = Res;
-  p->nCacheMisses++;
   return Res;
 }
 unsigned Abc_BddIteAnd( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 )

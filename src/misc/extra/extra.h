@@ -425,9 +425,6 @@ struct Abc_BddMan_
   unsigned char *    pMark;         // array of marks for each BDD node
   unsigned           nUniqueMask;   // selection mask for unique table
   unsigned           nCacheMask;    // selection mask for computed table
-  int                nCacheLookups; // the number of computed table lookups
-  int                nCacheMisses;  // the number of computed table misses
-  long long          nMemory;       // total amount of memory used (in bytes)
   int                nMinRemoved;   // the minimum int of removed nodes
   int                nRemoved;      // the number of removed nodes
   int                nVerbose;      // the level of verbosing information
@@ -525,10 +522,6 @@ extern unsigned        Abc_BddIteAnd( Abc_BddMan * p, unsigned c, unsigned d1, u
 extern unsigned        Abc_BddVectorCompose( Abc_BddMan * p, unsigned F,  Vec_Int_t * Vars, unsigned * cache, int fAnd );
 
 /*=== extraUtilReorder.c ================================================================*/
-
-extern void           Abc_BddCountEdge( Abc_BddMan * p, Vec_Int_t * pFunctions );
-extern void           Abc_BddUncountEdge( Abc_BddMan * p, Vec_Int_t * pFunctions );
-extern void           Abc_BddCountEdgeAndBvar( Abc_BddMan * p, Vec_Int_t * pFunctions );
 
 extern int            Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int fVerbose );
 

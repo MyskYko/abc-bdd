@@ -45980,7 +45980,7 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &bdd [-W <file>] [-FMRV num] [-agh]\n" );
+    Abc_Print( -2, "usage: &bdd [-W <file>] [-FMRV num] [-agnh]\n" );
     Abc_Print( -2, "\t        BDD construction with simple BDD package\n" );
     Abc_Print( -2, "\t-a    : toggle reallocating by double when nodes reach the limit (after garbage collection) [default = %s]\n", fRealloc? "yes": "no" );
     Abc_Print( -2, "\t-g    : toggle garbage collecting when nodes reach the limit [default = %s]\n", fGC? "yes": "no" );
