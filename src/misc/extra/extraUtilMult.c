@@ -707,7 +707,7 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
 ***********************************************************************/
 int Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth )
 {
-  if ( p->nVars - depth < 0 ) return 0;
+  if ( p->nVars < depth ) return 0;
   if ( Abc_BddLitIsConst0( a ) ) return 1 << ( p->nVars - depth );
   if ( Abc_BddLitIsConst1( a ) ) return 0;
   return Abc_BddCount0s( p, Abc_BddElse( p, a ), depth + 1 ) + Abc_BddCount0s( p, Abc_BddThen( p, a ), depth + 1 );
