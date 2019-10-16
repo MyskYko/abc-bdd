@@ -46014,18 +46014,22 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     int fReo = 0;
     int fExdc = 0;
     int fCudd = 0;
+    int fVerify = 1;
     int fRep = 1;
-    char * FileName;
-    char Command[1000];
-    extern void Abc_BddNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nType, int fRep, int fExdc, int nVerbose );
+    char * FileName = NULL;
+    Gia_Man_t * pNew, * pMiter;
+    extern Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nType, int fRep, int fExdc, int nVerbose );
     extern void Abc_DdNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nMemMax, int nType, int nIte, int nOpt, int fReo, int nVerbose );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "GMVcrpxh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "GMVWcerpxh" ) ) != EOF )
     {
         switch ( c )
         {
 	case 'c':
             fCudd ^= 1;
+            break;
+	case 'e':
+            fVerify ^= 1;
             break;
 	case 'p':
             fRep ^= 1;
@@ -46069,6 +46073,15 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
             if ( nVerbose < 0 )
                 goto usage;
             break;
+        case 'W':
+	  if ( globalUtilOptind >= argc )
+            {
+	        Abc_Print( -1, "Command line switch \"-W\" should be followed by a blif filename.\n" );
+                goto usage;
+            }
+            FileName = argv[globalUtilOptind];
+            globalUtilOptind++;
+            break;
         case 'h':
             goto usage;
         default:
@@ -46080,25 +46093,64 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
         Abc_Print( -1, "Abc_CommandAbc9Cspf(): There is no AIG.\n" );
         return 1;
     }
-    if ( argc != globalUtilOptind + 1 )
-    {
-        goto usage;
-    }
     // get the input file name
-    FileName = argv[globalUtilOptind];
     if ( fCudd )
       Abc_DdNandGiaTest( pAbc->pGia, FileName, nMem, 30, nType, 0, 0, fReo, nVerbose );
     else
-      Abc_BddNandGiaTest( pAbc->pGia, FileName, nMem, nType, fRep, fExdc, nVerbose );
-    sprintf(Command, "read %s; strash; &get", FileName );
-    Cmd_CommandExecute( pAbc, Command );
+      pNew = Abc_BddNandGiaTest( pAbc->pGia, FileName, nMem, nType, fRep, fExdc, nVerbose );
+    if ( fVerify )
+      {
+	if ( fExdc )
+	  {
+	    Gia_Man_t * p00, *p01, *p10, *p11;
+	    Gia_Obj_t * pObj;
+	    int i, v;
+	    int nDcPos = Gia_ManCoNum( pAbc->pGia ) / 2;
+	    int * vDcPos = ABC_CALLOC( int, nDcPos );
+	    p00 = Gia_ManDup( pAbc->pGia );
+	    p10 = Gia_ManDup( pNew );
+	    for ( i = 0; i < nDcPos; i++ )
+	      {
+		vDcPos[i] = nDcPos + nDcPos + i;
+		v = Gia_ManAppendAnd( p00,
+				      Gia_Obj2Lit( p00, Gia_ObjChild0( Gia_ManPo( p00, i ) ) ),
+				      Abc_LitNot( Gia_Obj2Lit( p00, Gia_ObjChild0( Gia_ManPo( p00, i + nDcPos ) ) ) ) );
+		Gia_ManAppendCo( p00, v );
+		v = Gia_ManAppendAnd( p10,
+				      Gia_Obj2Lit( p10, Gia_ObjChild0( Gia_ManPo( p10, i ) ) ),
+				      Abc_LitNot( Gia_Obj2Lit( p10, Gia_ObjChild0( Gia_ManPo( p10, i + nDcPos ) ) ) ) );
+		Gia_ManAppendCo( p10, v );
+	      }
+	    p01 = Gia_ManDupCones( p00, vDcPos, nDcPos, 0 );
+	    p11 = Gia_ManDupCones( p10, vDcPos, nDcPos, 0 );
+	    Gia_AigerWrite( p00, "p00.aig", 0, 0, 0 );
+	    Gia_AigerWrite( p10, "p10.aig", 0, 0, 0 );
+	    Gia_ManStop( p00 );
+	    Gia_ManStop( p10 );
+	    pMiter = Gia_ManMiter( p01, p11, 0, 1, 0, 0, 0 );
+	    Gia_ManStop( p01 );
+	    Gia_ManStop( p11 );
+	  }
+	else
+	  pMiter = Gia_ManMiter( pAbc->pGia, pNew, 0, 1, 0, 0, 0 );
+	if ( pMiter )
+	  {
+	    Cec_ParCec_t ParsCec, * pPars = &ParsCec;
+	    Cec_ManCecSetDefaultParams( pPars );
+	    pAbc->Status = Cec_ManVerify( pMiter, pPars );
+	    // Abc_FrameReplaceCex( pAbc, &pNew->pCexComb );
+	    Gia_ManStop( pMiter );
+	  }
+      }
+    Abc_FrameUpdateGia( pAbc, pNew );
 
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &cspf [-GNOMUV num] [-cdrh] <file>\n" );
+    Abc_Print( -2, "usage: &cspf [-W <file>] [-GMUV num] [-ceprxh]\n" );
     Abc_Print( -2, "\t        nand circuit minimization by permissible function using simple bdd\n" );
     Abc_Print( -2, "\t-c    : toggle using CUDD not simple BDD [default = %s]\n", fCudd? "yes": "no" );
+    Abc_Print( -2, "\t-e    : toggle verification [default = %s]\n", fVerify? "yes": "no" );
     Abc_Print( -2, "\t-p    : toggle repeating optimization while it is effectie [default = %s]\n", fRep? "yes": "no" );
     Abc_Print( -2, "\t-r    : toggle dynamic variable reoredering only in CUDD [default = %s]\n", fReo? "yes": "no" );
     Abc_Print( -2, "\t-x    : toggle using the later half outputs as external don't cares of the first half outputs [default = %s]\n", fExdc? "yes": "no" );
@@ -46109,6 +46161,7 @@ usage:
     Abc_Print( -2, "\t\t3: transduction method of gate merging\n" );
     Abc_Print( -2, "\t\t4: transduction method of gate substitution of the first half outputs by the latter half outputs\n" );
     Abc_Print( -2, "\t-M num: number of BDD nodes to allocate initially 2^? (not for CUDD) [default = %d]\n", nMem );
+    Abc_Print( -2, "\t-W <file>: file to write blif\n" );
     Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
     Abc_Print( -2, "\t-h    : print the command usage\n");
     Abc_Print( -2, "\t<file> : output file name\n");

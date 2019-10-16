@@ -47,7 +47,6 @@ struct Abc_NandMan_
   unsigned * G;
   Vec_Int_t ** C;
   Abc_BddMan * pBdd;
-  char * filename;
   int nMem;
   int nVerbose;
   int fDc;
@@ -264,6 +263,71 @@ static inline void Abc_BddNandGenNet( Abc_NandMan * p, Gia_Man_t * pGia )
   Vec_IntForEachEntry( p->livingNodes, id, i )
     if ( Vec_IntSize( p->fanoutList[id] ) == 0 ) Abc_BddNandRemoveNode( p, id );
 }
+static inline Gia_Man_t * Abc_BddNandGenGia( Abc_NandMan * p, Gia_Man_t * pOld )
+{
+    Gia_Man_t * pNew, * pTemp;
+    Gia_Obj_t * pObj;
+    int i, j, id, idj, id0, id1, Value;
+    int * Values;
+    Values = ABC_CALLOC( int, p->nObjs );
+    pNew = Gia_ManStart( Vec_IntSize( p->livingNodes ) );
+    pNew->pName = Abc_UtilStrsav( pOld->pName );
+    pNew->pSpec = Abc_UtilStrsav( pOld->pSpec );
+    Gia_ManHashAlloc( pNew );
+    id = 0;
+    Values[id] = 0;
+    id = Abc_BddNandCompl( p, id );
+    Values[id] = 1;
+    Vec_IntForEachEntry( p->pis, id, i )
+      {
+	Value = Gia_ManAppendCi( pNew );
+	Values[id] = Value;
+	id = Abc_BddNandCompl( p, id );
+	Values[id] = Abc_LitNot( Value );
+      }
+    Vec_IntForEachEntry( p->livingNodes, id, i )
+      {
+	if ( p->faninList[id]                 == 0 ||
+	     p->fanoutList[id]                == 0 ||
+	     Vec_IntSize( p->faninList[id] )  == 0 ||
+	     Vec_IntSize( p->fanoutList[id] ) == 0 )
+	  continue;
+	if ( Vec_IntSize( p->faninList[id] ) == 1 )
+	  {
+	    idj = Vec_IntEntry( p->faninList[id], 0 );
+	    Values[id] = Abc_LitNot( Values[idj] );
+	  }
+	else // if ( Vec_IntSize( p->faninList[id] ) >= 2 )
+	  {
+	    id0 = Vec_IntEntry( p->faninList[id], 0 );
+	    id1 = Vec_IntEntry( p->faninList[id], 1 );
+	    Values[id] = Gia_ManHashAnd( pNew, Values[id0], Values[id1] );
+	    Vec_IntForEachEntryStart( p->faninList[id], idj, j, 2 )
+	      Values[id] = Gia_ManHashAnd( pNew, Values[id], Values[idj] );
+	    Values[id] = Abc_LitNot( Values[id] );
+	  }
+      }	
+    Vec_IntForEachEntry( p->pos, id, i )
+      {
+	idj = Vec_IntEntry( p->faninList[id], 0 );
+	Values[id] = Gia_ManAppendCo( pNew, Values[idj] );
+      }
+    if ( p->fDc )
+      {
+	int nDcPos = Gia_ManCoNum( pOld ) / 2;
+	int * vDcPos = ABC_CALLOC( int, nDcPos );
+	for ( i = 0; i < nDcPos; i++ )
+	  vDcPos[i] = nDcPos + i;
+	pTemp = Gia_ManDupCones( pOld, vDcPos, nDcPos, 0 );
+	Gia_ManDupAppendShare( pNew, pTemp );
+	Gia_ManStop( pTemp );
+	ABC_FREE( vDcPos );
+      }
+    pNew = Gia_ManCleanup( pTemp = pNew );
+    Gia_ManStop( pTemp );
+    ABC_FREE( Values );
+    return pNew;
+}
 
 /**Function*************************************************************
 
@@ -276,7 +340,7 @@ static inline void Abc_BddNandGenNet( Abc_NandMan * p, Gia_Man_t * pGia )
   SeeAlso     []
 
 ***********************************************************************/
-static inline Abc_NandMan * Abc_BddNandManAlloc( Gia_Man_t * pGia, char * Filename, int nMem, int fDc, int nVerbose )
+static inline Abc_NandMan * Abc_BddNandManAlloc( Gia_Man_t * pGia, int nMem, int fDc, int nVerbose )
 {
   Abc_NandMan * p = ABC_CALLOC( Abc_NandMan, 1 );
   p->nGiaObjs = pGia->nObjs;
@@ -290,7 +354,6 @@ static inline Abc_NandMan * Abc_BddNandManAlloc( Gia_Man_t * pGia, char * Filena
   p->rank = ABC_CALLOC( int, p->nObjs );
   p->G = ABC_CALLOC( unsigned, p->nObjs );
   p->C = ABC_CALLOC( Vec_Int_t *, p->nObjs );
-  p->filename = Filename;
   p->nMem = nMem;
   p->fDc = fDc;
   p->nVerbose = nVerbose;
@@ -328,11 +391,11 @@ static inline void Abc_BddNandManFree( Abc_NandMan * p )
   SeeAlso     []
 
 ***********************************************************************/
-static inline void Abc_BddNandPrintNet( Abc_NandMan * p )
+static inline void Abc_BddNandPrintNet( Abc_NandMan * p, char * FileName )
 {
   int id, idj; int i, j, k;
   FILE *fp;
-  fp = fopen( p->filename, "w" );
+  fp = fopen( FileName, "w" );
   fprintf( fp, ".model test\n" );
   fprintf( fp, ".inputs" );
   Vec_IntForEachEntry( p->pis, id, i )
@@ -1031,7 +1094,6 @@ static inline void Abc_BddNandDc( Abc_NandMan * p )
   // please be sure reset will destroy Dc set here and will cause segmentation fault
   int id, idj; int i;
   int nPos = Vec_IntSize( p->pos ) / 2;
-  p->fDc = 1;
   for ( i = 0; i < nPos; i++ )
     {
       id = Vec_IntPop( p->pos );
@@ -1039,7 +1101,7 @@ static inline void Abc_BddNandDc( Abc_NandMan * p )
       Vec_IntRemove( p->fanoutList[idj], id );
       Vec_IntFree( p->faninList[id] );
       p->faninList[id] = 0;
-      p->G[Vec_IntEntry( p->pos, nPos - i )] = Abc_BddNandObjValue( p, idj );
+      p->G[Vec_IntEntry( p->pos, nPos - i - 1 )] = Abc_BddNandObjValue( p, idj );
     }
 }
 
@@ -1059,9 +1121,9 @@ static inline void Abc_BddNandPrintStats( Abc_NandMan * p, char * prefix, abctim
   printf( "\r%-10s: gates = %5d, wires = %5d, AIG node = %5d", prefix, Vec_IntSize( p->livingNodes ), Abc_BddNandCountWire( p ), Abc_BddNandCountWire( p ) - Vec_IntSize( p->livingNodes ) );
   ABC_PRT( ", time ", Abc_Clock() - clk0 );
 }
-void Abc_BddNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nType, int fRep, int fDc, int nVerbose )
+Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nType, int fRep, int fDc, int nVerbose )
 {
-  Abc_NandMan * p = Abc_BddNandManAlloc( pGia, FileName, nMem, fDc, nVerbose );
+  Abc_NandMan * p = Abc_BddNandManAlloc( pGia, nMem, fDc, nVerbose );
   Abc_BddNandGenNet( p, pGia );
   assert( ( 1u << p->nMem ) > Vec_IntSize( p->pis ) + 2 );
   abctime clk0 = Abc_Clock();
@@ -1102,8 +1164,10 @@ void Abc_BddNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nType,
       if ( !fRep ) break;
     }    
   if ( nVerbose ) ABC_PRT( "total ", Abc_Clock() - clk0 );
-  Abc_BddNandPrintNet( p );
+  if ( FileName != NULL ) Abc_BddNandPrintNet( p, FileName );
+  Gia_Man_t * pNew = Abc_BddNandGenGia( p, pGia );
   Abc_BddNandManFree( p );
+  return pNew;
 }
 
 ////////////////////////////////////////////////////////////////////////
