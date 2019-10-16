@@ -431,7 +431,6 @@ struct Abc_BddMan_
   
   int                fGC;           // flag to garbage collect
   int                fRealloc;      // flag to reallocate
-  int *              pFanouts;      // number of fanout-gates for each gate 
   Vec_Int_t *        pFrontiers;    // vector of frontier nodes
   
   float              ReorderThreshold; // threshold to terminate reordering. 0=off.
@@ -509,7 +508,10 @@ extern int             Abc_BddCountNodesArrayIndependent( Abc_BddMan * p, Vec_In
 extern void            Abc_BddPrint( Abc_BddMan * p, unsigned a, int offset, FILE * f );
 extern void            Abc_BddRemoveNodeByBvar( Abc_BddMan * p, int i );
 extern void            Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFrontiers );
+extern int             Abc_BddRefresh( Abc_BddMan * p, int * nRefresh );
+extern void            Abc_BddRefreshConfig( Abc_BddMan * p, int fRealloc, int fGC, int nReorderThreshold );
 extern int             Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p );
+
 
 extern int             Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth );
 extern int             Abc_BddCount1s( Abc_BddMan * p, unsigned a, int depth );

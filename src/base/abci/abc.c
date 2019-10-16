@@ -46113,18 +46113,16 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
 	      {
 		vDcPos[i] = nDcPos + nDcPos + i;
 		v = Gia_ManAppendAnd( p00,
-				      Gia_Obj2Lit( p00, Gia_ObjChild0( Gia_ManPo( p00, i ) ) ),
-				      Abc_LitNot( Gia_Obj2Lit( p00, Gia_ObjChild0( Gia_ManPo( p00, i + nDcPos ) ) ) ) );
+				      Gia_Obj2Lit( p00, Gia_ObjChild0( Gia_ManCo( p00, i ) ) ),
+				      Abc_LitNot( Gia_Obj2Lit( p00, Gia_ObjChild0( Gia_ManCo( p00, i + nDcPos ) ) ) ) );
 		Gia_ManAppendCo( p00, v );
 		v = Gia_ManAppendAnd( p10,
-				      Gia_Obj2Lit( p10, Gia_ObjChild0( Gia_ManPo( p10, i ) ) ),
-				      Abc_LitNot( Gia_Obj2Lit( p10, Gia_ObjChild0( Gia_ManPo( p10, i + nDcPos ) ) ) ) );
+				      Gia_Obj2Lit( p10, Gia_ObjChild0( Gia_ManCo( p10, i ) ) ),
+				      Abc_LitNot( Gia_Obj2Lit( p10, Gia_ObjChild0( Gia_ManCo( p10, i + nDcPos ) ) ) ) );
 		Gia_ManAppendCo( p10, v );
 	      }
 	    p01 = Gia_ManDupCones( p00, vDcPos, nDcPos, 0 );
 	    p11 = Gia_ManDupCones( p10, vDcPos, nDcPos, 0 );
-	    Gia_AigerWrite( p00, "p00.aig", 0, 0, 0 );
-	    Gia_AigerWrite( p10, "p10.aig", 0, 0, 0 );
 	    Gia_ManStop( p00 );
 	    Gia_ManStop( p10 );
 	    pMiter = Gia_ManMiter( p01, p11, 0, 1, 0, 0, 0 );

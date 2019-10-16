@@ -48,8 +48,8 @@ struct Abc_NandMan_
   Vec_Int_t ** C;
   Abc_BddMan * pBdd;
   int nMem;
+  Gia_Man_t * pDc;
   int nVerbose;
-  int fDc;
 };
 
 static inline int      Abc_BddNandCompl( Abc_NandMan * p, int id )    { return id + p->nGiaObjs;                }
@@ -248,6 +248,7 @@ static inline void Abc_BddNandGenNet( Abc_NandMan * p, Gia_Man_t * pGia )
   // po
   Gia_ManForEachCo( pGia, pObj, i )
     {
+      if ( p->pDc != NULL && i >= Gia_ManCoNum( pGia ) / 2 ) break;
       id = Gia_ObjId( pGia, pObj );
       p->faninList[id] = Vec_IntAlloc( 1 );
       p->fanoutList[id] = 0;
@@ -260,8 +261,28 @@ static inline void Abc_BddNandGenNet( Abc_NandMan * p, Gia_Man_t * pGia )
       Vec_IntPush( p->pos, id );
     }
   // remove redundant nodes
-  Vec_IntForEachEntry( p->livingNodes, id, i )
+  Vec_IntForEachEntryReverse( p->livingNodes, id, i )
     if ( Vec_IntSize( p->fanoutList[id] ) == 0 ) Abc_BddNandRemoveNode( p, id );
+}
+
+/**Function*************************************************************
+   
+  Synopsis    []
+
+  Description []
+               
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+static inline void Abc_BddNandDc( Abc_NandMan * p )
+{
+  int i;
+  Gia_Obj_t * pObj;
+  assert( !Abc_BddGia( p->pDc, p->pBdd ) );
+  Gia_ManForEachCo( p->pDc, pObj, i )
+    p->G[Vec_IntEntry( p->pos, i )] = pObj->Value;
 }
 static inline Gia_Man_t * Abc_BddNandGenGia( Abc_NandMan * p, Gia_Man_t * pOld )
 {
@@ -312,17 +333,7 @@ static inline Gia_Man_t * Abc_BddNandGenGia( Abc_NandMan * p, Gia_Man_t * pOld )
 	idj = Vec_IntEntry( p->faninList[id], 0 );
 	Values[id] = Gia_ManAppendCo( pNew, Values[idj] );
       }
-    if ( p->fDc )
-      {
-	int nDcPos = Gia_ManCoNum( pOld ) / 2;
-	int * vDcPos = ABC_CALLOC( int, nDcPos );
-	for ( i = 0; i < nDcPos; i++ )
-	  vDcPos[i] = nDcPos + i;
-	pTemp = Gia_ManDupCones( pOld, vDcPos, nDcPos, 0 );
-	Gia_ManDupAppendShare( pNew, pTemp );
-	Gia_ManStop( pTemp );
-	ABC_FREE( vDcPos );
-      }
+    if ( p->pDc != NULL ) Gia_ManDupAppendShare( pNew, p->pDc );
     pNew = Gia_ManCleanup( pTemp = pNew );
     Gia_ManStop( pTemp );
     ABC_FREE( Values );
@@ -355,8 +366,17 @@ static inline Abc_NandMan * Abc_BddNandManAlloc( Gia_Man_t * pGia, int nMem, int
   p->G = ABC_CALLOC( unsigned, p->nObjs );
   p->C = ABC_CALLOC( Vec_Int_t *, p->nObjs );
   p->nMem = nMem;
-  p->fDc = fDc;
   p->nVerbose = nVerbose;
+  if ( fDc )
+    {
+      int i;
+      int nDcPos = Gia_ManCoNum( pGia ) / 2;
+      int * vDcPos = ABC_CALLOC( int, nDcPos );
+      for ( i = 0; i < nDcPos; i++ )
+	vDcPos[i] = nDcPos + i;
+      p->pDc= Gia_ManDupCones( pGia, vDcPos, nDcPos, 0 );
+    }
+  else p->pDc = NULL;
   return p;
 }
 static inline void Abc_BddNandManFree( Abc_NandMan * p )
@@ -377,6 +397,7 @@ static inline void Abc_BddNandManFree( Abc_NandMan * p )
   ABC_FREE( p->G );
   ABC_FREE( p->C );
   Abc_BddManFree( p->pBdd );
+  if ( p->pDc != NULL ) Gia_ManStop( p->pDc );
   ABC_FREE( p );
 }
 
@@ -703,13 +724,13 @@ static inline int Abc_BddNandCspfFaninCone( Abc_NandMan * p, int startId )
 ***********************************************************************/
 static inline void Abc_BddNandRefresh( Abc_NandMan * p )
 {
-  assert( !p->fDc );
-  if ( p->nVerbose > 1 ) printf( "Refresh\n");
-  int out;
+  if ( p->nVerbose > 1 ) printf( "Refresh\n" );
   abctime clk0 = Abc_Clock();
   Abc_BddManFree( p->pBdd );
   p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->pis ), 1 << p->nMem, (int)( p->nVerbose > 2 ) );
-  out = Abc_BddNandBuildAll( p );
+  if ( p->pDc != NULL ) Abc_BddNandDc( p );
+  int out = 0;
+  out += Abc_BddNandBuildAll( p );
   out += Abc_BddNandCspf( p );
   assert( !out );
   if ( p->nVerbose > 1 ) ABC_PRT( "Refresh took", Abc_Clock() - clk0 );
@@ -1089,21 +1110,6 @@ static inline void Abc_BddNandG1multi( Abc_NandMan * p, int fWeak )
   Vec_IntFree( targets );
   Vec_IntFree( targets2 );
 }
-static inline void Abc_BddNandDc( Abc_NandMan * p )
-{
-  // please be sure reset will destroy Dc set here and will cause segmentation fault
-  int id, idj; int i;
-  int nPos = Vec_IntSize( p->pos ) / 2;
-  for ( i = 0; i < nPos; i++ )
-    {
-      id = Vec_IntPop( p->pos );
-      idj = Vec_IntEntry( p->faninList[id], 0 );
-      Vec_IntRemove( p->fanoutList[idj], id );
-      Vec_IntFree( p->faninList[id] );
-      p->faninList[id] = 0;
-      p->G[Vec_IntEntry( p->pos, nPos - i - 1 )] = Abc_BddNandObjValue( p, idj );
-    }
-}
 
 /**Function*************************************************************
    
@@ -1128,8 +1134,8 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int
   assert( ( 1u << p->nMem ) > Vec_IntSize( p->pis ) + 2 );
   abctime clk0 = Abc_Clock();
   p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->pis ), 1 << p->nMem, (int)( nVerbose > 2 ) );
+  if ( p->pDc != NULL ) Abc_BddNandDc( p );
   assert( !Abc_BddNandBuildAll( p ) );
-  if ( p->fDc ) Abc_BddNandDc( p );
   if ( nVerbose ) Abc_BddNandPrintStats( p, "initial", clk0 );
   Abc_BddNandCspfEager( p );
   if ( nVerbose ) Abc_BddNandPrintStats( p, "cspf", clk0 );
