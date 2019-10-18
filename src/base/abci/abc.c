@@ -46016,12 +46016,13 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     int fCudd = 0;
     int fVerify = 1;
     int fRep = 1;
+    int nWindowSize = 0;
     char * FileName = NULL;
-    Gia_Man_t * pNew, * pMiter;
-    extern Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nType, int fRep, int fExdc, int nVerbose );
+    Gia_Man_t * pNew = NULL, * pMiter;
+    extern Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nType, int fRep, int fExdc, int nWindowSize, int nVerbose );
     extern void Abc_DdNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nMemMax, int nType, int nIte, int nOpt, int fReo, int nVerbose );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "GMVWcerpxh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "GMPVWcerpxh" ) ) != EOF )
     {
         switch ( c )
         {
@@ -46062,6 +46063,17 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
             if ( nMem < 0 )
                 goto usage;
             break;
+        case 'P':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-P\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nWindowSize = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nWindowSize < 0 )
+                goto usage;
+            break;
         case 'V':
             if ( globalUtilOptind >= argc )
             {
@@ -46097,13 +46109,12 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     if ( fCudd )
       Abc_DdNandGiaTest( pAbc->pGia, FileName, nMem, 30, nType, 0, 0, fReo, nVerbose );
     else
-      pNew = Abc_BddNandGiaTest( pAbc->pGia, FileName, nMem, nType, fRep, fExdc, nVerbose );
+      pNew = Abc_BddNandGiaTest( pAbc->pGia, FileName, nMem, nType, fRep, fExdc, nWindowSize, nVerbose );
     if ( fVerify )
       {
 	if ( fExdc )
 	  {
 	    Gia_Man_t * p00, *p01, *p10, *p11;
-	    Gia_Obj_t * pObj;
 	    int i, v;
 	    int nDcPos = Gia_ManCoNum( pAbc->pGia ) / 2;
 	    int * vDcPos = ABC_CALLOC( int, nDcPos );
@@ -46153,13 +46164,14 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &cspf [-W <file>] [-GMUV num] [-ceprxh]\n" );
+    Abc_Print( -2, "usage: &cspf [-W <file>] [-GMPUV num] [-ceprxh]\n" );
     Abc_Print( -2, "\t        nand circuit minimization by permissible function using simple bdd\n" );
     Abc_Print( -2, "\t-c    : toggle using CUDD not simple BDD [default = %s]\n", fCudd? "yes": "no" );
     Abc_Print( -2, "\t-e    : toggle verification [default = %s]\n", fVerify? "yes": "no" );
     Abc_Print( -2, "\t-p    : toggle repeating optimization while it is effectie [default = %s]\n", fRep? "yes": "no" );
     Abc_Print( -2, "\t-r    : toggle dynamic variable reoredering only in CUDD [default = %s]\n", fReo? "yes": "no" );
     Abc_Print( -2, "\t-x    : toggle using the later half outputs as external don't cares of the first half outputs [default = %s]\n", fExdc? "yes": "no" );
+    Abc_Print( -2, "\t-W <file>: file to write blif\n" );
     Abc_Print( -2, "\t-G num: optimization heuristic type [default = %d]\n", nType );
     Abc_Print( -2, "\t\t0: nothing\n" );
     Abc_Print( -2, "\t\t1: transduction method of gate substitution (eager)\n" );
@@ -46167,10 +46179,9 @@ usage:
     Abc_Print( -2, "\t\t3: transduction method of gate merging\n" );
     Abc_Print( -2, "\t\t4: transduction method of gate substitution of the first half outputs by the latter half outputs\n" );
     Abc_Print( -2, "\t-M num: number of BDD nodes to allocate initially 2^? (not for CUDD) [default = %d]\n", nMem );
-    Abc_Print( -2, "\t-W <file>: file to write blif\n" );
+    Abc_Print( -2, "\t-P num: number of AIG nodes in each window (0 means no limit) [default = %d]\n", nWindowSize );
     Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
     Abc_Print( -2, "\t-h    : print the command usage\n");
-    Abc_Print( -2, "\t<file> : output file name\n");
     return 1;
 }
 
