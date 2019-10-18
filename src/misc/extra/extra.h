@@ -508,6 +508,7 @@ extern int             Abc_BddCountNodesArrayIndependent( Abc_BddMan * p, Vec_In
 extern void            Abc_BddPrint( Abc_BddMan * p, unsigned a, int offset, FILE * f );
 extern void            Abc_BddRemoveNodeByBvar( Abc_BddMan * p, int i );
 extern void            Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFrontiers );
+extern void            Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts );
 extern int             Abc_BddRefresh( Abc_BddMan * p, int * nRefresh );
 extern void            Abc_BddRefreshConfig( Abc_BddMan * p, int fRealloc, int fGC, int nReorderThreshold );
 extern int             Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p );

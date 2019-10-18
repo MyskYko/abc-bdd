@@ -25,6 +25,7 @@
 #include "extra.h"
 #include "misc/vec/vec.h"
 #include "aig/gia/gia.h"
+#include "proof/cec/cec.h"
 
 ABC_NAMESPACE_IMPL_START
 
@@ -196,7 +197,7 @@ static inline void Abc_BddNandGenNet( Abc_NandMan * p, Gia_Man_t * pGia )
   Gia_Obj_t * pObj, * pObj0, * pObj1;
   int i; int id, idj, id0, id1;
   // constant
-  id = 0;
+  id = 0; // Gia_ObjId( pGia, Gia_ManConst0( pGia ) );
   p->newNodeValues[id] = Abc_BddLitConst0();
   p->faninList[id] = 0;
   p->fanoutList[id] = Vec_IntAlloc( 1 );
@@ -1122,6 +1123,249 @@ static inline void Abc_BddNandG1multi( Abc_NandMan * p, int fWeak )
   SeeAlso     []
 
 ***********************************************************************/
+static inline Gia_Man_t * Abc_BddNandGenGiaFromNets( Vec_Ptr_t * pNets, int * Id2Circuit, int * Id2Ind, Vec_Ptr_t * vvPis, Vec_Int_t * vExternalPos, Vec_Int_t * vExternalCs, Gia_Man_t * pOld )
+{
+  Gia_Man_t * pNew, * pTemp;
+  Gia_Obj_t * pObj;
+  int i, j, k, id, idj, id0, id1, Value;
+  int ** vvPoValues = ABC_CALLOC( int *, Vec_PtrSize( pNets ) + 1 );
+  Abc_NandMan * p;
+  int * Values;
+  pNew = Gia_ManStart( pOld->nObjs );
+  pNew->pName = Abc_UtilStrsav( pOld->pName );
+  pNew->pSpec = Abc_UtilStrsav( pOld->pSpec );
+  Gia_ManHashAlloc( pNew );
+
+  vvPoValues[0] = ABC_CALLOC( int, Gia_ManCiNum( pOld ) );
+  Gia_ManForEachCi( pOld, pObj, i )
+    vvPoValues[0][i] = Gia_ManAppendCi( pNew );
+
+  Vec_PtrForEachEntryReverse( Abc_NandMan *, pNets, p, i )
+    {
+      Values = ABC_CALLOC( int, p->nObjs );
+      vvPoValues[i+1] = ABC_CALLOC( int, Vec_IntSize( p->pos ) );
+      id = 0;
+      Values[id] = 0;
+      id = Abc_BddNandCompl( p, id );
+      Values[id] = 1;
+      
+      Vec_Int_t * vPis = (Vec_Int_t *)Vec_PtrEntry( vvPis, i );
+      Vec_IntForEachEntry( p->pis, id, j )
+	{
+	  idj = Vec_IntEntry( vPis, j );
+	  Value = vvPoValues[Id2Circuit[idj]+1][Id2Ind[idj]];
+	  Values[id] = Value;
+	  id = Abc_BddNandCompl( p, id );
+	  Values[id] = Abc_LitNot( Value );
+	}
+      Vec_IntForEachEntry( p->livingNodes, id, j )
+	{
+	  if ( p->faninList[id]                 == 0 ||
+	       p->fanoutList[id]                == 0 ||
+	       Vec_IntSize( p->faninList[id] )  == 0 ||
+	       Vec_IntSize( p->fanoutList[id] ) == 0 )
+	    continue;
+	  if ( Vec_IntSize( p->faninList[id] ) == 1 )
+	    {
+	      idj = Vec_IntEntry( p->faninList[id], 0 );
+	      Values[id] = Abc_LitNot( Values[idj] );
+	    }
+	  else // if ( Vec_IntSize( p->faninList[id] ) >= 2 )
+	    {
+	      id0 = Vec_IntEntry( p->faninList[id], 0 );
+	      id1 = Vec_IntEntry( p->faninList[id], 1 );
+	      Values[id] = Gia_ManHashAnd( pNew, Values[id0], Values[id1] );
+	      Vec_IntForEachEntryStart( p->faninList[id], idj, k, 2 )
+		Values[id] = Gia_ManHashAnd( pNew, Values[id], Values[idj] );
+	      Values[id] = Abc_LitNot( Values[id] );
+	    }
+	}
+      Vec_IntForEachEntry( p->pos, id, j )
+	{
+	  idj = Vec_IntEntry( p->faninList[id], 0 );
+	  Value = Values[idj];
+	  vvPoValues[i+1][j] = Value;
+	}
+      ABC_FREE( Values );
+    }
+  
+  Vec_IntForEachEntry( vExternalPos, id, i )
+    {
+      Value = vvPoValues[Id2Circuit[id]+1][Id2Ind[id]];
+      int cond = Vec_IntEntry( vExternalCs, i );
+      Gia_ManAppendCo( pNew, Abc_LitNotCond( Value, cond ) );
+    }
+  //    if ( p->pDc != NULL ) Gia_ManDupAppendShare( pNew, p->pDc );
+  pNew = Gia_ManCleanup( pTemp = pNew );
+  Gia_ManStop( pTemp );
+  return pNew;
+}
+static inline void Abc_BddNandPartitionGias( Gia_Man_t * pOld )
+{
+  int i, j, id, lit, id0;
+  Gia_Obj_t * pObj, * pObj0, * pObj1;
+  Vec_Int_t * vPis, * vPos, * vPoFanins, * vNodes;
+  Vec_Int_t * vExternalPos = Vec_IntAlloc( 1 );
+  Vec_Int_t * vExternalCs = Vec_IntAlloc( 1 );
+  Vec_Int_t * vCands = Vec_IntAlloc( 1 );
+  Vec_Ptr_t * vvPis = Vec_PtrAlloc( 1 );
+  Vec_Ptr_t * vvPos = Vec_PtrAlloc( 1 );
+  Gia_Man_t * pGia = Gia_ManDup ( pOld );
+  Vec_Ptr_t * vNets = Vec_PtrAlloc( 1 );
+  
+  int * pFanouts;
+  pFanouts = ABC_CALLOC( int, pGia->nObjs );
+  assert( pFanouts );
+  Abc_BddGiaCountFanout( pGia, pFanouts );
+  
+  Gia_ManForEachCo( pGia, pObj, i )
+    {
+      Vec_IntPush( vExternalCs, Gia_ObjFaninC0( pObj ) );
+      //      printf("%d\n", Gia_ObjFaninC0( pObj ));
+      pObj = Gia_ObjFanin0( pObj );
+      id = Gia_ObjId( pGia, pObj );
+      Vec_IntPush( vExternalPos, id );
+      pFanouts[id]--;
+      if ( id != 0 && !Gia_ObjIsCi( pObj ) )
+	Vec_IntPush( vCands, id );
+    }
+
+  // TODO: loop
+  while ( 1 )
+    {
+      int newId;
+      vPis = Vec_IntAlloc( 1 );
+      vPos = Vec_IntAlloc( 1 );
+      vPoFanins = Vec_IntAlloc( 1 );
+      vNodes = Vec_IntAlloc( 1 );
+      while ( 1 )
+	{
+	  newId = 0;
+	  Vec_IntForEachEntry( vPis, id, i )
+	    if ( id != 0 && id > Gia_ManCiNum( pGia ) && pFanouts[id] == 0 )
+	      {
+		newId = id;
+		Vec_IntDrop( vPis, i );
+		j = Vec_IntFind( vCands, id );
+		if ( j != -1 )
+		  {
+		    Vec_IntDrop( vCands, j );
+		    Vec_IntPush( vPoFanins, id );
+		    pObj = Gia_ManObj( pGia, id );
+		    lit = Gia_Obj2Lit( pGia, pObj );
+		    lit = Gia_ManAppendCo( pGia, lit );
+		    pObj = Gia_Lit2Obj( pGia, lit );
+		    id = Gia_ObjId( pGia, pObj );
+		    Vec_IntPush( vPos, id );
+		  }
+		break;
+	      }
+	  if ( newId == 0 )
+	    Vec_IntForEachEntry( vCands, id, i )
+	      if ( id != 0 && id > Gia_ManCiNum( pGia ) && pFanouts[id] == 0 )
+		{
+		  newId = id;
+		  Vec_IntDrop( vCands, i );
+		  Vec_IntPush( vPoFanins, id );
+		  pObj = Gia_ManObj( pGia, id );
+		  lit = Gia_Obj2Lit( pGia, pObj );
+		  lit = Gia_ManAppendCo( pGia, lit );
+		  pObj = Gia_Lit2Obj( pGia, lit );
+		  id = Gia_ObjId( pGia, pObj );
+		  Vec_IntPush( vPos, id );
+		  break;
+		}
+	  if ( newId == 0 ) break;
+	  //	  assert( Vec_IntFind( vNodes, newId ) == -1 );
+	  Vec_IntPush( vNodes, newId );
+	  pObj = Gia_ManObj( pGia, newId );
+	  pObj0 = Gia_ObjFanin0( pObj );
+	  id = Gia_ObjId( pGia, pObj0 );
+	  if ( id > Gia_ManCiNum( pGia ) ) pFanouts[id]--;
+	  assert( pFanouts[id] >= 0 );
+	  Vec_IntPushUnique( vPis, id );
+	  pObj1 = Gia_ObjFanin1( pObj );
+	  id = Gia_ObjId( pGia, pObj1 );
+	  if ( id > Gia_ManCiNum( pGia ) ) pFanouts[id]--;
+	  assert( pFanouts[id] >= 0 );
+	  Vec_IntPushUnique( vPis, id );
+	  if ( Vec_IntSize( vNodes ) > 500 ) break;
+	  if ( Vec_IntSize( vPis ) > 100 ) break;
+	}
+      Vec_IntSort( vNodes, 0 );
+      // check po is not empty?
+      Gia_Man_t * pNew = Gia_ManDupFromVecs( pGia, vPis, vNodes, vPos, 0 );
+      Abc_NandMan * p = Abc_BddNandManAlloc( pNew, 21, 0, 0 );
+      Abc_BddNandGenNet( p, pNew );
+      Vec_PtrPush( vNets, p );
+      Vec_PtrPush( vvPis, vPis );
+      Vec_PtrPush( vvPos, vPoFanins );
+      Vec_IntForEachEntry( vPis, id, i )
+	Vec_IntPushUnique( vCands, id );
+      Vec_IntFree( vPos );
+      Vec_IntFree( vNodes );
+      if ( newId == 0 ) break;
+    }
+
+  int * Id2Circuit = ABC_CALLOC( int, pGia->nObjs );
+  int * Id2Ind = ABC_CALLOC( int, pGia->nObjs );
+  Vec_PtrForEachEntry( Vec_Int_t *, vvPis, vPis, i )
+    {
+      vPos = (Vec_Int_t *)Vec_PtrEntry( vvPos, i );
+      printf("circuit %d\nfanin:", i);
+      Vec_IntForEachEntry( vPis, id, j )
+	printf("%d,", id);
+      printf("\nfanout:");
+      Vec_IntForEachEntry( vPos, id, j )
+	{
+	  assert( Id2Circuit[id] == 0 && Id2Ind[id] == 0 );
+	  Id2Circuit[id] = i;
+	  Id2Ind[id] = j;
+	  printf("%d,", id);
+	}
+      printf("\n");
+    }
+  
+  Gia_ManForEachCi( pGia, pObj, i )
+    {
+      id = Gia_ObjId( pGia, pObj );
+      Id2Ind[id] = i;
+      Id2Circuit[id] = -1;
+    }
+  Vec_PtrForEachEntry( Vec_Int_t *, vvPis, vPis, i )
+    {
+      printf("circuit %d\nfanin:\n", i);
+      Vec_IntForEachEntry( vPis, id, j )
+	printf("%d from %d of circuit %d\n", id, Id2Ind[id], Id2Circuit[id]);
+    }
+    
+  Gia_ManStop( pGia );
+  pGia = Abc_BddNandGenGiaFromNets( vNets, Id2Circuit, Id2Ind, vvPis, vExternalPos, vExternalCs, pOld );
+  Gia_AigerWriteSimple( pGia, "a.aig" );
+  Gia_Man_t * pMiter = Gia_ManMiter( pGia, pOld, 0, 1, 0, 0, 0 );
+  if ( pMiter )
+    {
+      Cec_ParCec_t ParsCec, * pPars = &ParsCec;
+      Cec_ManCecSetDefaultParams( pPars );
+      Cec_ManVerify( pMiter, pPars );
+      // Abc_FrameReplaceCex( pAbc, &pNew->pCexComb );
+      Gia_ManStop( pMiter );
+    }
+  else printf("miss miter\n");
+  
+}
+
+/**Function*************************************************************
+   
+  Synopsis    []
+
+  Description []
+               
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
 static inline void Abc_BddNandPrintStats( Abc_NandMan * p, char * prefix, abctime clk0 )
 {
   printf( "\r%-10s: gates = %5d, wires = %5d, AIG node = %5d", prefix, Vec_IntSize( p->livingNodes ), Abc_BddNandCountWire( p ), Abc_BddNandCountWire( p ) - Vec_IntSize( p->livingNodes ) );
@@ -1129,6 +1373,8 @@ static inline void Abc_BddNandPrintStats( Abc_NandMan * p, char * prefix, abctim
 }
 Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nType, int fRep, int fDc, int nVerbose )
 {
+    Abc_BddNandPartitionGias( pGia );
+
   Abc_NandMan * p = Abc_BddNandManAlloc( pGia, nMem, fDc, nVerbose );
   Abc_BddNandGenNet( p, pGia );
   assert( ( 1u << p->nMem ) > Vec_IntSize( p->pis ) + 2 );

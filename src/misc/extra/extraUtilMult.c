@@ -123,7 +123,7 @@ static inline void Abc_BddCacheRemove( Abc_BddMan * p ) {
    SeeAlso     []
 
 ***********************************************************************/
-static inline void Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts )
+void Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts )
 {
   Gia_Obj_t * pObj; int i;
   Gia_ManStaticFanoutStart( pGia );
