@@ -505,7 +505,7 @@ void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName, int
       Abc_BddWriteBlif_rec( p, Abc_BddLit2Bvar( x ), f );
     }
   Vec_IntForEachEntry( vNodes, x, i )
-      Abc_BddUnmark_rec( p, x );
+    Abc_BddUnmark_rec( p, x );
   fprintf( f, ".end\n" );
   fprintf( f, ".model mux\n" );
   fprintf( f, ".inputs sel in1 else comp1\n" );
@@ -515,6 +515,58 @@ void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName, int
   fprintf( f, "0-1 1\n11- 1\n" );
   fprintf( f, ".end\n" );
   fclose( f );
+}
+
+/**Function*************************************************************
+
+   Synopsis    [Generate Gia from BDD.]
+
+   Description []
+               
+   SideEffects []
+
+   SeeAlso     []
+
+***********************************************************************/
+void Abc_Bdd2Gia_rec( Abc_BddMan * p, int x, int * Values, Gia_Man_t * pGia )
+{
+  int VarBvar, ThenBvar, ElseBvar, compl;
+  unsigned i;
+  i = Abc_BddBvar2Lit( x, 0 );
+  if ( Abc_BddLitIsConst( i ) ) return;
+  if ( Abc_BddMark( p, i ) ) return;
+  Abc_BddSetMark( p, i, 1 );
+  VarBvar = Abc_BddBvarIthVar( Abc_BddVar( p, i ) );
+  ThenBvar = Abc_BddLit2Bvar( Abc_BddThen( p, i ) );
+  ElseBvar = Abc_BddLit2Bvar( Abc_BddElse( p, i ) );
+  compl = Abc_BddLitIsCompl( Abc_BddThen( p, i ) );
+  Abc_Bdd2Gia_rec( p, ThenBvar, Values, pGia );
+  Abc_Bdd2Gia_rec( p, ElseBvar, Values, pGia );
+  Values[x] = Gia_ManHashMux( pGia, Values[VarBvar], Abc_LitNotCond( Values[ThenBvar], compl ), Values[ElseBvar] ); 
+}
+Gia_Man_t * Abc_Bdd2Gia( Abc_BddMan * p, Vec_Int_t * vNodes )
+{
+  int i, j;
+  int * Values;
+  unsigned x;
+  Gia_Man_t * pGia, * pTemp;
+  pGia = Gia_ManStart( p->nObjs );
+  Gia_ManHashAlloc( pGia );
+  Values = ABC_CALLOC( int, p->nObjsAlloc );
+  Values[Abc_BddLit2Bvar( Abc_BddLitConst0() ) ] = Gia_ManConst0Lit( pGia );
+  for ( i = 0; i < p->nVars; i++ )
+    Values[Abc_BddBvarIthVar( Abc_BddVar( p, Abc_BddLitIthVar( i ) ) )] = Gia_ManAppendCi( pGia );
+  Vec_IntForEachEntry( vNodes, x, i )
+    {
+      j = Abc_BddLit2Bvar( x );
+      Abc_Bdd2Gia_rec( p, j, Values, pGia );
+      Gia_ManAppendCo( pGia, Abc_LitNotCond( Values[j], Abc_BddLitIsCompl( x ) ) );
+    }
+  Vec_IntForEachEntry( vNodes, x, i )
+    Abc_BddUnmark_rec( p, x );
+  pGia = Gia_ManCleanup( pTemp = pGia );
+  Gia_ManStop( pTemp );
+  return pGia;
 }
 
 /**Function*************************************************************

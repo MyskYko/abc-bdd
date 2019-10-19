@@ -1037,7 +1037,7 @@ static inline Gia_Man_t * Abc_BddNandNets2Gia( Vec_Ptr_t * vNets, Vec_Int_t * vP
       Values = ABC_CALLOC( int, p->nObjsAlloc );
       vvPoValues[k+1] = ABC_CALLOC( int, Vec_IntSize( p->vPos ) );
       id = Abc_BddNandConst0();
-      Values[id] = Abc_BddLitConst0();
+      Values[id] = Gia_ManConst0Lit( pNew );
       Vec_IntForEachEntry( p->vPis, id, i )
 	Values[id] = vvPoValues[Vec_IntEntry( p->vPiCkts, i ) + 1][Vec_IntEntry( p->vPiIdxs, i )];
       Vec_IntForEachEntry( p->vObjs, id, i )

@@ -449,7 +449,8 @@ static inline unsigned Abc_BddLitConst0()                            { return 0;
 
 static inline unsigned Abc_BddBvar2Lit( int i, int c )               { return i + i + (int)( c > 0 );                               }
 static inline int      Abc_BddLit2Bvar( unsigned i )                 { return i >> 1;                                               }
-static inline unsigned Abc_BddLitIthVar( int i )                     { return Abc_BddBvar2Lit( i + 1, 0 );                          }
+static inline unsigned Abc_BddBvarIthVar( int i )                    { return  i + 1;                                               }
+static inline unsigned Abc_BddLitIthVar( int i )                     { return Abc_BddBvar2Lit( Abc_BddBvarIthVar( i ), 0 );         }
 
 static inline unsigned Abc_BddLitRegular( unsigned i )               { return i & ~01;                                              }
 static inline unsigned Abc_BddLitNot( unsigned i )                   { return i ^ 1;                                                }
