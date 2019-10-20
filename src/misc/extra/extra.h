@@ -449,7 +449,8 @@ static inline unsigned Abc_BddLitConst0()                            { return 0;
 
 static inline unsigned Abc_BddBvar2Lit( int i, int c )               { return i + i + (int)( c > 0 );                               }
 static inline int      Abc_BddLit2Bvar( unsigned i )                 { return i >> 1;                                               }
-static inline unsigned Abc_BddLitIthVar( int i )                     { return Abc_BddBvar2Lit( i + 1, 0 );                          }
+static inline unsigned Abc_BddBvarIthVar( int i )                    { return  i + 1;                                               }
+static inline unsigned Abc_BddLitIthVar( int i )                     { return Abc_BddBvar2Lit( Abc_BddBvarIthVar( i ), 0 );         }
 
 static inline unsigned Abc_BddLitRegular( unsigned i )               { return i & ~01;                                              }
 static inline unsigned Abc_BddLitNot( unsigned i )                   { return i ^ 1;                                                }
@@ -508,11 +509,13 @@ extern int             Abc_BddCountNodesArrayIndependent( Abc_BddMan * p, Vec_In
 extern void            Abc_BddPrint( Abc_BddMan * p, unsigned a, int offset, FILE * f );
 extern void            Abc_BddRemoveNodeByBvar( Abc_BddMan * p, int i );
 extern void            Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFrontiers );
+extern void            Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts );
 extern int             Abc_BddRefresh( Abc_BddMan * p, int * nRefresh );
 extern void            Abc_BddRefreshConfig( Abc_BddMan * p, int fRealloc, int fGC, int nReorderThreshold );
 extern int             Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p );
-
-
+extern Gia_Man_t *     Abc_Bdd2Gia( Abc_BddMan * p, Vec_Int_t * vNodes );
+  
+extern unsigned        Abc_BddUnivAbstract_rec( Abc_BddMan * p, unsigned x, Vec_Int_t * vVars );
 extern int             Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth );
 extern int             Abc_BddCount1s( Abc_BddMan * p, unsigned a, int depth );
 extern unsigned __int128 Abc_BddCount1s128( Abc_BddMan * p, unsigned a, int depth );
