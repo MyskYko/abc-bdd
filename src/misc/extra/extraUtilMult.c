@@ -654,7 +654,7 @@ int Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p )
   Gia_Obj_t * pObj, * pObj0, *pObj1;
   int i, nRefresh = 0;
   unsigned Cof0, Cof1;
-  int * pFanouts;
+  int * pFanouts = NULL;
   if ( p->pFrontiers != NULL )
     {
       pFanouts = ABC_CALLOC( int, pGia->nObjs );
@@ -748,6 +748,30 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
   if ( pFileName != NULL ) Abc_BddWriteBlif( p, vNodes, pFileName, fName );
   Vec_IntFree( vNodes );
   Abc_BddManFree( p );
+}
+
+/**Function*************************************************************
+
+   Synopsis    []
+
+   Description []
+               
+   SideEffects []
+
+   SeeAlso     []
+
+***********************************************************************/
+unsigned Abc_BddUnivAbstract_rec( Abc_BddMan * p, unsigned x, Vec_Int_t * vVars )
+{
+  if ( Abc_BddLitIsConst( x ) ) return x;
+  int Var;
+  unsigned Then, Else;
+  Then = Abc_BddUnivAbstract_rec( p, Abc_BddThen( p, x ), vVars );
+  Else = Abc_BddUnivAbstract_rec( p, Abc_BddElse( p, x ), vVars );
+  Var = Abc_BddVar( p, x );
+  if ( Vec_IntFind( vVars, Var ) != -1 )
+    return Abc_BddAnd( p, Then, Else );
+  return Abc_BddUniqueCreate( p, Var, Then, Else );
 }
 
 /**Function*************************************************************
