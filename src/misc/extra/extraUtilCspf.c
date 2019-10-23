@@ -281,127 +281,6 @@ static inline void Abc_BddNandGia2Net( Abc_NandMan * p )
 }
 
 /**Function*************************************************************
-   
-  Synopsis    []
-
-  Description []
-               
-  SideEffects []
-
-  SeeAlso     []
-
-***********************************************************************/
-static inline void Abc_BddNandDc( Abc_NandMan * p )
-{
-  int i, j;
-  unsigned Value;
-  Gia_Obj_t * pObj;
-  Gia_Man_t * pGia;
-  Vec_Ptr_t * vDcGias;
-  Vec_PtrForEachEntry( Vec_Ptr_t *, p->vvDcGias, vDcGias, i )
-    {
-      if ( Vec_PtrSize( vDcGias ) == 0 ) continue;
-      Value = Abc_BddLitConst1();
-      Vec_PtrForEachEntry( Gia_Man_t *, vDcGias, pGia, j )
-	{
-	  // TODO : error handling
-	  assert( !Abc_BddGia( pGia, p->pBdd ) );
-	  pObj = Gia_ManCo( pGia, 0 );
-	  Value = Abc_BddAnd( p->pBdd, Value, pObj->Value );
-	  assert( !Abc_BddLitIsInvalid( Value ) );
-	}
-      p->pGFuncs[Vec_IntEntry( p->vPos, i )] = Value;
-    }
-}
-static inline void Abc_BddNandPropagateDc( Vec_Ptr_t * vNets, int from )
-{
-  int i, j, k, id, idj, pi, pij, index, best_i, best_pi;
-  unsigned Value, c;
-  Vec_Int_t ** pvPis;
-  Vec_Int_t * vVars, * vNodes;
-  Abc_NandMan * pFrom, * pTo;
-  Gia_Man_t * pDc, * pTemp;
-  vVars = Vec_IntAlloc( 1 );
-  vNodes = Vec_IntAlloc( 1 );
-  pFrom = Vec_PtrEntry( vNets, from );
-  pvPis = ABC_CALLOC( Vec_Int_t *, Vec_PtrSize( vNets ) );
-  for ( i = 0; i < Vec_PtrSize( vNets ); i++ )
-    pvPis[i] = Vec_IntAlloc( 1 );
-  Vec_IntForEachEntry( pFrom->vPis, id, pi )
-    if ( Vec_IntEntry( pFrom->vPiCkts, pi ) != -1 )
-      Vec_IntPush( pvPis[Vec_IntEntry( pFrom->vPiCkts, pi )], pi );
-  Vec_PtrForEachEntry( Abc_NandMan *, vNets, pTo, k )
-    {
-      if ( Vec_IntSize( pvPis[k] ) == 0 ) continue;
-      Vec_IntForEachEntry( pvPis[k], pi, i )
-	{
-	  best_i = i;
-	  best_pi = pi;
-	  Vec_IntForEachEntryStart( pvPis[k], pij, j, i + 1 )
-	    if ( Vec_IntEntry( pFrom->vPiIdxs, best_pi ) > Vec_IntEntry( pFrom->vPiIdxs, pij ) )
-	      {
-		best_i = j;
-		best_pi = pij;
-	      }
-	  Vec_IntWriteEntry( pvPis[k], i, best_pi );
-	  Vec_IntWriteEntry( pvPis[k], best_i, pi );
-	}
-      Vec_IntForEachEntry( pvPis[k], pi, i )
-	{
-	  id = Vec_IntEntry( pFrom->vPis, pi );
-	  Value = Abc_BddLitConst1();
-	  Vec_IntForEachEntry( pFrom->pvFanouts[id], idj, j )
-	    {
-	      if ( Abc_BddNandObjIsPo( pFrom, idj ) )
-		Value = Abc_BddAnd( pFrom->pBdd, Value, pFrom->pGFuncs[idj] );
-	      else
-		{
-		  index = Vec_IntFind( pFrom->pvFanins[idj], id );
-		  c = (unsigned)Vec_IntEntry( pFrom->pvCFuncs[idj], index );
-		  Value = Abc_BddAnd( pFrom->pBdd, Value, c );
-		}
-	    }
-	  // TODO : error handling
-	  assert ( !Abc_BddLitIsInvalid( Value ) ); 
-	  // universify the inputs of Value other than those in pvPis[i]
-	  Vec_IntClear( vVars );
-	  for ( pij = 0; pij < Vec_IntSize( pFrom->vPis ); pij++ )
-	    if ( Vec_IntFind( pvPis[k], pij ) == -1 )
-	      Vec_IntPush( vVars, pij );
-	  Value = Abc_BddUnivAbstract_rec( pFrom->pBdd, Value, vVars );
-	  assert ( !Abc_BddLitIsInvalid( Value ) );
-	  // gia on top of it
-	  Vec_IntClear( vNodes );
-	  Vec_IntPush( vNodes, Value );
-	  pDc = Abc_Bdd2Gia( pFrom->pBdd, vNodes );
-	  while( Gia_ManCiNum( pDc ) < Vec_IntSize( pTo->vPos ) )
-	    {
-	      Vec_IntPush( vVars, Gia_ManCiNum( pDc ) );
-	      Gia_ManAppendCi( pDc );
-	    }
-	  Vec_IntForEachEntry( pvPis[k], pij, j )
-	    Vec_IntInsert( vVars, Vec_IntEntry( pFrom->vPiIdxs, pij ), pij );
-	  pTemp = pDc;
-	  pDc = Gia_ManDupPerm( pDc, vVars );
-	  Gia_ManStop( pTemp );
-	  pTemp = pDc;
-	  pDc = Gia_ManDupRemovePis( pDc, Gia_ManCiNum( pDc ) - Vec_IntSize( pTo->vPos ) );
-	  Gia_ManStop( pTemp );
-	  pTemp = pDc;
-	  pDc = Gia_ManDupOntop( pTo->pGia, pDc );
-	  Gia_ManStop( pTemp );
-	  // push it to pTo->vvDcGias[pFrom->vPiIdxs[pi]]
-	  Vec_PtrPush( Vec_PtrEntry( pTo->vvDcGias, Vec_IntEntry( pFrom->vPiIdxs, pi ) ), pDc );
-	}
-    }
-  Vec_IntFree( vVars );
-  Vec_IntFree( vNodes );
-  for ( i = 0; i < Vec_PtrSize( vNets ); i++ )
-    Vec_IntFree( pvPis[i] );
-  ABC_FREE( pvPis );
-}
-
-/**Function*************************************************************
 
   Synopsis    []
 
@@ -421,13 +300,17 @@ static inline Abc_NandMan * Abc_BddNandManAlloc( Gia_Man_t * pGia, int nMem, int
   p->vPis = Vec_IntAlloc( Gia_ManCiNum( pGia ) );
   p->vPos = Vec_IntAlloc( Gia_ManCoNum( pGia ) );
   p->vObjs = Vec_IntAlloc( 1 );
-  // TODO : error handling
   p->pvFanins  = ABC_CALLOC( Vec_Int_t *, p->nObjsAlloc );
   p->pvFanouts = ABC_CALLOC( Vec_Int_t *, p->nObjsAlloc );
   p->pBddFuncs = ABC_CALLOC( int        , p->nObjsAlloc );
   p->pRank     = ABC_CALLOC( int        , p->nObjsAlloc );
   p->pGFuncs   = ABC_CALLOC( unsigned   , p->nObjsAlloc );
   p->pvCFuncs  = ABC_CALLOC( Vec_Int_t *, p->nObjsAlloc );
+  if ( !p->pvFanins || !p->pvFanouts || !p->pBddFuncs || !p->pRank || !p->pGFuncs || !p->pvCFuncs )
+    {
+      printf("Error: Allocation failed\n");
+      return NULL;
+    }
   p->nMem = nMem;
   p->nVerbose = nVerbose;
   p->pGia = pGia;
@@ -559,10 +442,8 @@ static inline int Abc_BddNandBuild( Abc_NandMan * p, int id )
   int j, idj;
   unsigned Value = Abc_BddLitConst1();
   Vec_IntForEachEntry( p->pvFanins[id], idj, j )
-    {
-      Value = Abc_BddAnd( p->pBdd, Value, Abc_BddNandObjGetBddFunc( p, idj ) );
-      if ( Abc_BddLitIsInvalid( Value ) ) return 1;
-    }
+    Value = Abc_BddAnd( p->pBdd, Value, Abc_BddNandObjGetBddFunc( p, idj ) );
+  if ( Abc_BddLitIsInvalid( Value ) ) return -1;
   Abc_BddNandObjSetBddFunc( p, id, Abc_BddLitNot( Value ) );
   return 0;
 }
@@ -570,7 +451,7 @@ static inline int Abc_BddNandBuildAll( Abc_NandMan * p )
 {
   int i, id;
   Vec_IntForEachEntry( p->vObjs, id, i )
-    if ( Abc_BddNandBuild( p, id ) ) return 1;
+    if ( Abc_BddNandBuild( p, id ) ) return -1;
   return 0;
 }
 static inline int Abc_BddNandBuildFanoutCone( Abc_NandMan * p, int startId )
@@ -583,7 +464,7 @@ static inline int Abc_BddNandBuildFanoutCone( Abc_NandMan * p, int startId )
     if ( Abc_BddNandBuild( p, id ) )
       {
 	Vec_IntFree( targets );
-	return 1;
+	return -1;
       }
   Vec_IntFree( targets );
   return 0;
@@ -599,8 +480,8 @@ static inline int Abc_BddNandCheck( Abc_NandMan * p )
 	Value = Abc_BddAnd( p->pBdd, Value, Abc_BddNandObjGetBddFunc( p, idj ) );
       if ( !Abc_BddLitIsEq( Abc_BddNandObjGetBddFunc( p, id ), Abc_BddLitNot( Value ) ) )
 	{
-	  printf( "error : different at %d %10u %10u\n", id, Abc_BddNandObjGetBddFunc( p, id ), Abc_BddLitNot( Value ) );
-	  return 1;
+	  printf( "Eq-check faild: different at %d %10u %10u\n", id, Abc_BddNandObjGetBddFunc( p, id ), Abc_BddLitNot( Value ) );
+	  return -1;
 	}
     }
   return 0;
@@ -634,7 +515,7 @@ static inline int Abc_BddNandCspfG( Abc_NandMan * p, int id )
 	  p->pGFuncs[id] = Abc_BddAnd( p->pBdd, p->pGFuncs[id], c );
 	}
     }
-  if ( Abc_BddLitIsInvalid( p->pGFuncs[id] ) ) return 1;
+  if ( Abc_BddLitIsInvalid( p->pGFuncs[id] ) ) return -1;
   return 0;
 }
 static inline int Abc_BddNandCspfC( Abc_NandMan * p, int id ) {
@@ -648,17 +529,13 @@ static inline int Abc_BddNandCspfC( Abc_NandMan * p, int id ) {
       fanins = Abc_BddLitConst1();
       Vec_IntForEachEntryStart( p->pvFanins[id], idk, k, j + 1 )
 	fanins = Abc_BddAnd( p->pBdd, fanins, Abc_BddNandObjGetBddFunc( p, idk ) );
-      if ( Abc_BddLitIsInvalid( fanins ) ) return 1;
       fi = Abc_BddNandObjGetBddFunc( p, id );
       fj = Abc_BddNandObjGetBddFunc( p, idj );
       already1 = Abc_BddAnd( p->pBdd, fi, fj );
-      if ( Abc_BddLitIsInvalid( already1 ) ) return 1;
       c = Abc_BddOr( p->pBdd, p->pGFuncs[id], Abc_BddLitNot( fanins ) );
-      if ( Abc_BddLitIsInvalid( c ) ) return 1;
       c = Abc_BddOr( p->pBdd, c, already1 );
-      if ( Abc_BddLitIsInvalid( c ) ) return 1;
       dc1 = Abc_BddOr( p->pBdd, fj, c );
-      if ( Abc_BddLitIsInvalid( dc1 ) ) return 1;
+      if ( Abc_BddLitIsInvalid( dc1 ) ) return -1;
       if ( Abc_BddLitIsConst1( dc1 ) )
 	{
 	  Abc_BddNandDisconnect( p, idj, id );
@@ -687,8 +564,8 @@ static inline int Abc_BddNandCspf( Abc_NandMan * p )
 	  Abc_BddNandRemoveNode( p, id );
 	  continue;
 	}
-      if ( Abc_BddNandCspfG( p, id ) ) return 1;
-      if ( Abc_BddNandCspfC( p, id ) ) return 1;
+      if ( Abc_BddNandCspfG( p, id ) ) return -1;
+      if ( Abc_BddNandCspfC( p, id ) ) return -1;
     }
   return Abc_BddNandBuildAll( p );
 }
@@ -705,8 +582,8 @@ static inline int Abc_BddNandCspfFaninCone( Abc_NandMan * p, int startId )
 	  Abc_BddNandRemoveNode( p, id );
 	  continue;
 	}
-      if ( Abc_BddNandCspfG( p, id ) ) return 1;
-      if ( Abc_BddNandCspfC( p, id ) ) return 1;
+      if ( Abc_BddNandCspfG( p, id ) ) return -1;
+      if ( Abc_BddNandCspfC( p, id ) ) return -1;
     }
   Vec_IntFree( targets );
   return 0;
@@ -730,12 +607,46 @@ static inline int Abc_BddNandTryConnect( Abc_NandMan * p, int fanin, int fanout 
   unsigned ffanout = Abc_BddNandObjGetBddFunc( p, fanout );
   unsigned gfanout = p->pGFuncs[fanout];
   unsigned connectable = Abc_BddOr( p->pBdd, ffanout, gfanout );
-  if( Abc_BddLitIsInvalid( connectable ) ) return -1;
   connectable = Abc_BddOr( p->pBdd, ffanin, connectable );
+  if( Abc_BddLitIsInvalid( connectable ) ) return -1;
   if ( Abc_BddLitIsConst1( connectable ) )
     {
       Abc_BddNandConnect( p, fanin, fanout, 1 );
       return 1;
+    }
+  return 0;
+}
+
+/**Function*************************************************************
+   
+  Synopsis    []
+
+  Description []
+               
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+static inline int Abc_BddNandDc( Abc_NandMan * p )
+{
+  int i, j;
+  unsigned Value;
+  Gia_Obj_t * pObj;
+  Gia_Man_t * pGia;
+  Vec_Ptr_t * vDcGias;
+  Vec_PtrForEachEntry( Vec_Ptr_t *, p->vvDcGias, vDcGias, i )
+    {
+      if ( Vec_PtrSize( vDcGias ) == 0 ) continue;
+      Value = Abc_BddLitConst1();
+      Vec_PtrForEachEntry( Gia_Man_t *, vDcGias, pGia, j )
+	{
+	  if ( Abc_BddGia( pGia, p->pBdd ) ) return -1;
+	  pObj = Gia_ManCo( pGia, 0 );
+	  Value = Abc_BddAnd( p->pBdd, Value, pObj->Value );
+	  if ( Abc_BddLitIsInvalid( Value ) ) return -1;
+	}
+      p->pGFuncs[Vec_IntEntry( p->vPos, i )] = Value;
     }
   return 0;
 }
@@ -757,12 +668,15 @@ static inline void Abc_BddNandRefresh( Abc_NandMan * p )
   abctime clk0 = Abc_Clock();
   Abc_BddManFree( p->pBdd );
   p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, (int)( p->nVerbose > 2 ) );
-  // TODO : error handling
-  Abc_BddNandDc( p );
   int out = 0;
+  out += Abc_BddNandDc( p );
   out += Abc_BddNandBuildAll( p );
   out += Abc_BddNandCspf( p );
-  assert( !out );
+  if ( out )
+    {
+      printf("Error: Refresh failed\n");
+      assert( 0 );
+    }
   if ( p->nVerbose > 1 ) ABC_PRT( "Refresh took", Abc_Clock() - clk0 );
 }
 static inline void Abc_BddNandRefreshIfNeeded( Abc_NandMan * p )
@@ -788,6 +702,126 @@ static inline int Abc_BddNandTryConnect_Refresh( Abc_NandMan * p, int fanin, int
       c = Abc_BddNandTryConnect( p, fanin, fanout );
     }
   return c;
+}
+
+/**Function*************************************************************
+
+  Synopsis    []
+
+  Description []
+               
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+static inline int Abc_BddNandPropagateDc( Vec_Ptr_t * vNets, int from )
+{
+  int i, j, k, id, idj, pi, pij, index, best_i, best_pi;
+  unsigned Value, c;
+  Vec_Int_t ** pvPis;
+  Vec_Int_t * vVars, * vNodes;
+  Abc_NandMan * pFrom, * pTo;
+  Gia_Man_t * pDc, * pTemp;
+  vVars = Vec_IntAlloc( 1 );
+  vNodes = Vec_IntAlloc( 1 );
+  pFrom = Vec_PtrEntry( vNets, from );
+  pvPis = ABC_CALLOC( Vec_Int_t *, Vec_PtrSize( vNets ) );
+  for ( i = 0; i < Vec_PtrSize( vNets ); i++ )
+    pvPis[i] = Vec_IntAlloc( 1 );
+  Vec_IntForEachEntry( pFrom->vPis, id, pi )
+    if ( Vec_IntEntry( pFrom->vPiCkts, pi ) != -1 )
+      Vec_IntPush( pvPis[Vec_IntEntry( pFrom->vPiCkts, pi )], pi );
+  Vec_PtrForEachEntry( Abc_NandMan *, vNets, pTo, k )
+    {
+      if ( Vec_IntSize( pvPis[k] ) == 0 ) continue;
+      Vec_IntForEachEntry( pvPis[k], pi, i )
+	{
+	  best_i = i;
+	  best_pi = pi;
+	  Vec_IntForEachEntryStart( pvPis[k], pij, j, i + 1 )
+	    if ( Vec_IntEntry( pFrom->vPiIdxs, best_pi ) > Vec_IntEntry( pFrom->vPiIdxs, pij ) )
+	      {
+		best_i = j;
+		best_pi = pij;
+	      }
+	  Vec_IntWriteEntry( pvPis[k], i, best_pi );
+	  Vec_IntWriteEntry( pvPis[k], best_i, pi );
+	}
+      Vec_IntForEachEntry( pvPis[k], pi, i )
+	{
+	  id = Vec_IntEntry( pFrom->vPis, pi );
+	  Value = Abc_BddLitConst1();
+	  // calculate AND of G of fanouts
+	  Vec_IntForEachEntry( pFrom->pvFanouts[id], idj, j )
+	    {
+	      if ( Abc_BddNandObjIsPo( pFrom, idj ) )
+		Value = Abc_BddAnd( pFrom->pBdd, Value, pFrom->pGFuncs[idj] );
+	      else
+		{
+		  index = Vec_IntFind( pFrom->pvFanins[idj], id );
+		  c = (unsigned)Vec_IntEntry( pFrom->pvCFuncs[idj], index );
+		  Value = Abc_BddAnd( pFrom->pBdd, Value, c );
+		}
+	    }
+	  // universify the inputs of Value other than those in pvPis[i]
+	  Vec_IntClear( vVars );
+	  for ( pij = 0; pij < Vec_IntSize( pFrom->vPis ); pij++ )
+	    if ( Vec_IntFind( pvPis[k], pij ) == -1 )
+	      Vec_IntPush( vVars, pij );
+	  Value = Abc_BddUnivAbstract( pFrom->pBdd, Value, vVars );
+	  if ( Abc_BddLitIsInvalid( Value ) )
+	    {
+	      Abc_BddNandRefresh( pFrom );
+	      Value = Abc_BddLitConst1();
+	      Vec_IntForEachEntry( pFrom->pvFanouts[id], idj, j )
+		{
+		  if ( Abc_BddNandObjIsPo( pFrom, idj ) )
+		    Value = Abc_BddAnd( pFrom->pBdd, Value, pFrom->pGFuncs[idj] );
+		  else
+		    {
+		      index = Vec_IntFind( pFrom->pvFanins[idj], id );
+		      c = (unsigned)Vec_IntEntry( pFrom->pvCFuncs[idj], index );
+		      Value = Abc_BddAnd( pFrom->pBdd, Value, c );
+		    }
+		}
+	      Value = Abc_BddUnivAbstract( pFrom->pBdd, Value, vVars );	      
+	      if ( Abc_BddLitIsInvalid( Value ) )
+		{
+		  printf("Error: Calculating propagation of DC failed\n");
+		  return -1;
+		}
+	    }
+	  // gia on top of it
+	  Vec_IntClear( vNodes );
+	  Vec_IntPush( vNodes, Value );
+	  pDc = Abc_Bdd2Gia( pFrom->pBdd, vNodes );
+	  while( Gia_ManCiNum( pDc ) < Vec_IntSize( pTo->vPos ) )
+	    {
+	      Vec_IntPush( vVars, Gia_ManCiNum( pDc ) );
+	      Gia_ManAppendCi( pDc );
+	    }
+	  Vec_IntForEachEntry( pvPis[k], pij, j )
+	    Vec_IntInsert( vVars, Vec_IntEntry( pFrom->vPiIdxs, pij ), pij );
+	  pTemp = pDc;
+	  pDc = Gia_ManDupPerm( pDc, vVars );
+	  Gia_ManStop( pTemp );
+	  pTemp = pDc;
+	  pDc = Gia_ManDupRemovePis( pDc, Gia_ManCiNum( pDc ) - Vec_IntSize( pTo->vPos ) );
+	  Gia_ManStop( pTemp );
+	  pTemp = pDc;
+	  pDc = Gia_ManDupOntop( pTo->pGia, pDc );
+	  Gia_ManStop( pTemp );
+	  // push it to pTo->vvDcGias[pFrom->vPiIdxs[pi]]
+	  Vec_PtrPush( Vec_PtrEntry( pTo->vvDcGias, Vec_IntEntry( pFrom->vPiIdxs, pi ) ), pDc );
+	}
+    }
+  Vec_IntFree( vVars );
+  Vec_IntFree( vNodes );
+  for ( i = 0; i < Vec_PtrSize( vNets ); i++ )
+    Vec_IntFree( pvPis[i] );
+  ABC_FREE( pvPis );
+  return 0;
 }
 
 /**Function*************************************************************
@@ -910,7 +944,7 @@ static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak )
   SeeAlso     []
 
 ***********************************************************************/
-static inline void Abc_BddNandG3( Abc_NandMan * p )
+static inline int Abc_BddNandG3( Abc_NandMan * p )
 {
   int i,j,k, id, idj, idk, out, wire, new_id;
   unsigned fi, fj, gi, gj, f1, f0, a, b, mergible, figj, fjgi, fx, gx, Value, eq;
@@ -919,8 +953,11 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
   while ( !Abc_BddNandObjIsEmpty( p, new_id ) )
     {
       new_id++;
-      // TODO : error handling
-      assert( new_id < p->nObjsAlloc );
+      if ( new_id >= p->nObjsAlloc )
+	{
+	  printf("Error: Too many new merged nodes\n");
+	  return -1;
+	}
     }
   targets = Vec_IntDup( p->vObjs );
   fanouts = Vec_IntAlloc( 1 );
@@ -942,23 +979,17 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	  // calculate intersection. if it is impossible, continue.
 	  f1 = Abc_BddAnd( p->pBdd, fi, fj );
 	  f0 = Abc_BddAnd( p->pBdd, Abc_BddLitNot( fi ), Abc_BddLitNot( fj ) );
-	  if ( Abc_BddLitIsInvalid( f1 ) || Abc_BddLitIsInvalid( f0 ) ) continue;
 	  a = Abc_BddOr( p->pBdd, f1, f0 );
-	  if ( Abc_BddLitIsInvalid( a ) ) continue;
 	  b = Abc_BddOr( p->pBdd, gi, gj );
-	  if ( Abc_BddLitIsInvalid( b ) ) continue;
 	  mergible = Abc_BddOr( p->pBdd, a, b );
 	  if ( !Abc_BddLitIsConst1( mergible ) ) continue;
 	  // create BDD of intersection. both F and G.
 	  figj = Abc_BddAnd( p->pBdd, fi, gj );
-	  if ( Abc_BddLitIsInvalid( figj ) ) continue;
 	  fjgi = Abc_BddAnd( p->pBdd, fj, gi );
-	  if ( Abc_BddLitIsInvalid( fjgi ) ) continue;
 	  fx = Abc_BddOr( p->pBdd, figj, fjgi );
-	  if ( Abc_BddLitIsInvalid( fx ) ) continue;
 	  fx = Abc_BddOr( p->pBdd, fx, f1 );
-	  if ( Abc_BddLitIsInvalid( fx ) ) continue;
 	  gx = Abc_BddAnd( p->pBdd, gi, gj );
+	  if ( Abc_BddLitIsInvalid( fx ) ) continue;
 	  if ( Abc_BddLitIsInvalid( gx ) ) continue;
 	  Abc_BddNandObjSetBddFunc( p, new_id, fx );
 	  p->pGFuncs[new_id] = gx;
@@ -997,14 +1028,14 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	      Abc_BddNandRemoveNode( p, new_id );
 	      continue;
 	    }
-	  //	  assert( !Abc_BddNandCheck( p ) );
-	  //	  assert( Abc_BddOr( p->pBdd, Abc_BddOr( p->pBdd, fx, gx ), Value ) == 1 );
+	  //assert( !Abc_BddNandCheck( p ) );
+	  //assert( Abc_BddOr( p->pBdd, Abc_BddOr( p->pBdd, fx, gx ), Value ) == 1 );
 	  // check the F of new node satisfies F and G.
 	  if ( !Abc_BddLitIsConst1( eq ) ) {
 	    Abc_BddNandRemoveNode( p, new_id );
 	    continue;
 	  }
-	  //	  assert( Abc_BddOr( p->pBdd, Abc_BddOr( p->pBdd, fx^1, gx ), Value^1 ) == 1 );
+	  //assert( Abc_BddOr( p->pBdd, Abc_BddOr( p->pBdd, fx^1, gx ), Value^1 ) == 1 );
 	  // reduce the inputs
 	  Abc_BddNandObjSetBddFunc( p, new_id, Abc_BddLitNot( Value ) );
 	  p->pGFuncs[new_id] = Abc_BddAnd( p->pBdd, p->pGFuncs[id] ,p->pGFuncs[idj] );
@@ -1044,6 +1075,7 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
     }
   Vec_IntFree( targets );
   Vec_IntFree( fanouts );
+  return 0;
 }
 
 /**Function*************************************************************
@@ -1118,14 +1150,17 @@ static inline void Abc_BddNandG1multi( Abc_NandMan * p, int fWeak )
   SeeAlso     []
 
 p***********************************************************************/
-static inline Gia_Man_t * Abc_BddNandNets2Gia( Vec_Ptr_t * vNets, Vec_Int_t * vPoCkts, Vec_Int_t * vPoIdxs, Vec_Int_t * vExternalCs, Gia_Man_t * pOld )
+static inline Gia_Man_t * Abc_BddNandNets2Gia( Vec_Ptr_t * vNets, Vec_Int_t * vPoCkts, Vec_Int_t * vPoIdxs, Vec_Int_t * vExternalCs, int fDc, Gia_Man_t * pOld )
 {
-  Gia_Man_t * pNew, * pTemp;
-  Gia_Obj_t * pObj;
-  int i, j, k, id, idj, id0, id1, Value, cond;
+  int i, j, k, id, idj, id0, id1, Value, cond, nPos;
   int * Values;
-  int ** vvPoValues = ABC_CALLOC( int *, Vec_PtrSize( vNets ) + 1 );
+  int ** vvPoValues;
+  Vec_Ptr_t * vDcGias;
+  Gia_Obj_t * pObj;
+  Gia_Man_t * pNew, * pTemp;
+  Gia_Man_t ** pDcGias;
   Abc_NandMan * p;
+  vvPoValues = ABC_CALLOC( int *, Vec_PtrSize( vNets ) + 1 );
   pNew = Gia_ManStart( pOld->nObjs );
   pNew->pName = Abc_UtilStrsav( pOld->pName );
   pNew->pSpec = Abc_UtilStrsav( pOld->pSpec );
@@ -1174,6 +1209,21 @@ static inline Gia_Man_t * Abc_BddNandNets2Gia( Vec_Ptr_t * vNets, Vec_Int_t * vP
     }
   pNew = Gia_ManCleanup( pTemp = pNew );
   Gia_ManStop( pTemp );
+  if ( fDc )
+    {
+      nPos = Gia_ManCoNum( pOld ) / 2;
+      pDcGias = ABC_CALLOC( Gia_Man_t *, nPos );
+      p = Vec_PtrEntry( vNets, 0 );
+      Vec_PtrForEachEntry( Vec_Ptr_t *, p->vvDcGias, vDcGias, i )
+	pDcGias[i] = Vec_PtrEntry( vDcGias, 0 );
+      pTemp = pNew;
+      pNew = Gia_ManDupAppendCones( pNew, pDcGias, nPos, 0 );
+      Gia_ManStop( pTemp );
+      ABC_FREE( pDcGias );
+    }
+  for ( i = 0; i < Vec_PtrSize( vNets ) + 1; i++ )
+    ABC_FREE( vvPoValues[i] );
+  ABC_FREE( vvPoValues );
   return pNew;
 }
 static inline void Abc_BddNandSetPoInfo( Gia_Man_t * pGia, Vec_Ptr_t * vNets, Vec_Ptr_t * vvPis, Vec_Ptr_t * vvPos, Vec_Int_t * vExternalPos, Vec_Int_t * vPoCkts, Vec_Int_t * vPoIdxs )
@@ -1181,6 +1231,7 @@ static inline void Abc_BddNandSetPoInfo( Gia_Man_t * pGia, Vec_Ptr_t * vNets, Ve
   int i, j, k, id;
   Gia_Obj_t * pObj;
   Vec_Int_t * vId, * vCkts, * vIdxs, * vPis, * vPos;
+  Gia_Man_t * pConst0;
   Abc_NandMan * p;
   vId = Vec_IntAlloc( 1 );
   vCkts = Vec_IntAlloc( 1 );
@@ -1216,6 +1267,13 @@ static inline void Abc_BddNandSetPoInfo( Gia_Man_t * pGia, Vec_Ptr_t * vNets, Ve
       k = Vec_IntFind( vId, id );
       Vec_IntPush( vPoCkts, Vec_IntEntry( vCkts, k ) );
       Vec_IntPush( vPoIdxs, Vec_IntEntry( vIdxs, k ) );
+      // set external don't care to be 0
+      p = Vec_PtrEntry( vNets, Vec_IntEntry( vCkts, k ) );
+      pConst0 = Gia_ManStart( Vec_IntSize( p->vPis ) );
+      Vec_IntForEachEntry( p->vPis, id, j )
+	Gia_ManAppendCi( pConst0 );
+      Gia_ManAppendCo( pConst0, Gia_ManConst0Lit() );
+      Vec_IntPush( Vec_PtrEntry( p->vvDcGias, Vec_IntEntry( vIdxs, k ) ), pConst0 );
     }
   Vec_IntFree( vId );
   Vec_IntFree( vCkts );
@@ -1231,7 +1289,7 @@ static inline int Abc_BddNandCountNewFanins( Gia_Man_t * pGia, Gia_Obj_t * pObj,
   id1 = Gia_ObjId( pGia, pObj1 );
   return (int)(pParts[id0] != part) + (int)(pParts[id1] != part);
 }
-static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec_Int_t * vPoCkts, Vec_Int_t * vPoIdxs, Vec_Int_t * vExternalCs, int nMem, int nWindowSize, int nVerbose )
+static inline int Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec_Int_t * vPoCkts, Vec_Int_t * vPoIdxs, Vec_Int_t * vExternalCs, int nMem, int nWindowSize, int nVerbose )
 {
   int i, id, lit, newId, part;
   int * pFanouts, * pParts;
@@ -1243,9 +1301,11 @@ static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec
   pGia = Gia_ManDup ( pOld );
   pFanouts = ABC_CALLOC( int, pGia->nObjs );
   pParts = ABC_CALLOC( int, pGia->nObjs );
-  // TODO : error handling
-  assert( pFanouts );
-  assert( pParts );
+  if ( !pFanouts || !pParts )
+    {
+      printf("Error: Allocation failed\n");
+      return -1;
+    }
   Abc_BddGiaCountFanout( pGia, pFanouts );
   vExternalPos = Vec_IntAlloc( 1 );
   vCands = Vec_IntAlloc( 1 );
@@ -1347,6 +1407,7 @@ static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec
       Vec_IntSort( vNodes, 0 );
       pNew = Gia_ManDupFromVecs( pGia, vPis, vNodes, vTempPos, 0 );
       p = Abc_BddNandManAlloc( pNew, nMem, (int)( nVerbose > 2 ) );
+      if ( !p ) return -1;
       Vec_PtrPush( vNets, p );
       Vec_PtrPush( vvPis, vPis );
       Vec_PtrPush( vvPos, vPos );
@@ -1368,6 +1429,7 @@ static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec
   Vec_PtrFree( vvPis );
   Vec_PtrForEachEntry( Vec_Int_t *, vvPos, vPos, i )
     Vec_IntFree( vPos );
+  return 0;
 }
 
 /**Function*************************************************************
@@ -1393,7 +1455,6 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
   Abc_NandMan * p;
   Gia_Obj_t * pObj;
   Gia_Man_t * pNew;
-  Gia_Man_t ** pDcGias;
   Vec_Ptr_t * vNets, * vDcGias;
   Vec_Int_t * vPoCkts, * vPoIdxs, * vExternalCs;
   vNets = Vec_PtrAlloc( 1 );
@@ -1414,6 +1475,7 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
       else
 	pNew = Gia_ManDup( pGia );
       p = Abc_BddNandManAlloc( pNew, nMem, nVerbose );
+      if ( !p ) return NULL;
       Vec_IntForEachEntry( p->vPis, id, i )
 	{
 	  Vec_IntPush( p->vPiCkts, -1 );
@@ -1435,16 +1497,24 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
 	  }
     }
   else
-    Abc_BddNandGia2Nets( pGia, vNets, vPoCkts, vPoIdxs, vExternalCs, nMem, nWindowSize, nVerbose );
+    if ( Abc_BddNandGia2Nets( pGia, vNets, vPoCkts, vPoIdxs, vExternalCs, nMem, nWindowSize, nVerbose ) )
+      return NULL;
   // optimize
   abctime clk0 = Abc_Clock();
   Vec_PtrForEachEntry( Abc_NandMan *, vNets, p, i )
     {
-      // TODO : error handling
-      assert( ( 1u << p->nMem ) > Vec_IntSize( p->vPis ) + 2 );
+     if ( ( 1u << p->nMem ) <= Vec_IntSize( p->vPis ) + 2 )
+       {
+	 printf("Error: Number of inputs is too large\n");
+	 return NULL;
+       }
       p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, (int)( nVerbose > 2 ) );
-      Abc_BddNandDc( p );
-      assert( !Abc_BddNandBuildAll( p ) );
+      if ( !p->pBdd ) return NULL;
+      if ( Abc_BddNandDc( p ) || Abc_BddNandBuildAll( p ) )
+	{
+	  printf("Error: Building Bdd failed\n");
+	  return NULL;
+	}
       if ( nVerbose ) Abc_BddNandPrintStats( p, "initial", clk0 );
       Abc_BddNandCspfEager( p );
       if ( nVerbose ) Abc_BddNandPrintStats( p, "cspf", clk0 );
@@ -1465,7 +1535,7 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
 	    if ( nVerbose ) Abc_BddNandPrintStats( p, "g1-weak", clk0 );
 	    break;
 	  case 3:
-	    Abc_BddNandG3( p );
+	    if ( Abc_BddNandG3( p ) ) return NULL;
 	    if ( nVerbose ) Abc_BddNandPrintStats( p, "g3", clk0 );
 	    break;
 	  case 4:
@@ -1479,20 +1549,11 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
 	  if ( !fRep ) break;
 	}
       if ( fDcPropagate )
-	Abc_BddNandPropagateDc( vNets, i );
+	if ( Abc_BddNandPropagateDc( vNets, i ) )
+	  return NULL;
     }
   if ( nVerbose ) ABC_PRT( "total ", Abc_Clock() - clk0 );
-  pNew = Abc_BddNandNets2Gia( vNets, vPoCkts, vPoIdxs, vExternalCs, pGia );
-  if ( fDc )
-    {
-      nPos = Gia_ManCoNum( pGia ) / 2;
-      pDcGias = ABC_CALLOC( Gia_Man_t *, nPos );
-      p = Vec_PtrEntry( vNets, 0 );
-      Vec_PtrForEachEntry( Vec_Ptr_t *, p->vvDcGias, vDcGias, i )
-	pDcGias[i] = Vec_PtrEntry( vDcGias, 0 );
-      pNew = Gia_ManDupAppendCones( pNew, pDcGias, nPos, 0 );
-      ABC_FREE( pDcGias );
-    }
+  pNew = Abc_BddNandNets2Gia( vNets, vPoCkts, vPoIdxs, vExternalCs, fDc, pGia );
   Vec_IntFree( vPoCkts );
   Vec_IntFree( vPoIdxs );
   Vec_IntFree( vExternalCs );

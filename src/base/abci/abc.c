@@ -46020,7 +46020,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     int nWindowSize = 0;
     Gia_Man_t * pNew = NULL, * pMiter;
     extern Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep, int fExdc, int nWindowSize, int fDcPropagate, int nVerbose );
-    extern void Abc_DdNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nMemMax, int nType, int nIte, int nOpt, int fReo, int nVerbose );
+    //    extern void Abc_DdNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nMemMax, int nType, int nIte, int nOpt, int fReo, int nVerbose );
     Extra_UtilGetoptReset();
     while ( ( c = Extra_UtilGetopt( argc, argv, "GMPVcerpxzh" ) ) != EOF )
     {
@@ -46099,18 +46099,25 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
         Abc_Print( -1, "Abc_CommandAbc9Cspf(): There is no AIG.\n" );
         return 1;
     }
-
     if ( nWindowSize != 0 && fExdc )
     {
         Abc_Print( -1, "Abc_CommandAbc9Cspf(): External Don't Cares cannot be used for partitioned circuits\n" );
 	return 1;
     }
-    
-    // get the input file name
+    if ( !fCudd && fReo )
+    {
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): Reordring can be used only with cudd\n" );
+	return 1;
+    }
     if ( fCudd )
-      Abc_DdNandGiaTest( pAbc->pGia, NULL, nMem, 30, nType, 0, 0, fReo, nVerbose );
-    else
-      pNew = Abc_BddNandGiaTest( pAbc->pGia, nMem, nType, fRep, fExdc, nWindowSize, fDcPropagate, nVerbose );
+      {
+      //Abc_DdNandGiaTest( pAbc->pGia, NULL, nMem, 30, nType, 0, 0, fReo, nVerbose );
+	Abc_Print( -1, "Abc_CommandAbc9Cspf(): CUDD is currently disabled\n" );
+	return 1;
+    }
+    
+    pNew = Abc_BddNandGiaTest( pAbc->pGia, nMem, nType, fRep, fExdc, nWindowSize, fDcPropagate, nVerbose );
+    if ( pNew == NULL ) return 1;
     if ( fVerify )
       {
 	if ( fExdc )
@@ -46159,13 +46166,14 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
 	    Gia_ManStop( pMiter );
 	  }
       }
+    
     Abc_FrameUpdateGia( pAbc, pNew );
 
     return 0;
     
 usage:
     Abc_Print( -2, "usage: &cspf [-GMPV num] [-ceprxzh]\n" );
-    Abc_Print( -2, "\t        nand circuit minimization by permissible function using simple bdd\n" );
+    Abc_Print( -2, "\t        circuit minimization with permissible function using simple bdd\n" );
     Abc_Print( -2, "\t-c    : toggle using CUDD not simple BDD [default = %s]\n", fCudd? "yes": "no" );
     Abc_Print( -2, "\t-e    : toggle verification [default = %s]\n", fVerify? "yes": "no" );
     Abc_Print( -2, "\t-p    : toggle repeating optimization while it is effective [default = %s]\n", fRep? "yes": "no" );
@@ -46173,7 +46181,7 @@ usage:
     Abc_Print( -2, "\t-x    : toggle using the later half outputs as external don't cares of the first half outputs [default = %s]\n", fExdc? "yes": "no" );
     Abc_Print( -2, "\t-z    : toggle propagating don't cares in partitioned circuits [default = %s]\n", fDcPropagate? "yes": "no" );
     Abc_Print( -2, "\t-G num: optimization heuristic type [default = %d]\n", nType );
-    Abc_Print( -2, "\t\t0: nothing\n" );
+    Abc_Print( -2, "\t\t0: calculate permissible functions while removing apparent redundancy\n" );
     Abc_Print( -2, "\t\t1: transduction method of gate substitution (eager)\n" );
     Abc_Print( -2, "\t\t2: transduction method of gate substitution (weak)\n" );
     Abc_Print( -2, "\t\t3: transduction method of gate merging\n" );

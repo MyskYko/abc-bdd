@@ -426,7 +426,6 @@ struct Abc_BddMan_
   unsigned           nUniqueMask;   // selection mask for unique table
   unsigned           nCacheMask;    // selection mask for computed table
   int                nMinRemoved;   // the minimum int of removed nodes
-  int                nRemoved;      // the number of removed nodes
   int                nVerbose;      // the level of verbosing information
   
   int                fGC;           // flag to garbage collect
@@ -440,7 +439,7 @@ struct Abc_BddMan_
 
 // Var = Variable, Lit = Literal, Bvar = BddVariable = Lit >> 1 
 static inline unsigned Abc_BddHash( int Arg0, int Arg1, int Arg2 )   { return 12582917 * Arg0 + 4256249 * Arg1 + 741457 * Arg2;     }
-static inline unsigned Abc_BddLitInvalid()                           { return 0xffffffff;                                           }
+static inline unsigned Abc_BddBvarInvalid()                          { return 0x7fffffff;                                           }
 static inline unsigned Abc_BddEdgeInvalid()                          { return 0xffffffff;                                           }
 static inline unsigned char Abc_BddMarkInvalid()                     { return 0xff;                                                 }
 static inline unsigned char Abc_BddVarConst()                        { return 0xff;                                                 }
@@ -452,6 +451,7 @@ static inline int      Abc_BddLit2Bvar( unsigned i )                 { return i 
 static inline unsigned Abc_BddBvarIthVar( int i )                    { return  i + 1;                                               }
 static inline unsigned Abc_BddLitIthVar( int i )                     { return Abc_BddBvar2Lit( Abc_BddBvarIthVar( i ), 0 );         }
 
+static inline unsigned Abc_BddLitInvalid()                           { return Abc_BddBvar2Lit( Abc_BddBvarInvalid(), 0 );           }
 static inline unsigned Abc_BddLitRegular( unsigned i )               { return i & ~01;                                              }
 static inline unsigned Abc_BddLitNot( unsigned i )                   { return i ^ 1;                                                }
 static inline unsigned Abc_BddLitNotCond( unsigned i, int c )        { return i ^ (int)( c > 0 );                                   }
@@ -461,7 +461,7 @@ static inline int      Abc_BddLitIsEq( unsigned i, unsigned j )      { return (i
 static inline int      Abc_BddLitIsConst0( unsigned i )              { return Abc_BddLitIsEq( i, Abc_BddLitConst0() );              }
 static inline int      Abc_BddLitIsConst1( unsigned i )              { return Abc_BddLitIsEq( i, Abc_BddLitConst1() );              }
 static inline int      Abc_BddLitIsConst( unsigned i )               { return Abc_BddLitIsConst0( i ) || Abc_BddLitIsConst1( i );   }
-static inline int      Abc_BddLitIsInvalid( unsigned i )             { return Abc_BddLitIsEq( i, Abc_BddLitInvalid() );             }
+static inline int      Abc_BddLitIsInvalid( unsigned i )             { return Abc_BddLitIsEq( Abc_BddLitRegular( i ), Abc_BddLitInvalid() ); }
 
 static inline int      Abc_BddBvarIsRemoved( Abc_BddMan * p, int i ) { return (int)( p->pVars[i] == Abc_BddVarRemoved() );          }
 static inline void     Abc_BddSetBvarRemoved( Abc_BddMan * p, int i ) { p->pVars[i] = Abc_BddVarRemoved();                          }
@@ -506,16 +506,15 @@ extern unsigned        Abc_BddOr( Abc_BddMan * p, unsigned a, unsigned b );
 extern void            Abc_BddUnmark_rec( Abc_BddMan * p, unsigned i );
 extern int             Abc_BddCountNodesArrayShared( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern int             Abc_BddCountNodesArrayIndependent( Abc_BddMan * p, Vec_Int_t * vNodes );
-extern void            Abc_BddPrint( Abc_BddMan * p, unsigned a, int offset, FILE * f );
 extern void            Abc_BddRemoveNodeByBvar( Abc_BddMan * p, int i );
 extern void            Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFrontiers );
 extern void            Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts );
 extern int             Abc_BddRefresh( Abc_BddMan * p, int * nRefresh );
-extern void            Abc_BddRefreshConfig( Abc_BddMan * p, int fRealloc, int fGC, int nReorderThreshold );
+extern int             Abc_BddRefreshConfig( Abc_BddMan * p, int fRealloc, int fGC, int nReorderThreshold );
 extern int             Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p );
 extern Gia_Man_t *     Abc_Bdd2Gia( Abc_BddMan * p, Vec_Int_t * vNodes );
   
-extern unsigned        Abc_BddUnivAbstract_rec( Abc_BddMan * p, unsigned x, Vec_Int_t * vVars );
+extern unsigned        Abc_BddUnivAbstract( Abc_BddMan * p, unsigned x, Vec_Int_t * vVars );
 extern int             Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth );
 extern int             Abc_BddCount1s( Abc_BddMan * p, unsigned a, int depth );
 extern unsigned __int128 Abc_BddCount1s128( Abc_BddMan * p, unsigned a, int depth );
