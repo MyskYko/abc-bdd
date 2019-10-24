@@ -159,18 +159,25 @@ Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int nVerbose )
   p->pCache      = ABC_CALLOC( unsigned, 3 * (long long)( p->nCacheMask + 1 ) );
   p->pObjs       = ABC_CALLOC( unsigned, 2 * (long long)p->nObjsAlloc );
   p->pMark       = ABC_CALLOC( unsigned char, p->nObjsAlloc );
-  p->pVars       = ABC_CALLOC( unsigned char, p->nObjsAlloc );
-  if ( p->nVars > (int)Abc_BddVarConst() )
+  if ( nVars < 0xff )
+    p->pVars     = ABC_CALLOC( unsigned char, p->nObjsAlloc ),
+      p->pSVars = NULL;
+  else
+    p->pSVars    = ABC_CALLOC( short, p->nObjsAlloc ),
+      p->pVars = NULL;
+  /*
+  if ( p->nVars > (int)Abc_BddVarConst( p ) )
     {
       printf("Error: Number of variables must be less than 255\n");
       return NULL;
     }
-  if ( !p->pUnique || !p->pNexts || !p->pCache || !p->pObjs || !p->pMark || !p->pVars )
+  */
+  if ( !p->pUnique || !p->pNexts || !p->pCache || !p->pObjs || !p->pMark || (!p->pVars && !p->pSVars) )
     {
       printf("Error: Allocation failed\n");
       return NULL;
     }
-  p->pVars[0]    = Abc_BddVarConst();
+  Abc_BddSetVarOfBvar( p, 0, Abc_BddVarConst( p ) );
   p->nObjs       = 1;
   for ( i = 0; i < nVars; i++ ) Abc_BddUniqueCreate( p, i, 1, 0 );
   //assert( p->nObjs == nVars + 1 );
@@ -212,7 +219,8 @@ void Abc_BddManFree( Abc_BddMan * p )
   ABC_FREE( p->pNexts );
   ABC_FREE( p->pCache );
   ABC_FREE( p->pObjs );
-  ABC_FREE( p->pVars );
+  if ( p->pVars ) ABC_FREE( p->pVars );
+  if ( p->pSVars ) ABC_FREE( p->pSVars );
   if ( p->pFrontiers != NULL ) Vec_IntFree( p->pFrontiers );
   if ( p->pEdges != NULL) ABC_FREE( p->pEdges );
   if ( p->liveBvars != NULL)
@@ -264,8 +272,11 @@ int Abc_BddManRealloc( Abc_BddMan * p )
   p->pNexts      = ABC_REALLOC( int, p->pNexts, p->nUniqueMask + 1 );
   p->pObjs       = ABC_REALLOC( unsigned, p->pObjs, 2 * (long long)p->nObjsAlloc );
   p->pMark       = ABC_REALLOC( unsigned char, p->pMark, p->nObjsAlloc );
-  p->pVars       = ABC_REALLOC( unsigned char, p->pVars, p->nObjsAlloc );
-  if ( !p->pUnique || !p->pNexts || !p->pObjs || !p->pMark || !p->pVars )
+  if ( p->pVars )
+    p->pVars       = ABC_REALLOC( unsigned char, p->pVars, p->nObjsAlloc );
+  else
+    p->pSVars       = ABC_REALLOC( short, p->pSVars, p->nObjsAlloc );
+  if ( !p->pUnique || !p->pNexts || !p->pObjs || !p->pMark || (!p->pVars && !p->pSVars) )
     {
       printf("Error: Reallocation failed\n");
       return -1;
@@ -274,7 +285,10 @@ int Abc_BddManRealloc( Abc_BddMan * p )
   memset( p->pNexts + ( nUniqueMaskOld + 1 ), 0, sizeof(int) * ( nUniqueMaskOld + 1 ) );
   memset( p->pObjs + 2 * (long long)nObjsAllocOld, 0, sizeof(unsigned) * 2 * (long long)nObjsAllocOld );
   memset( p->pMark + nObjsAllocOld, 0, sizeof(unsigned char) * nObjsAllocOld );
-  memset( p->pVars + nObjsAllocOld, 0, sizeof(unsigned char) * nObjsAllocOld );
+  if ( p->pVars )
+    memset( p->pVars + nObjsAllocOld, 0, sizeof(unsigned char) * nObjsAllocOld );
+  else
+    memset( p->pSVars + nObjsAllocOld, 0, sizeof(short) * nObjsAllocOld );
   Abc_BddCacheRemove( p );
   Abc_BddRehash( p );
   if ( p->pEdges != NULL )
