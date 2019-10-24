@@ -421,7 +421,7 @@ static inline int Abc_BddShift( Abc_BddMan * p, int * pos, int * nNode, int dist
   int fRefresh = 0;
   for ( j = 0; j < distance; j++ )
     {
-      int nLimit = *nNode * p->ReorderThreshold;
+      int nLimit = *nNode * p->ReoThold;
       if ( fNoLimit ) nLimit = 0x0fffffff;
       if ( fUp ) *pos -= 1;
       int r = Abc_BddSwap( p, *pos, nNode, nLimit );
