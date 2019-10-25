@@ -21,7 +21,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 #include "extra.h"
 #include "misc/vec/vec.h"
 #include "aig/gia/gia.h"
@@ -165,27 +164,25 @@ Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int nVerbose )
   p->pEdges      = NULL;
   p->liveBvars   = NULL;
   if ( nVars < 0xff )
-    p->pVars     = ABC_CALLOC( unsigned char, p->nObjsAlloc ),
-      p->pSVars = NULL;
+    p->pVars     = ABC_CALLOC( unsigned char, p->nObjsAlloc ), p->pSVars = NULL;
   else
-    p->pSVars    = ABC_CALLOC( unsigned short, p->nObjsAlloc ),
-      p->pVars = NULL;
-  if ( p->nVars > (int)Abc_BddVarConst( p ) )
+    p->pSVars    = ABC_CALLOC( unsigned short, p->nObjsAlloc ), p->pVars = NULL;
+  if ( p->nVars > Abc_BddVarConst( p ) )
     {
       printf("Error: Number of variables is too many\n");
-      return NULL;
+      abort();
     }
   if ( !p->pUnique || !p->pNexts || !p->pCache || !p->pObjs || !p->pMark || (!p->pVars && !p->pSVars) )
     {
       printf("Error: Allocation failed\n");
-      return NULL;
+      abort();
     }
   Abc_BddSetVarOfBvar( p, Abc_BddBvarConst(), Abc_BddVarConst( p ) );
   p->nObjs = 1;
   for ( i = 0; i < nVars; i++ ) Abc_BddUniqueCreate( p, i, Abc_BddLitConst1(), Abc_BddLitConst0() );
   return p;
 }
-int Abc_BddRefreshConfig( Abc_BddMan * p,  int fRealloc, int fGC, int nReorderThreshold )
+void Abc_BddRefreshConfig( Abc_BddMan * p,  int fRealloc, int fGC, int nReorderThreshold )
 {
   int i;
   p->fRealloc = fRealloc;
@@ -199,13 +196,12 @@ int Abc_BddRefreshConfig( Abc_BddMan * p,  int fRealloc, int fGC, int nReorderTh
       if ( !p->pEdges )
 	{
 	  printf("Error: Allocation failed\n");
-	  return -1;
+	  abort();
 	}
       p->liveBvars = ABC_ALLOC( Vec_Int_t *, p->nVars + 2 );
       for ( i = 0; i < p->nVars + 2; i++ )
 	p->liveBvars[i] = Vec_IntAlloc( 1 );
     }
-  return 0;
 }
 void Abc_BddManFree( Abc_BddMan * p )
 {
@@ -254,7 +250,7 @@ static inline void Abc_BddRehash( Abc_BddMan * p )
 	}
     }
 }
-int Abc_BddManRealloc( Abc_BddMan * p )
+void Abc_BddManRealloc( Abc_BddMan * p )
 {
   int nUniqueMaskOld = p->nUniqueMask;
   unsigned nObjsAllocOld = p->nObjsAlloc;
@@ -262,7 +258,7 @@ int Abc_BddManRealloc( Abc_BddMan * p )
   if ( p->nObjsAlloc == 0 )
     {
       printf("Error: Reallocation failed\n");
-      return -1;
+      abort();
     }
   if ( p->nVerbose ) printf( "\tReallocate nodes by 2^%d\n", Abc_Base2Log( p->nObjsAlloc ) );
   p->nUniqueMask = ( 1 << Abc_Base2Log( p->nObjsAlloc ) ) - 1;
@@ -278,7 +274,7 @@ int Abc_BddManRealloc( Abc_BddMan * p )
   if ( !p->pUnique || !p->pNexts || !p->pObjs || !p->pMark || (!p->pVars && !p->pSVars) )
     {
       printf("Error: Reallocation failed\n");
-      return -1;
+      abort();
     }
   memset( p->pUnique + ( nUniqueMaskOld + 1 ), 0, sizeof(int) * ( nUniqueMaskOld + 1 ) );
   memset( p->pNexts + ( nUniqueMaskOld + 1 ), 0, sizeof(int) * ( nUniqueMaskOld + 1 ) );
@@ -296,11 +292,10 @@ int Abc_BddManRealloc( Abc_BddMan * p )
       if ( !p->pEdges )
 	{
 	  printf("Error: Reallocation failed\n");
-	  return -1;
+	  abort();
 	}
       memset ( p->pEdges + nObjsAllocOld, 0, sizeof(unsigned) * nObjsAllocOld );
     }
-  return 0;
 }
 
 /**Function*************************************************************
@@ -323,7 +318,7 @@ unsigned Abc_BddAnd_rec( Abc_BddMan * p, unsigned a, unsigned b )
   if ( Abc_BddLitIsConst1( a ) ) return b;
   if ( Abc_BddLitIsConst1( b ) ) return a;
   if ( Abc_BddLitIsEq( a, b ) ) return a;
-  if ( a > b )  return Abc_BddAnd( p, b, a );
+  if ( a > b ) return Abc_BddAnd_rec( p, b, a );
   r = Abc_BddCacheLookup( p, a, b );
   if ( !Abc_BddLitIsInvalid( r ) ) return r;
   if ( Abc_BddVar( p, a ) < Abc_BddVar( p, b ) )
@@ -332,9 +327,9 @@ unsigned Abc_BddAnd_rec( Abc_BddMan * p, unsigned a, unsigned b )
     s0 = a, t0 = Abc_BddElse( p, b ), s1 = a, t1 = Abc_BddThen( p, b );
   else // if ( Abc_BddVar( p, a ) == Abc_BddVar( p, b ) )
     s0 = Abc_BddElse( p, a ), t0 = Abc_BddElse( p, b ), s1 = Abc_BddThen( p, a ), t1 = Abc_BddThen( p, b );
-  r0 = Abc_BddAnd( p, s0, t0 );
+  r0 = Abc_BddAnd_rec( p, s0, t0 );
   if ( Abc_BddLitIsInvalid( r0 ) ) return r0;
-  r1 = Abc_BddAnd( p, s1, t1 );
+  r1 = Abc_BddAnd_rec( p, s1, t1 );
   if ( Abc_BddLitIsInvalid( r1 ) ) return r1;
   r = Abc_BddUniqueCreate( p, Abc_MinInt( Abc_BddVar( p, a ), Abc_BddVar( p, b ) ), r1, r0 );
   if ( Abc_BddLitIsInvalid( r ) ) return r;
@@ -348,9 +343,7 @@ unsigned Abc_BddAnd( Abc_BddMan * p, unsigned a, unsigned b )
 }
 unsigned Abc_BddOr( Abc_BddMan * p, unsigned a, unsigned b )
 {
-  if ( Abc_BddLitIsInvalid( a ) ) return a;
-  if ( Abc_BddLitIsInvalid( b ) ) return b;
-  return Abc_BddLitNot( Abc_BddAnd_rec( p, Abc_BddLitNot( a ), Abc_BddLitNot( b ) ) );
+  return Abc_BddLitNot( Abc_BddAnd( p, Abc_BddLitNot( a ), Abc_BddLitNot( b ) ) );
 }
 
 /**Function*************************************************************
@@ -611,7 +604,7 @@ void Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFrontiers )
    SeeAlso     []
 
 ***********************************************************************/
-int Abc_BddRefresh( Abc_BddMan * p, int * nRefresh )
+static inline int Abc_BddRefresh( Abc_BddMan * p, int * nRefresh )
 {
   *nRefresh += 1;
   if ( p->nVerbose > 1 ) printf( "\n" );
@@ -624,13 +617,13 @@ int Abc_BddRefresh( Abc_BddMan * p, int * nRefresh )
   if ( *nRefresh <= 2 && p->ReoThold != 0 && p->nObjsAlloc > 4000 )
     {
       if ( p->nVerbose ) printf("\tReordering\n");
-      if ( Abc_BddReorder( p, p->pFrontiers, p->nVerbose - 1 ) ) return -1;
+      Abc_BddReorder( p, p->pFrontiers, p->nVerbose - 1 );
       Abc_BddGarbageCollect( p, p->pFrontiers );
       return 0;
     }
   if ( p->fRealloc && p->nObjsAlloc < 1 << 31 )
     {
-      if ( Abc_BddManRealloc( p ) ) return -1;
+      Abc_BddManRealloc( p );
       return 0;
     }
   printf( "The number of nodes exceeds the limit %u\n", p->nObjsAlloc );
@@ -645,7 +638,7 @@ int Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p )
   if ( p->pFrontiers != NULL )
     {
       pFanouts = ABC_CALLOC( int, pGia->nObjs );
-      if ( !pFanouts ) return -1;
+      if ( !pFanouts ) abort();
       Abc_BddGiaCountFanout( pGia, pFanouts );
     }
   Gia_ManFillValue( pGia );
@@ -698,9 +691,8 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
     }
   clk = Abc_Clock();
   p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, nVerbose );
-  if ( !p ) return;
-  if ( Abc_BddRefreshConfig( p, fRealloc, fGC, nReorderThreshold ) ) return;
-  if ( Abc_BddGia( pGia, p ) ) return;
+  Abc_BddRefreshConfig( p, fRealloc, fGC, nReorderThreshold );
+  assert( !Abc_BddGia( pGia, p ) );
   clk2 = Abc_Clock();
   vNodes = Vec_IntAlloc( Gia_ManCoNum( pGia ) );
   Gia_ManForEachCo( pGia, pObj, i ) Vec_IntPush( vNodes, pObj->Value );

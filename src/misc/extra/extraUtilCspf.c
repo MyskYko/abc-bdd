@@ -309,7 +309,7 @@ static inline Abc_NandMan * Abc_BddNandManAlloc( Gia_Man_t * pGia, int nMem, int
   if ( !p->pvFanins || !p->pvFanouts || !p->pBddFuncs || !p->pRank || !p->pGFuncs || !p->pvCFuncs )
     {
       printf("Error: Allocation failed\n");
-      return NULL;
+      abort();
     }
   p->nMem = nMem;
   p->nVerbose = nVerbose;
@@ -427,7 +427,7 @@ static inline int Abc_BddNandCountNewFanins( Gia_Man_t * pGia, Gia_Obj_t * pObj,
   id1 = Gia_ObjId( pGia, pObj1 );
   return (int)(pParts[id0] != part) + (int)(pParts[id1] != part);
 }
-static inline int Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec_Int_t * vPoCkts, Vec_Int_t * vPoIdxs, Vec_Int_t * vExternalCs, int nMem, int nWindowSize, int nVerbose )
+static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec_Int_t * vPoCkts, Vec_Int_t * vPoIdxs, Vec_Int_t * vExternalCs, int nMem, int nWindowSize, int nVerbose )
 {
   int i, id, lit, newId, part;
   int * pFanouts, * pParts;
@@ -442,7 +442,7 @@ static inline int Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec_
   if ( !pFanouts || !pParts )
     {
       printf("Error: Allocation failed\n");
-      return -1;
+      abort();
     }
   Abc_BddGiaCountFanout( pGia, pFanouts );
   vExternalPos = Vec_IntAlloc( 1 );
@@ -545,7 +545,6 @@ static inline int Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec_
       Vec_IntSort( vNodes, 0 );
       pNew = Gia_ManDupFromVecs( pGia, vPis, vNodes, vTempPos, 0 );
       p = Abc_BddNandManAlloc( pNew, nMem, (int)( nVerbose > 2 ) );
-      if ( !p ) return -1;
       Vec_PtrPush( vNets, p );
       Vec_PtrPush( vvPis, vPis );
       Vec_PtrPush( vvPos, vPos );
@@ -567,7 +566,6 @@ static inline int Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec_
   Vec_PtrFree( vvPis );
   Vec_PtrForEachEntry( Vec_Int_t *, vvPos, vPos, i )
     Vec_IntFree( vPos );
-  return 0;
 }
 
 /**Function*************************************************************
@@ -896,7 +894,7 @@ static inline void Abc_BddNandRefresh( Abc_NandMan * p )
       if ( 1 << p->nMem == 0 )
 	{
 	  printf("Error: Refresh failed\n");
-	  assert( 0 );
+	  abort();
 	}
     }
   if ( p->nVerbose > 1 ) ABC_PRT( "Refresh took", Abc_Clock() - clk0 );
@@ -923,127 +921,8 @@ static inline int Abc_BddNandTryConnect_Refresh( Abc_NandMan * p, int fanin, int
       if ( Abc_BddNandObjIsEmptyOrDead( p, fanout ) ) return 0;
       c = Abc_BddNandTryConnect( p, fanin, fanout );
     }
+  if ( c == -1 ) abort();
   return c;
-}
-
-/**Function*************************************************************
-
-  Synopsis    []
-
-  Description []
-               
-  SideEffects []
-
-  SeeAlso     []
-
-***********************************************************************/
-static inline int Abc_BddNandPropagateDc( Vec_Ptr_t * vNets, int from )
-{
-  int i, j, k, id, idj, pi, pij, index, best_i, best_pi;
-  unsigned Value, c;
-  Vec_Int_t ** pvPis;
-  Vec_Int_t * vVars, * vNodes;
-  Abc_NandMan * pFrom, * pTo;
-  Gia_Man_t * pDc, * pTemp;
-  vVars = Vec_IntAlloc( 1 );
-  vNodes = Vec_IntAlloc( 1 );
-  pFrom = Vec_PtrEntry( vNets, from );
-  pvPis = ABC_CALLOC( Vec_Int_t *, Vec_PtrSize( vNets ) );
-  for ( i = 0; i < Vec_PtrSize( vNets ); i++ )
-    pvPis[i] = Vec_IntAlloc( 1 );
-  Vec_IntForEachEntry( pFrom->vPis, id, pi )
-    if ( Vec_IntEntry( pFrom->vPiCkts, pi ) != -1 )
-      Vec_IntPush( pvPis[Vec_IntEntry( pFrom->vPiCkts, pi )], pi );
-  Vec_PtrForEachEntry( Abc_NandMan *, vNets, pTo, k )
-    {
-      if ( Vec_IntSize( pvPis[k] ) == 0 ) continue;
-      Vec_IntForEachEntry( pvPis[k], pi, i )
-	{
-	  best_i = i;
-	  best_pi = pi;
-	  Vec_IntForEachEntryStart( pvPis[k], pij, j, i + 1 )
-	    if ( Vec_IntEntry( pFrom->vPiIdxs, best_pi ) > Vec_IntEntry( pFrom->vPiIdxs, pij ) )
-	      {
-		best_i = j;
-		best_pi = pij;
-	      }
-	  Vec_IntWriteEntry( pvPis[k], i, best_pi );
-	  Vec_IntWriteEntry( pvPis[k], best_i, pi );
-	}
-      Vec_IntForEachEntry( pvPis[k], pi, i )
-	{
-	  id = Vec_IntEntry( pFrom->vPis, pi );
-	  Value = Abc_BddLitConst1();
-	  // calculate AND of G of fanouts
-	  Vec_IntForEachEntry( pFrom->pvFanouts[id], idj, j )
-	    {
-	      if ( Abc_BddNandObjIsPo( pFrom, idj ) )
-		Value = Abc_BddAnd( pFrom->pBdd, Value, pFrom->pGFuncs[idj] );
-	      else
-		{
-		  index = Vec_IntFind( pFrom->pvFanins[idj], id );
-		  c = (unsigned)Vec_IntEntry( pFrom->pvCFuncs[idj], index );
-		  Value = Abc_BddAnd( pFrom->pBdd, Value, c );
-		}
-	    }
-	  // universify the inputs of Value other than those in pvPis[i]
-	  Vec_IntClear( vVars );
-	  for ( pij = 0; pij < Vec_IntSize( pFrom->vPis ); pij++ )
-	    if ( Vec_IntFind( pvPis[k], pij ) == -1 )
-	      Vec_IntPush( vVars, pij );
-	  Value = Abc_BddUnivAbstract( pFrom->pBdd, Value, vVars );
-	  if ( Abc_BddLitIsInvalid( Value ) )
-	    {
-	      Abc_BddNandRefresh( pFrom );
-	      Value = Abc_BddLitConst1();
-	      Vec_IntForEachEntry( pFrom->pvFanouts[id], idj, j )
-		{
-		  if ( Abc_BddNandObjIsPo( pFrom, idj ) )
-		    Value = Abc_BddAnd( pFrom->pBdd, Value, pFrom->pGFuncs[idj] );
-		  else
-		    {
-		      index = Vec_IntFind( pFrom->pvFanins[idj], id );
-		      c = (unsigned)Vec_IntEntry( pFrom->pvCFuncs[idj], index );
-		      Value = Abc_BddAnd( pFrom->pBdd, Value, c );
-		    }
-		}
-	      Value = Abc_BddUnivAbstract( pFrom->pBdd, Value, vVars );	      
-	      if ( Abc_BddLitIsInvalid( Value ) )
-		{
-		  printf("Error: Calculating propagation of DC failed\n");
-		  return -1;
-		}
-	    }
-	  // gia on top of it
-	  Vec_IntClear( vNodes );
-	  Vec_IntPush( vNodes, Value );
-	  pDc = Abc_Bdd2Gia( pFrom->pBdd, vNodes );
-	  while( Gia_ManCiNum( pDc ) < Vec_IntSize( pTo->vPos ) )
-	    {
-	      Vec_IntPush( vVars, Gia_ManCiNum( pDc ) );
-	      Gia_ManAppendCi( pDc );
-	    }
-	  Vec_IntForEachEntry( pvPis[k], pij, j )
-	    Vec_IntInsert( vVars, Vec_IntEntry( pFrom->vPiIdxs, pij ), pij );
-	  pTemp = pDc;
-	  pDc = Gia_ManDupPerm( pDc, vVars );
-	  Gia_ManStop( pTemp );
-	  pTemp = pDc;
-	  pDc = Gia_ManDupRemovePis( pDc, Gia_ManCiNum( pDc ) - Vec_IntSize( pTo->vPos ) );
-	  Gia_ManStop( pTemp );
-	  pTemp = pDc;
-	  pDc = Gia_ManDupOntop( pTo->pGia, pDc );
-	  Gia_ManStop( pTemp );
-	  // push it to pTo->vvDcGias[pFrom->vPiIdxs[pi]]
-	  Vec_PtrPush( Vec_PtrEntry( pTo->vvDcGias, Vec_IntEntry( pFrom->vPiIdxs, pi ) ), pDc );
-	}
-    }
-  Vec_IntFree( vVars );
-  Vec_IntFree( vNodes );
-  for ( i = 0; i < Vec_PtrSize( vNets ); i++ )
-    Vec_IntFree( pvPis[i] );
-  ABC_FREE( pvPis );
-  return 0;
 }
 
 /**Function*************************************************************
@@ -1166,7 +1045,7 @@ static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak )
   SeeAlso     []
 
 ***********************************************************************/
-static inline int Abc_BddNandG3( Abc_NandMan * p )
+static inline void Abc_BddNandG3( Abc_NandMan * p )
 {
   int i,j,k, id, idj, idk, out, wire, new_id;
   unsigned fi, fj, gi, gj, f1, f0, a, b, mergible, figj, fjgi, fx, gx, Value, eq;
@@ -1178,7 +1057,7 @@ static inline int Abc_BddNandG3( Abc_NandMan * p )
       if ( new_id >= p->nObjsAlloc )
 	{
 	  printf("Error: Too many new merged nodes\n");
-	  return -1;
+	  abort();
 	}
     }
   targets = Vec_IntDup( p->vObjs );
@@ -1297,7 +1176,6 @@ static inline int Abc_BddNandG3( Abc_NandMan * p )
     }
   Vec_IntFree( targets );
   Vec_IntFree( fanouts );
-  return 0;
 }
 
 /**Function*************************************************************
@@ -1449,6 +1327,125 @@ static inline Gia_Man_t * Abc_BddNandNets2Gia( Vec_Ptr_t * vNets, Vec_Int_t * vP
   return pNew;
 }
 
+/**Function*************************************************************
+
+  Synopsis    []
+
+  Description []
+               
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+static inline void Abc_BddNandPropagateDc( Vec_Ptr_t * vNets, int from )
+{
+  int i, j, k, id, idj, pi, pij, index, best_i, best_pi;
+  unsigned Value, c;
+  Vec_Int_t ** pvPis;
+  Vec_Int_t * vVars, * vNodes;
+  Abc_NandMan * pFrom, * pTo;
+  Gia_Man_t * pDc, * pTemp;
+  vVars = Vec_IntAlloc( 1 );
+  vNodes = Vec_IntAlloc( 1 );
+  pFrom = Vec_PtrEntry( vNets, from );
+  pvPis = ABC_CALLOC( Vec_Int_t *, Vec_PtrSize( vNets ) );
+  for ( i = 0; i < Vec_PtrSize( vNets ); i++ )
+    pvPis[i] = Vec_IntAlloc( 1 );
+  Vec_IntForEachEntry( pFrom->vPis, id, pi )
+    if ( Vec_IntEntry( pFrom->vPiCkts, pi ) != -1 )
+      Vec_IntPush( pvPis[Vec_IntEntry( pFrom->vPiCkts, pi )], pi );
+  Vec_PtrForEachEntry( Abc_NandMan *, vNets, pTo, k )
+    {
+      if ( Vec_IntSize( pvPis[k] ) == 0 ) continue;
+      Vec_IntForEachEntry( pvPis[k], pi, i )
+	{
+	  best_i = i;
+	  best_pi = pi;
+	  Vec_IntForEachEntryStart( pvPis[k], pij, j, i + 1 )
+	    if ( Vec_IntEntry( pFrom->vPiIdxs, best_pi ) > Vec_IntEntry( pFrom->vPiIdxs, pij ) )
+	      {
+		best_i = j;
+		best_pi = pij;
+	      }
+	  Vec_IntWriteEntry( pvPis[k], i, best_pi );
+	  Vec_IntWriteEntry( pvPis[k], best_i, pi );
+	}
+      Vec_IntForEachEntry( pvPis[k], pi, i )
+	{
+	  id = Vec_IntEntry( pFrom->vPis, pi );
+	  Value = Abc_BddLitConst1();
+	  // calculate AND of G of fanouts
+	  Vec_IntForEachEntry( pFrom->pvFanouts[id], idj, j )
+	    {
+	      if ( Abc_BddNandObjIsPo( pFrom, idj ) )
+		Value = Abc_BddAnd( pFrom->pBdd, Value, pFrom->pGFuncs[idj] );
+	      else
+		{
+		  index = Vec_IntFind( pFrom->pvFanins[idj], id );
+		  c = (unsigned)Vec_IntEntry( pFrom->pvCFuncs[idj], index );
+		  Value = Abc_BddAnd( pFrom->pBdd, Value, c );
+		}
+	    }
+	  // universify the inputs of Value other than those in pvPis[i]
+	  Vec_IntClear( vVars );
+	  for ( pij = 0; pij < Vec_IntSize( pFrom->vPis ); pij++ )
+	    if ( Vec_IntFind( pvPis[k], pij ) == -1 )
+	      Vec_IntPush( vVars, pij );
+	  Value = Abc_BddUnivAbstract( pFrom->pBdd, Value, vVars );
+	  while ( Abc_BddLitIsInvalid( Value ) )
+	    {
+	      Abc_BddNandRefresh( pFrom );
+	      Value = Abc_BddLitConst1();
+	      Vec_IntForEachEntry( pFrom->pvFanouts[id], idj, j )
+		{
+		  if ( Abc_BddNandObjIsPo( pFrom, idj ) )
+		    Value = Abc_BddAnd( pFrom->pBdd, Value, pFrom->pGFuncs[idj] );
+		  else
+		    {
+		      index = Vec_IntFind( pFrom->pvFanins[idj], id );
+		      c = (unsigned)Vec_IntEntry( pFrom->pvCFuncs[idj], index );
+		      Value = Abc_BddAnd( pFrom->pBdd, Value, c );
+		    }
+		}
+	      Value = Abc_BddUnivAbstract( pFrom->pBdd, Value, vVars );
+	      pFrom->nMem++;
+	      if ( 1 << pFrom->nMem == 0 )
+		{
+		  printf("Error: Calculating propagation of DC failed due to shortage of nodes\n");
+		  abort();
+		}
+	    }
+	  // gia on top of it
+	  Vec_IntClear( vNodes );
+	  Vec_IntPush( vNodes, Value );
+	  pDc = Abc_Bdd2Gia( pFrom->pBdd, vNodes );
+	  while( Gia_ManCiNum( pDc ) < Vec_IntSize( pTo->vPos ) )
+	    {
+	      Vec_IntPush( vVars, Gia_ManCiNum( pDc ) );
+	      Gia_ManAppendCi( pDc );
+	    }
+	  Vec_IntForEachEntry( pvPis[k], pij, j )
+	    Vec_IntInsert( vVars, Vec_IntEntry( pFrom->vPiIdxs, pij ), pij );
+	  pTemp = pDc;
+	  pDc = Gia_ManDupPerm( pDc, vVars );
+	  Gia_ManStop( pTemp );
+	  pTemp = pDc;
+	  pDc = Gia_ManDupRemovePis( pDc, Gia_ManCiNum( pDc ) - Vec_IntSize( pTo->vPos ) );
+	  Gia_ManStop( pTemp );
+	  pTemp = pDc;
+	  pDc = Gia_ManDupOntop( pTo->pGia, pDc );
+	  Gia_ManStop( pTemp );
+	  // push it to pTo->vvDcGias[pFrom->vPiIdxs[pi]]
+	  Vec_PtrPush( Vec_PtrEntry( pTo->vvDcGias, Vec_IntEntry( pFrom->vPiIdxs, pi ) ), pDc );
+	}
+    }
+  Vec_IntFree( vVars );
+  Vec_IntFree( vNodes );
+  for ( i = 0; i < Vec_PtrSize( vNets ); i++ )
+    Vec_IntFree( pvPis[i] );
+  ABC_FREE( pvPis );
+}
 
 /**Function*************************************************************
    
@@ -1493,7 +1490,6 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
       else
 	pNew = Gia_ManDup( pGia );
       p = Abc_BddNandManAlloc( pNew, nMem, nVerbose );
-      if ( !p ) return NULL;
       Vec_IntForEachEntry( p->vPis, id, i )
 	{
 	  Vec_IntPush( p->vPiCkts, -1 );
@@ -1515,26 +1511,28 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
 	  }
     }
   else
-    if ( Abc_BddNandGia2Nets( pGia, vNets, vPoCkts, vPoIdxs, vExternalCs, nMem, nWindowSize, nVerbose ) )
-      return NULL;
+    Abc_BddNandGia2Nets( pGia, vNets, vPoCkts, vPoIdxs, vExternalCs, nMem, nWindowSize, nVerbose );
   // optimize
   abctime clk0 = Abc_Clock();
   Vec_PtrForEachEntry( Abc_NandMan *, vNets, p, i )
     {
-     if ( ( 1u << p->nMem ) <= Vec_IntSize( p->vPis ) + 2 )
-       {
-	 printf("Error: Number of inputs is too large\n");
-	 return NULL;
-       }
+      while ( ( 1 << p->nMem ) <= Vec_IntSize( p->vPis ) + 2 )
+	{
+	  p->nMem++;
+	  if ( 1 << p->nMem == 0 )
+	    {
+	      printf("Error: Number of inputs is too large\n");
+	      abort();
+	    }
+	}
       p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, (int)( nVerbose > 2 ) );
-      if ( !p->pBdd ) return NULL;
       while ( Abc_BddNandDc( p ) || Abc_BddNandBuildAll( p ) )
 	{
 	  p->nMem++;
 	  if ( 1 << p->nMem == 0 )
 	    {
 	      printf("Error: Building Bdd failed\n");
-	      return NULL;
+	      abort();
 	    }
 	  Abc_BddManFree( p->pBdd );
 	  p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, (int)( nVerbose > 2 ) );
@@ -1559,7 +1557,7 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
 	    if ( nVerbose ) Abc_BddNandPrintStats( p, "g1-weak", clk0 );
 	    break;
 	  case 3:
-	    if ( Abc_BddNandG3( p ) ) return NULL;
+	    Abc_BddNandG3( p );
 	    if ( nVerbose ) Abc_BddNandPrintStats( p, "g3", clk0 );
 	    break;
 	  case 4:
@@ -1567,14 +1565,13 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
 	    if ( nVerbose ) Abc_BddNandPrintStats( p, "g1-multi", clk0 );
 	    break;
 	  default:
-	    assert( 0 );
+	    printf( "Error: Invalid optimization type %d\n", nType );
+	    abort();
 	  }
 	  Abc_BddNandCspfEager( p );
 	  if ( !fRep ) break;
 	}
-      if ( fDcPropagate )
-	if ( Abc_BddNandPropagateDc( vNets, i ) )
-	  return NULL;
+      if ( fDcPropagate ) Abc_BddNandPropagateDc( vNets, i );
     }
   if ( nVerbose ) ABC_PRT( "total ", Abc_Clock() - clk0 );
   pNew = Abc_BddNandNets2Gia( vNets, vPoCkts, vPoIdxs, vExternalCs, fDc, pGia );

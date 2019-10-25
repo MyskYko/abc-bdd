@@ -399,7 +399,7 @@ static inline int Abc_BddSwap( Abc_BddMan * p, int x, int * nNodes, int dLimit )
    SeeAlso     []
 
 ***********************************************************************/
-static inline int Abc_BddShift( Abc_BddMan * p, int * pos, int * nNodes, int nSwap, int fUp, int * bestPos, int * nBestNodes, int * new2old, Vec_Int_t * pFunctions, int nLimit, int nVerbose )
+static inline void Abc_BddShift( Abc_BddMan * p, int * pos, int * nNodes, int nSwap, int fUp, int * bestPos, int * nBestNodes, int * new2old, Vec_Int_t * pFunctions, int nLimit, int nVerbose )
 {
   int j, k, r, dLimit, fRefresh = 0;
   for ( j = 0; j < nSwap; j++ )
@@ -410,7 +410,7 @@ static inline int Abc_BddShift( Abc_BddMan * p, int * pos, int * nNodes, int nSw
       if ( r == 1 )
 	{
 	  if ( fUp ) *pos += 1;
-	  return 1;
+	  return;
 	}
       if ( r == -1 )
 	{
@@ -420,11 +420,12 @@ static inline int Abc_BddShift( Abc_BddMan * p, int * pos, int * nNodes, int nSw
 	      Abc_BddGarbageCollect( p, pFunctions );
 	      fRefresh = 1;
 	    }
-	  else if ( p->fRealloc )
+	  else if ( p->fRealloc ) Abc_BddManRealloc( p );
+	  else
 	    {
-	      if ( Abc_BddManRealloc( p ) ) return -1;
+	      printf("Error: Number of nodes exceeds 2^31 during reordering\n");
+	      abort();
 	    }
-	  else return -1;
 	  j--;
 	  continue;
 	}
@@ -444,7 +445,6 @@ static inline int Abc_BddShift( Abc_BddMan * p, int * pos, int * nNodes, int nSw
 	  printf("  pos %d  nodenum %d\n", *pos, *nNodes);
 	}
     }
-  return 0;
 }
 
 /**Function*************************************************************
@@ -458,9 +458,9 @@ static inline int Abc_BddShift( Abc_BddMan * p, int * pos, int * nNodes, int nSw
    SeeAlso     []
 
 ***********************************************************************/
-int Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
+void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 {
-  int i, j, best_i, pos, nNodes, nSwap, fUp, bestPos, nBestNodes, nLimit, fError;
+  int i, j, best_i, pos, nNodes, nSwap, fUp, bestPos, nBestNodes, nLimit;
   int * new2old, * descendingOrder;
   // initialize
   new2old = ABC_CALLOC( int, p->nVars );
@@ -516,15 +516,13 @@ int Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 	  printf( "begin shift %d (%d/%d)\n", descendingOrder[i], i + 1, p->nVars );
 	  printf( "\t%d goes %s by %d\n", descendingOrder[i], fUp? "up": "down", nSwap );
 	}
-      fError = Abc_BddShift( p, &pos, &nNodes, nSwap, fUp, &bestPos, &nBestNodes, new2old, pFunctions, nLimit, nVerbose );
-      if ( fError == -1 ) return -1;
+      Abc_BddShift( p, &pos, &nNodes, nSwap, fUp, &bestPos, &nBestNodes, new2old, pFunctions, nLimit, nVerbose );
       fUp ^= 1;
       if ( fUp ) nSwap = pos;
       else nSwap = p->nVars - pos - 1;
       if ( nVerbose )
 	printf( "\n\t%d goes %s by %d\n", descendingOrder[i], fUp? "up": "down", nSwap );
-      fError = Abc_BddShift( p, &pos, &nNodes, nSwap, fUp, &bestPos, &nBestNodes, new2old, pFunctions, nLimit, nVerbose );
-      if ( fError == -1 ) return -1;
+      Abc_BddShift( p, &pos, &nNodes, nSwap, fUp, &bestPos, &nBestNodes, new2old, pFunctions, nLimit, nVerbose );
       if ( pos < bestPos )
 	{
 	  fUp = 0;
@@ -540,8 +538,7 @@ int Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 	  printf( "\n\tbest position %d, nNodes %d\n", bestPos, nBestNodes );
 	  printf( "\t%d goes %s by %d\n", descendingOrder[i], fUp? "up": "down", nSwap );
         }
-      fError = Abc_BddShift( p, &pos, &nNodes, nSwap, fUp, &bestPos, &nBestNodes, new2old, pFunctions, nLimit, nVerbose );
-      if ( fError == -1 ) return -1;
+      Abc_BddShift( p, &pos, &nNodes, nSwap, fUp, &bestPos, &nBestNodes, new2old, pFunctions, nLimit, nVerbose );
       if ( nVerbose )
 	printf( "\nend shift %d (%d/%d)\n", descendingOrder[i], i + 1, p->nVars );
     }
@@ -555,7 +552,6 @@ int Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
       printf( "# end reordering\n" );
       printf( "###############################\n" );
     }
-  return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////
