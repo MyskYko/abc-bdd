@@ -767,7 +767,8 @@ static inline int Abc_BddNandCspfG( Abc_NandMan * p, int id )
   if ( Abc_BddLitIsInvalid( p->pGFuncs[id] ) ) return -1;
   return 0;
 }
-static inline int Abc_BddNandCspfC( Abc_NandMan * p, int id ) {
+static inline int Abc_BddNandCspfC( Abc_NandMan * p, int id )
+{
   int j, k, idj, idk;
   unsigned fanins, fi, fj, already1, c, dc1;
   if ( p->pvCFuncs[id] )
@@ -837,6 +838,112 @@ static inline int Abc_BddNandCspfFaninCone( Abc_NandMan * p, int startId )
   Vec_IntFree( targets );
   return 0;
 }
+
+/**Function*************************************************************
+
+  Synopsis    []
+
+  Description []
+               
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+static inline int Abc_BddNandMspfG( Abc_NandMan * p, int id )
+{ // the same as CspfG
+  int j, idj, index;
+  unsigned c;
+  p->pGFuncs[id] = Abc_BddLitConst1();
+  Vec_IntForEachEntry( p->pvFanouts[id], idj, j )
+    {
+      if ( Abc_BddNandObjIsPo( p, idj ) )
+	p->pGFuncs[id] = Abc_BddAnd( p->pBdd, p->pGFuncs[id], p->pGFuncs[idj] );
+	// pGFuncs[idj] will be 0 unless external don't care of po is given.
+      else
+	{
+	  index = Vec_IntFind( p->pvFanins[idj], id );
+	  c = (unsigned)Vec_IntEntry( p->pvCFuncs[idj], index );
+	  p->pGFuncs[id] = Abc_BddAnd( p->pBdd, p->pGFuncs[id], c );
+	}
+    }
+  if ( Abc_BddLitIsInvalid( p->pGFuncs[id] ) ) return -1;
+  return 0;
+}
+static inline int Abc_BddNandMspfC( Abc_NandMan * p, int id )
+{
+  int j, k, idj, idk;
+  unsigned fanins, fj, c, dc1;
+  if ( p->pvCFuncs[id] ) Vec_IntFree( p->pvCFuncs[id] );
+  p->pvCFuncs[id] = Vec_IntAlloc( Vec_IntSize( p->pvFanins[id] ) );
+  Vec_IntForEachEntry( p->pvFanins[id], idj, j )
+    {
+      fanins = Abc_BddLitConst1();
+      Vec_IntForEachEntry( p->pvFanins[id], idk, k )
+	if ( k != j )
+	  fanins = Abc_BddAnd( p->pBdd, fanins, Abc_BddNandObjGetBddFunc( p, idk ) );
+      c = Abc_BddOr( p->pBdd, p->pGFuncs[id], Abc_BddLitNot( fanins ) );
+      fj = Abc_BddNandObjGetBddFunc( p, idj );
+      dc1 = Abc_BddOr( p->pBdd, fj, c );
+      if ( Abc_BddLitIsInvalid( dc1 ) ) return -1;
+      if ( Abc_BddLitIsConst1( dc1 ) )
+	{
+	  Abc_BddNandDisconnect( p, idj, id );
+	  if ( Vec_IntSize( p->pvFanins[id] ) == 0 )
+	    {
+	      Vec_IntForEachEntry( p->pvFanouts[id], idk, k )
+		if ( Vec_IntFind( p->pvFanins[idk], Abc_BddNandConst0() ) == -1 )
+		  Abc_BddNandConnect( p, Abc_BddNandConst0(), idk, 0 );
+	      Abc_BddNandRemoveNode( p, id );
+	      return 1;
+	    }
+	  return 1;
+	}
+      Vec_IntPush( p->pvCFuncs[id], c );
+    }
+  return 0;
+}
+static inline int Abc_BddNandMspf( Abc_NandMan * p )
+{
+  int i, c, id;
+  Vec_IntForEachEntryReverse( p->vObjs, id, i )
+    {
+      if ( Vec_IntSize( p->pvFanouts[id] ) == 0 )
+	{
+	  Abc_BddNandRemoveNode( p, id );
+	  continue;
+	}
+      if ( Abc_BddNandMspfG( p, id ) ) abort();
+      c = Abc_BddNandMspfC( p, id );
+      if ( c == -1 ) abort();
+      if ( c == 1 )
+	{
+	  Abc_BddNandBuildFanoutCone( p, id );
+	  i = Vec_IntSize( p->vObjs );
+	}
+    }
+}
+/*
+static inline int Abc_BddNandMspfFaninCone( Abc_NandMan * p, int startId )
+{
+  int i, id;
+  Vec_Int_t * targets = Vec_IntAlloc( 1 );
+  if ( Abc_BddNandMspfC( p, startId ) ) return 1;
+  Abc_BddNandDescendantSortedList( p, p->pvFanins, targets, startId );
+  Vec_IntForEachEntryReverse( targets, id, i )
+    {
+      if ( Vec_IntSize( p->pvFanouts[id] ) == 0 )
+	{
+	  Abc_BddNandRemoveNode( p, id );
+	  continue;
+	}
+      if ( Abc_BddNandMspfG( p, id ) ) return -1;
+      if ( Abc_BddNandMspfC( p, id ) ) return -1;
+    }
+  Vec_IntFree( targets );
+  return 0;
+}
+*/
 
 /**Function*************************************************************
 
@@ -1539,8 +1646,8 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
 	}
       if ( nVerbose ) Abc_BddNandPrintStats( p, "initial", clk0 );
       Abc_BddNandCspfEager( p );
+      //Abc_BddNandMspf( p );
       if ( nVerbose ) Abc_BddNandPrintStats( p, "cspf", clk0 );
-      // TODO : mspf
       int wire = 0;
       while ( wire != Abc_BddNandCountWire( p ) )
 	{

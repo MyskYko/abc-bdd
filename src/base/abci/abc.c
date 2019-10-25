@@ -46117,7 +46117,6 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     }
     
     pNew = Abc_BddNandGiaTest( pAbc->pGia, nMem, nType, fRep, fExdc, nWindowSize, fDcPropagate, nVerbose );
-    if ( pNew == NULL ) return 1;
     if ( fVerify )
       {
 	if ( fExdc )
@@ -46177,7 +46176,7 @@ usage:
     Abc_Print( -2, "\t-c    : toggle using CUDD not simple BDD [default = %s]\n", fCudd? "yes": "no" );
     Abc_Print( -2, "\t-e    : toggle verification [default = %s]\n", fVerify? "yes": "no" );
     Abc_Print( -2, "\t-p    : toggle repeating optimization while it is effective [default = %s]\n", fRep? "yes": "no" );
-    Abc_Print( -2, "\t-r    : toggle dynamic variable reoredering only in CUDD [default = %s]\n", fReo? "yes": "no" );
+    Abc_Print( -2, "\t-r    : toggle dynamic variable reoredering (available only with CUDD) [default = %s]\n", fReo? "yes": "no" );
     Abc_Print( -2, "\t-x    : toggle using the later half outputs as external don't cares of the first half outputs [default = %s]\n", fExdc? "yes": "no" );
     Abc_Print( -2, "\t-z    : toggle propagating don't cares in partitioned circuits [default = %s]\n", fDcPropagate? "yes": "no" );
     Abc_Print( -2, "\t-G num: optimization heuristic type [default = %d]\n", nType );
