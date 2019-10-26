@@ -46018,11 +46018,12 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     int fVerify = 1;
     int fRep = 1;
     int nWindowSize = 0;
+    int fMspf = 0;
     Gia_Man_t * pNew = NULL, * pMiter;
-    extern Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep, int fExdc, int nWindowSize, int fDcPropagate, int nVerbose );
+    extern Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep, int fExdc, int nWindowSize, int fDcPropagate, int fMspf, int nVerbose );
     //    extern void Abc_DdNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nMemMax, int nType, int nIte, int nOpt, int fReo, int nVerbose );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "GMPVcerpxzh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "GMPVcemprxzh" ) ) != EOF )
     {
         switch ( c )
         {
@@ -46031,6 +46032,9 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
             break;
 	case 'e':
             fVerify ^= 1;
+            break;
+	case 'm':
+            fMspf ^= 1;
             break;
 	case 'p':
             fRep ^= 1;
@@ -46116,7 +46120,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
 	return 1;
     }
     
-    pNew = Abc_BddNandGiaTest( pAbc->pGia, nMem, nType, fRep, fExdc, nWindowSize, fDcPropagate, nVerbose );
+    pNew = Abc_BddNandGiaTest( pAbc->pGia, nMem, nType, fRep, fExdc, nWindowSize, fDcPropagate, fMspf, nVerbose );
     if ( fVerify )
       {
 	if ( fExdc )
@@ -46171,10 +46175,11 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &cspf [-GMPV num] [-ceprxzh]\n" );
+    Abc_Print( -2, "usage: &cspf [-GMPV num] [-cemprxzh]\n" );
     Abc_Print( -2, "\t        circuit minimization with permissible function using simple bdd\n" );
     Abc_Print( -2, "\t-c    : toggle using CUDD not simple BDD [default = %s]\n", fCudd? "yes": "no" );
     Abc_Print( -2, "\t-e    : toggle verification [default = %s]\n", fVerify? "yes": "no" );
+    Abc_Print( -2, "\t-m    : toggle using MSPF instead of CSPF [default = %s]\n", fMspf? "yes": "no" );
     Abc_Print( -2, "\t-p    : toggle repeating optimization while it is effective [default = %s]\n", fRep? "yes": "no" );
     Abc_Print( -2, "\t-r    : toggle dynamic variable reoredering (available only with CUDD) [default = %s]\n", fReo? "yes": "no" );
     Abc_Print( -2, "\t-x    : toggle using the later half outputs as external don't cares of the first half outputs [default = %s]\n", fExdc? "yes": "no" );

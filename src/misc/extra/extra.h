@@ -510,6 +510,7 @@ extern void            Abc_BddManRealloc( Abc_BddMan * p );
 extern void            Abc_BddManFree( Abc_BddMan * p );
 extern unsigned        Abc_BddAnd( Abc_BddMan * p, unsigned a, unsigned b );
 extern unsigned        Abc_BddOr( Abc_BddMan * p, unsigned a, unsigned b );
+extern unsigned        Abc_BddXnor( Abc_BddMan * p, unsigned a, unsigned b );
 extern void            Abc_BddUnmark_rec( Abc_BddMan * p, unsigned i );
 extern int             Abc_BddCountNodesArrayShared( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern int             Abc_BddCountNodesArrayIndependent( Abc_BddMan * p, Vec_Int_t * vNodes );

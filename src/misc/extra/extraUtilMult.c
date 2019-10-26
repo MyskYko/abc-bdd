@@ -345,6 +345,14 @@ unsigned Abc_BddOr( Abc_BddMan * p, unsigned a, unsigned b )
 {
   return Abc_BddLitNot( Abc_BddAnd( p, Abc_BddLitNot( a ), Abc_BddLitNot( b ) ) );
 }
+unsigned Abc_BddXnor( Abc_BddMan * p, unsigned a, unsigned b )
+{
+  unsigned v;
+  v = Abc_BddAnd( p, a, b );
+  b = Abc_BddAnd( p, Abc_BddLitNot( a ), Abc_BddLitNot( b ) );
+  a = v;
+  return Abc_BddOr( p, a, b );
+}
 
 /**Function*************************************************************
    
