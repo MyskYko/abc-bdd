@@ -52,12 +52,9 @@ struct Abc_NandMan_
   int nVerbose;
   
   Abc_BddMan * pBdd;
-
   Gia_Man_t * pGia;
-
   Vec_Int_t * vPiCkts;
   Vec_Int_t * vPiIdxs;
-
   Vec_Ptr_t * vvDcGias;
 };
 
@@ -604,79 +601,6 @@ static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec
   SeeAlso     []
 
 ***********************************************************************/
-// TODO : consider change the method to rank
-static inline void Abc_BddNandRank( Abc_NandMan * p, int id )
-{
-  if ( Abc_BddNandObjIsPi( p, id ) )
-    p->pRank[id] = 1 << 30; // assume this is the max
-  else if ( Vec_IntSize( p->vPis ) <= 20 )
-    {
-      p->pRank[id] = Vec_IntSize( p->pvFanouts[id] ) << Vec_IntSize( p->vPis );
-      p->pRank[id] += Abc_BddNandCount0s( p, id, 0 );
-    }
-  else
-    {
-      int nOverflow = Vec_IntSize( p->vPis ) - 20;
-      p->pRank[id] = Vec_IntSize( p->pvFanouts[id] ) << 20;
-      p->pRank[id] += Abc_BddNandCount0s( p, id, nOverflow );
-    }
-  assert( p->pRank[id] >= 0 );
-}
-static inline void Abc_BddNandRankAll( Abc_NandMan * p )
-{
-  int i, id;
-  Vec_IntForEachEntry( p->vPis, id, i )
-    Abc_BddNandRank( p, id );
-  Vec_IntForEachEntry( p->vObjs, id, i )
-    Abc_BddNandRank( p, id );
-}
-
-/**Function*************************************************************
-
-  Synopsis    []
-
-  Description []
-               
-  SideEffects []
-
-  SeeAlso     []
-
-***********************************************************************/
-static inline void Abc_BddNandSortFanin( Abc_NandMan * p, int id )
-{
-  int j, k, idj, idk, best_j, best_idj;
-  Vec_IntForEachEntry( p->pvFanins[id], idj, j )
-    {
-      best_j = j;
-      best_idj = idj;
-      Vec_IntForEachEntryStart( p->pvFanins[id], idk, k, j + 1 )
-	if ( p->pRank[idj] > p->pRank[idk] )
-	  {
-	    best_j = k;
-	    best_idj = idk;
-	  }
-      Vec_IntWriteEntry( p->pvFanins[id], j, best_idj );
-      Vec_IntWriteEntry( p->pvFanins[id], best_j, idj );
-    }
-}
-static inline void Abc_BddNandSortFaninAll( Abc_NandMan * p )
-{
-  int i, id;
-  Vec_IntForEachEntry( p->vObjs, id, i )
-    Abc_BddNandSortFanin( p, id );
-}
-
-/**Function*************************************************************
-
-  Synopsis    []
-
-  Description []
-               
-  SideEffects []
-
-  SeeAlso     []
-
-***********************************************************************/
 static inline int Abc_BddNandBuild( Abc_NandMan * p, int id )
 {
   int j, idj;
@@ -773,7 +697,7 @@ static inline int Abc_BddNandDc( Abc_NandMan * p )
   SeeAlso     []
 
 ***********************************************************************/
-static inline int Abc_BddNandCspfG( Abc_NandMan * p, int id )
+static inline int Abc_BddNandGFunc( Abc_NandMan * p, int id )
 {
   int j, idj, index;
   unsigned c;
@@ -793,7 +717,79 @@ static inline int Abc_BddNandCspfG( Abc_NandMan * p, int id )
   if ( Abc_BddLitIsInvalid( p->pGFuncs[id] ) ) return -1;
   return 0;
 }
-static inline int Abc_BddNandCspfC( Abc_NandMan * p, int id )
+/**Function*************************************************************
+
+  Synopsis    []
+
+  Description []
+               
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+// TODO : consider change the method to rank
+static inline void Abc_BddNandRank( Abc_NandMan * p, int id )
+{
+  if ( Abc_BddNandObjIsPi( p, id ) )
+    p->pRank[id] = 1 << 30; // assume this is the max
+  else if ( Vec_IntSize( p->vPis ) <= 20 )
+    {
+      p->pRank[id] = Vec_IntSize( p->pvFanouts[id] ) << Vec_IntSize( p->vPis );
+      p->pRank[id] += Abc_BddNandCount0s( p, id, 0 );
+    }
+  else
+    {
+      int nOverflow = Vec_IntSize( p->vPis ) - 20;
+      p->pRank[id] = Vec_IntSize( p->pvFanouts[id] ) << 20;
+      p->pRank[id] += Abc_BddNandCount0s( p, id, nOverflow );
+    }
+  assert( p->pRank[id] >= 0 );
+}
+static inline void Abc_BddNandRankAll( Abc_NandMan * p )
+{
+  int i, id;
+  Vec_IntForEachEntry( p->vPis, id, i )
+    Abc_BddNandRank( p, id );
+  Vec_IntForEachEntry( p->vObjs, id, i )
+    Abc_BddNandRank( p, id );
+}
+static inline void Abc_BddNandSortFanin( Abc_NandMan * p, int id )
+{
+  int j, k, idj, idk, best_j, best_idj;
+  Vec_IntForEachEntry( p->pvFanins[id], idj, j )
+    {
+      best_j = j;
+      best_idj = idj;
+      Vec_IntForEachEntryStart( p->pvFanins[id], idk, k, j + 1 )
+	if ( p->pRank[idj] > p->pRank[idk] )
+	  {
+	    best_j = k;
+	    best_idj = idk;
+	  }
+      Vec_IntWriteEntry( p->pvFanins[id], j, best_idj );
+      Vec_IntWriteEntry( p->pvFanins[id], best_j, idj );
+    }
+}
+static inline void Abc_BddNandSortFaninAll( Abc_NandMan * p )
+{
+  int i, id;
+  Vec_IntForEachEntry( p->vObjs, id, i )
+    Abc_BddNandSortFanin( p, id );
+}
+
+/**Function*************************************************************
+
+  Synopsis    []
+
+  Description []
+               
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+static inline int Abc_BddNandCFuncCspf( Abc_NandMan * p, int id )
 {
   int j, k, idj, idk;
   unsigned fanins, fi, fj, already1, c, dc1;
@@ -840,8 +836,8 @@ static inline int Abc_BddNandCspf( Abc_NandMan * p )
 	  Abc_BddNandRemoveNode( p, id );
 	  continue;
 	}
-      if ( Abc_BddNandCspfG( p, id ) ) return -1;
-      if ( Abc_BddNandCspfC( p, id ) ) return -1;
+      if ( Abc_BddNandGFunc( p, id ) ) return -1;
+      if ( Abc_BddNandCFuncCspf( p, id ) ) return -1;
     }
   return Abc_BddNandBuildAll( p );
 }
@@ -849,7 +845,7 @@ static inline int Abc_BddNandCspfFaninCone( Abc_NandMan * p, int startId )
 {
   int i, id;
   Vec_Int_t * targets = Vec_IntAlloc( 1 );
-  if ( Abc_BddNandCspfC( p, startId ) ) return 1;
+  if ( Abc_BddNandCFuncCspf( p, startId ) ) return -1;
   Abc_BddNandDescendantSortedList( p, p->pvFanins, targets, startId );
   Vec_IntForEachEntryReverse( targets, id, i )
     {
@@ -858,8 +854,8 @@ static inline int Abc_BddNandCspfFaninCone( Abc_NandMan * p, int startId )
 	  Abc_BddNandRemoveNode( p, id );
 	  continue;
 	}
-      if ( Abc_BddNandCspfG( p, id ) ) return -1;
-      if ( Abc_BddNandCspfC( p, id ) ) return -1;
+      if ( Abc_BddNandGFunc( p, id ) ) return -1;
+      if ( Abc_BddNandCFuncCspf( p, id ) ) return -1;
     }
   Vec_IntFree( targets );
   return 0;
@@ -876,27 +872,7 @@ static inline int Abc_BddNandCspfFaninCone( Abc_NandMan * p, int startId )
   SeeAlso     []
 
 ***********************************************************************/
-static inline int Abc_BddNandMspfG( Abc_NandMan * p, int id )
-{ // the same as CspfG
-  int j, idj, index;
-  unsigned c;
-  p->pGFuncs[id] = Abc_BddLitConst1();
-  Vec_IntForEachEntry( p->pvFanouts[id], idj, j )
-    {
-      if ( Abc_BddNandObjIsPo( p, idj ) )
-	p->pGFuncs[id] = Abc_BddAnd( p->pBdd, p->pGFuncs[id], p->pGFuncs[idj] );
-	// pGFuncs[idj] will be 0 unless external don't care of po is given.
-      else
-	{
-	  index = Vec_IntFind( p->pvFanins[idj], id );
-	  c = (unsigned)Vec_IntEntry( p->pvCFuncs[idj], index );
-	  p->pGFuncs[id] = Abc_BddAnd( p->pBdd, p->pGFuncs[id], c );
-	}
-    }
-  if ( Abc_BddLitIsInvalid( p->pGFuncs[id] ) ) return -1;
-  return 0;
-}
-static inline int Abc_BddNandMspfC( Abc_NandMan * p, int id )
+static inline int Abc_BddNandCFuncMspf( Abc_NandMan * p, int id )
 {
   int j, k, idj, idk;
   unsigned fanins, fj, c, dc1;
@@ -939,37 +915,17 @@ static inline int Abc_BddNandMspf( Abc_NandMan * p )
 	  Abc_BddNandRemoveNode( p, id );
 	  continue;
 	}
-      if ( Abc_BddNandMspfG( p, id ) ) abort();
-      c = Abc_BddNandMspfC( p, id );
-      if ( c == -1 ) abort();
+      if ( Abc_BddNandGFunc( p, id ) ) abort();
+      c = Abc_BddNandCFuncMspf( p, id );
+      if ( c == -1 ) return -1;
       if ( c == 1 )
 	{
 	  Abc_BddNandBuildFanoutCone( p, id );
 	  i = Vec_IntSize( p->vObjs );
 	}
     }
-}
-/*
-static inline int Abc_BddNandMspfFaninCone( Abc_NandMan * p, int startId )
-{
-  int i, id;
-  Vec_Int_t * targets = Vec_IntAlloc( 1 );
-  if ( Abc_BddNandMspfC( p, startId ) ) return 1;
-  Abc_BddNandDescendantSortedList( p, p->pvFanins, targets, startId );
-  Vec_IntForEachEntryReverse( targets, id, i )
-    {
-      if ( Vec_IntSize( p->pvFanouts[id] ) == 0 )
-	{
-	  Abc_BddNandRemoveNode( p, id );
-	  continue;
-	}
-      if ( Abc_BddNandMspfG( p, id ) ) return -1;
-      if ( Abc_BddNandMspfC( p, id ) ) return -1;
-    }
-  Vec_IntFree( targets );
   return 0;
 }
-*/
 
 /**Function*************************************************************
 
@@ -1041,7 +997,7 @@ static inline void Abc_BddNandRefreshIfNeeded( Abc_NandMan * p )
 static inline void Abc_BddNandBuild_Refresh( Abc_NandMan * p, int id ) { if ( Abc_BddNandBuild( p, id ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandBuildAll_Refresh( Abc_NandMan * p ) { if ( Abc_BddNandBuildAll( p ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandBuildFanoutCone_Refresh( Abc_NandMan * p, int startId ) { if ( Abc_BddNandBuildFanoutCone( p, startId ) ) Abc_BddNandRefresh( p ); }
-static inline void Abc_BddNandCspfC_Refresh( Abc_NandMan * p, int id ) { if ( Abc_BddNandCspfC( p, id ) ) Abc_BddNandRefresh( p ); }
+static inline void Abc_BddNandCFuncCspf_Refresh( Abc_NandMan * p, int id ) { if ( Abc_BddNandCFuncCspf( p, id ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandCspf_Refresh( Abc_NandMan * p ) { if ( Abc_BddNandCspf( p ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandCspfFaninCone_Refresh( Abc_NandMan * p, int startId ) { if ( Abc_BddNandCspfFaninCone( p, startId ) ) Abc_BddNandRefresh( p ); }
 static inline int Abc_BddNandTryConnect_Refresh( Abc_NandMan * p, int fanin, int fanout )
@@ -1110,7 +1066,7 @@ static inline void Abc_BddNandG1EagerReduce( Abc_NandMan * p, int id, int idj )
 static inline void Abc_BddNandG1WeakReduce( Abc_NandMan * p, int id, int idj )
 {
   int wire =  Abc_BddNandCountWire( p );
-  Abc_BddNandCspfC_Refresh( p, id );
+  Abc_BddNandCFuncCspf_Refresh( p, id );
   if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ||
        Abc_BddNandObjIsEmptyOrDead( p, idj ) )
     return; // If this, we don't need to do below.
@@ -1282,7 +1238,7 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	      Abc_BddNandConnect( p, new_id, idk, 0 );
 	  Abc_BddNandObjEntry( p, new_id );
 	  Abc_BddNandSortFanin( p, new_id );
-	  out = Abc_BddNandCspfC( p, new_id );
+	  out = Abc_BddNandCFuncCspf( p, new_id );
 	  wire = Vec_IntSize( p->pvFanins[id] ) + Vec_IntSize( p->pvFanins[idj] );
 	  if ( out || Vec_IntSize( p->pvFanins[new_id] ) > wire - 1 )
 	    {
