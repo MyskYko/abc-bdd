@@ -44,6 +44,7 @@ struct Abc_NandMan_
   Vec_Int_t ** pvFanouts;
   int * pBddFuncs;
   int * pRank;
+  char * pMark;
   unsigned * pGFuncs;
   Vec_Int_t ** pvCFuncs;
   
@@ -90,35 +91,57 @@ static inline int      Abc_BddNandObjIsEmptyOrDead( Abc_NandMan * p, int id ) { 
   SeeAlso     []
 
 ***********************************************************************/
-void Abc_BddNandDescendantList_rec( Vec_Int_t ** children, Vec_Int_t * list, int id )
+void Abc_BddNandMarkDescendant_rec( Abc_NandMan * p, Vec_Int_t ** children, int id )
 {
-  int j, idj, index;
+  int j, idj;
   Vec_IntForEachEntry( children[id], idj, j )
-    {
-      index = Vec_IntFind( list, idj );
-      if ( index == -1 && children[idj] != 0 ) // idj is not in list and is not leaf
-	{ 
-	  Vec_IntPush( list, idj );
-	  Abc_BddNandDescendantList_rec( children, list, idj );
-	}
-    }
+    if ( !p->pMark[idj] && children[idj] != 0 ) // idj is not marked and not leaf
+      {
+	p->pMark[idj] = 1;
+	Abc_BddNandMarkDescendant_rec( p, children, idj );
+      }
 }
-static inline void Abc_BddNandDescendantSortedList( Abc_NandMan * p, Vec_Int_t ** children, Vec_Int_t * sortedList, int parent )
+static inline void Abc_BddNandMarkClear( Abc_NandMan * p )
+{
+  ABC_FREE( p->pMark );
+  p->pMark = ABC_CALLOC( char, p->nObjsAlloc );
+}
+void Abc_BddNandDescendantList_rec( Abc_NandMan * p, Vec_Int_t ** children, Vec_Int_t * list, int id )
+{
+  int j, idj;
+  Vec_IntForEachEntry( children[id], idj, j )
+    if ( !(p->pMark[idj] >> 1) && children[idj] != 0 ) // idj is not marked and not leaf
+      {
+	p->pMark[idj] += 2;
+	Vec_IntPush( list, idj );
+	Abc_BddNandDescendantList_rec( p, children, list, idj );
+      }
+}
+static inline void Abc_BddNandSortList( Abc_NandMan * p, Vec_Int_t * list )
 {
   int i, id, index;
-  Vec_Int_t * list = Vec_IntAlloc( 1 );
-  Abc_BddNandDescendantList_rec( children, list, parent );
+  Vec_Int_t * listOld = Vec_IntDup( list );
+  Vec_IntClear( list );
   Vec_IntForEachEntry( p->vObjs, id, i )
     {
-      index = Vec_IntFind( list, id );
+      index = Vec_IntFind( listOld, id );
       if ( index != -1 )
 	{
-	  Vec_IntDrop( list, index );      
-	  Vec_IntPush( sortedList, id );
-	  if ( Vec_IntSize( list ) == 0 ) break;
+	  Vec_IntDrop( listOld, index );      
+	  Vec_IntPush( list, id );
+	  if ( Vec_IntSize( listOld ) == 0 ) break;
 	}
     }
-  Vec_IntFree( list );
+  Vec_IntFree( listOld );
+}
+
+static inline void Abc_BddNandDescendantSortedList( Abc_NandMan * p, Vec_Int_t ** children, Vec_Int_t * list, int id )
+{
+  int j, idj;
+  Abc_BddNandDescendantList_rec( p, children, list, id );
+  Vec_IntForEachEntry( list, idj, j )
+    p->pMark[idj] -= 2;
+  Abc_BddNandSortList( p, list );
 }
 
 /**Function*************************************************************
@@ -304,9 +327,10 @@ static inline Abc_NandMan * Abc_BddNandManAlloc( Gia_Man_t * pGia, int nMem, int
   p->pvFanouts = ABC_CALLOC( Vec_Int_t *, p->nObjsAlloc );
   p->pBddFuncs = ABC_CALLOC( int        , p->nObjsAlloc );
   p->pRank     = ABC_CALLOC( int        , p->nObjsAlloc );
+  p->pMark     = ABC_CALLOC( char       , p->nObjsAlloc );
   p->pGFuncs   = ABC_CALLOC( unsigned   , p->nObjsAlloc );
   p->pvCFuncs  = ABC_CALLOC( Vec_Int_t *, p->nObjsAlloc );
-  if ( !p->pvFanins || !p->pvFanouts || !p->pBddFuncs || !p->pRank || !p->pGFuncs || !p->pvCFuncs )
+  if ( !p->pvFanins || !p->pvFanouts || !p->pBddFuncs || !p->pRank || !p->pMark || !p->pGFuncs || !p->pvCFuncs )
     {
       printf("Error: Allocation failed\n");
       abort();
@@ -334,6 +358,7 @@ static inline void Abc_BddNandManFree( Abc_NandMan * p )
   Vec_IntFree( p->vPiIdxs );
   ABC_FREE( p->pBddFuncs );
   ABC_FREE( p->pRank );
+  ABC_FREE( p->pMark );
   ABC_FREE( p->pGFuncs );
   for ( i = 0; i < p->nObjsAlloc; i++ )
     {
@@ -411,7 +436,7 @@ static inline void Abc_BddNandSetPoInfo( Gia_Man_t * pGia, Vec_Ptr_t * vNets, Ve
       Vec_IntForEachEntry( p->vPis, id, j )
 	Gia_ManAppendCi( pConst0 );
       Gia_ManAppendCo( pConst0, Gia_ManConst0Lit() );
-      Vec_IntPush( Vec_PtrEntry( p->vvDcGias, Vec_IntEntry( vIdxs, k ) ), pConst0 );
+      Vec_PtrPush( Vec_PtrEntry( p->vvDcGias, Vec_IntEntry( vIdxs, k ) ), pConst0 );
     }
   Vec_IntFree( vId );
   Vec_IntFree( vCkts );
@@ -673,6 +698,7 @@ static inline int Abc_BddNandBuildFanoutCone( Abc_NandMan * p, int startId )
 { // including startId itself
   int i, id;
   Vec_Int_t * targets = Vec_IntAlloc( 1 );
+  p->pMark[startId] += 2;
   Vec_IntPush( targets, startId );
   Abc_BddNandDescendantSortedList( p, p->pvFanouts, targets, startId );
   Vec_IntForEachEntry( targets, id, i )
@@ -1095,16 +1121,16 @@ static inline void Abc_BddNandG1WeakReduce( Abc_NandMan * p, int id, int idj )
 static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak )
 {
   int i, j, id, idj;
-  Vec_Int_t * targets, * fanouts;
+  Vec_Int_t * targets;
   targets = Vec_IntDup( p->vObjs );
-  fanouts = Vec_IntAlloc( 1 );
   Vec_IntForEachEntryReverse( targets, id, i )
     {
       if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) continue;
       if ( p->nVerbose > 1 )
 	printf( "G1 for %d in %d gates\n", i, Vec_IntSize(targets) );
-      Vec_IntClear( fanouts );
-      Abc_BddNandDescendantList_rec( p->pvFanouts, fanouts, id );
+      Abc_BddNandMarkClear( p );
+      p->pMark[id] = 1;
+      Abc_BddNandMarkDescendant_rec( p, p->pvFanouts, id );
       // try connecting pi
       Vec_IntForEachEntry( p->vPis, idj, j )
 	{
@@ -1120,8 +1146,7 @@ static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak )
 	{
 	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) break;
 	  if ( Abc_BddNandObjIsEmptyOrDead( p, idj ) ) continue;
-	  if ( id == idj ) continue;
-	  if ( Vec_IntFind( fanouts, idj ) != -1 ) continue;
+	  if ( p->pMark[idj] ) continue;
 	  if ( Abc_BddNandTryConnect_Refresh( p, idj, id ) == 1 )
 	    {
 	      if ( fWeak ) Abc_BddNandG1WeakReduce( p, id, idj );
@@ -1138,7 +1163,6 @@ static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak )
 	}
     }
   Vec_IntFree( targets );
-  Vec_IntFree( fanouts );
 }
 
 /**Function*************************************************************
@@ -1156,7 +1180,7 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 {
   int i,j,k, id, idj, idk, out, wire, new_id;
   unsigned fi, fj, gi, gj, f1, f0, a, b, mergible, figj, fjgi, fx, gx, Value, eq;
-  Vec_Int_t * targets, * fanouts;
+  Vec_Int_t * targets;
   new_id = Vec_IntSize( p->vPis ) + 1;
   while ( !Abc_BddNandObjIsEmpty( p, new_id ) )
     {
@@ -1168,7 +1192,6 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	}
     }
   targets = Vec_IntDup( p->vObjs );
-  fanouts = Vec_IntAlloc( 1 );
   // optimize
   Vec_IntForEachEntryReverse( targets, id, i )
     {
@@ -1204,11 +1227,11 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	  p->pvFanins[new_id] = Vec_IntAlloc( 1 );
 	  p->pvFanouts[new_id] = Vec_IntAlloc( 1 );
 	  // for all living nodes, if it is not included in fanouts of i and j, and i and j themselves, try connect it to new node.
-	  Vec_IntClear( fanouts );
-	  Abc_BddNandDescendantList_rec( p->pvFanouts, fanouts, id );
-	  Abc_BddNandDescendantList_rec( p->pvFanouts, fanouts, idj );
-	  Vec_IntPushUnique( fanouts, id );
-	  Vec_IntPushUnique( fanouts, idj );
+	  Abc_BddNandMarkClear( p );
+	  p->pMark[id] = 1;
+	  p->pMark[idj] = 1;
+	  Abc_BddNandMarkDescendant_rec( p, p->pvFanouts, id );
+	  Abc_BddNandMarkDescendant_rec( p, p->pvFanouts, idj );
 	  eq = Abc_BddOr( p->pBdd, Abc_BddLitNot( fx ), gx );
 	  Value = Abc_BddLitConst1();
 	  Vec_IntForEachEntry( p->vPis, idk, k ) 
@@ -1222,7 +1245,7 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	  Vec_IntForEachEntry( targets, idk, k )
 	    {
 	      if ( Abc_BddNandObjIsEmptyOrDead( p, idk ) ) continue;
-	      if ( Vec_IntFind( fanouts, idj ) != -1 ) continue;
+	      if ( p->pMark[idj] ) continue;
 	      if ( Abc_BddNandTryConnect( p, idk, new_id ) == 1 )
 		{
 		  if ( Abc_BddLitIsConst1( eq ) ) break;
@@ -1282,7 +1305,6 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	}
     }
   Vec_IntFree( targets );
-  Vec_IntFree( fanouts );
 }
 
 /**Function*************************************************************
@@ -1299,19 +1321,21 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 static inline void Abc_BddNandG1multi( Abc_NandMan * p, int fWeak )
 {
   int i, j, id, idj;
-  Vec_Int_t * targets, * targets2, * fanouts;
+  Vec_Int_t * targets, * targets2;
   targets = Vec_IntDup( p->vObjs );
   targets2 = Vec_IntAlloc( 1 );
-  fanouts = Vec_IntAlloc( 1 );
   Vec_IntForEachEntryStart( p->vPos, id, i, Vec_IntSize( p->vPos ) / 2 )
-    Abc_BddNandDescendantList_rec( p->pvFanins, targets2, id );
+    Abc_BddNandDescendantList_rec( p, p->pvFanins, targets2, id );
+  Abc_BddNandMarkClear( p );  
+  Abc_BddNandSortList( p, targets2 );
   Vec_IntForEachEntryReverse( targets, id, i )
     {
       if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) continue;
       if ( p->nVerbose > 1 )
 	printf( "G1-multi for %d in %d gates\n", i, Vec_IntSize(targets) );
-      Vec_IntClear( fanouts );
-      Abc_BddNandDescendantList_rec( p->pvFanouts, fanouts, id );
+      Abc_BddNandMarkClear( p );
+      p->pMark[id] = 1;
+      Abc_BddNandMarkDescendant_rec( p, p->pvFanouts, id );
       Vec_IntForEachEntry( p->vPis, idj, j )
 	{
 	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) break;
@@ -1325,8 +1349,7 @@ static inline void Abc_BddNandG1multi( Abc_NandMan * p, int fWeak )
 	{
 	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) break;
 	  if ( Abc_BddNandObjIsEmptyOrDead( p, idj ) ) continue;
-	  if ( id == idj ) continue;
-	  if ( Vec_IntFind( fanouts, idj ) != -1 ) continue;
+	  if ( p->pMark[idj] ) continue;
 	  if ( Abc_BddNandTryConnect_Refresh( p, idj, id ) == 1 )
 	    {
 	      if ( fWeak ) Abc_BddNandG1WeakReduce( p, id, idj );
@@ -1343,7 +1366,6 @@ static inline void Abc_BddNandG1multi( Abc_NandMan * p, int fWeak )
     }
   Vec_IntFree( targets );
   Vec_IntFree( targets2 );
-  Vec_IntFree( fanouts );
 }
 
 /**Function*************************************************************
@@ -1583,11 +1605,11 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
   vPoCkts = Vec_IntAlloc( 1 );
   vPoIdxs = Vec_IntAlloc( 1 );
   vExternalCs = Vec_IntAlloc( 1 );
+  nPos = Gia_ManCoNum( pGia ) / 2;
   if ( nWindowSize == 0 )
     {
       if ( fDc )
 	{
-	  nPos = Gia_ManCoNum( pGia ) / 2;
 	  pPos = ABC_CALLOC( int, nPos );
 	  for ( i = 0; i < nPos; i++ )
 	    pPos[i] = i;
