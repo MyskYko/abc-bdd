@@ -57,7 +57,7 @@ struct Abc_NandMan_
   Vec_Int_t * vPiIdxs;
   Vec_Ptr_t * vvDcGias;
 
-  int fMspf;
+  int nMspf;
 };
 
 static inline int      Abc_BddNandConst0() { return 0; }  // = Gia_ObjId( pGia, Gia_ManConst0( pGia ) );
@@ -371,7 +371,7 @@ static inline void Abc_BddNandGia2Net( Abc_NandMan * p )
   SeeAlso     []
 
 ***********************************************************************/
-static inline Abc_NandMan * Abc_BddNandManAlloc( Gia_Man_t * pGia, int nMem, int fMspf, int nVerbose )
+static inline Abc_NandMan * Abc_BddNandManAlloc( Gia_Man_t * pGia, int nMem, int nMspf, int nVerbose )
 {
   int i;
   Abc_NandMan * p = ABC_CALLOC( Abc_NandMan, 1 );
@@ -393,7 +393,7 @@ static inline Abc_NandMan * Abc_BddNandManAlloc( Gia_Man_t * pGia, int nMem, int
       abort();
     }
   p->nMem = nMem;
-  p->fMspf = fMspf;
+  p->nMspf = nMspf;
   p->nVerbose = nVerbose;
   p->pGia = pGia;
   p->vPiCkts = Vec_IntAlloc( 1 );
@@ -510,7 +510,7 @@ static inline int Abc_BddNandCountNewFanins( Gia_Man_t * pGia, Gia_Obj_t * pObj,
   id1 = Gia_ObjId( pGia, pObj1 );
   return (int)(pParts[id0] != part) + (int)(pParts[id1] != part);
 }
-static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec_Int_t * vPoCkts, Vec_Int_t * vPoIdxs, Vec_Int_t * vExternalCs, int nMem, int nWindowSize, int fMspf, int nVerbose )
+static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec_Int_t * vPoCkts, Vec_Int_t * vPoIdxs, Vec_Int_t * vExternalCs, int nMem, int nWindowSize, int nMspf, int nVerbose )
 {
   int i, id, lit, newId, part;
   int * pFanouts, * pParts;
@@ -627,7 +627,7 @@ static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec
 	}
       Vec_IntSort( vNodes, 0 );
       pNew = Gia_ManDupFromVecs( pGia, vPis, vNodes, vTempPos, 0 );
-      p = Abc_BddNandManAlloc( pNew, nMem, fMspf, (int)( nVerbose > 2 ) );
+      p = Abc_BddNandManAlloc( pNew, nMem, nMspf, (int)( nVerbose > 2 ) );
       Vec_PtrPush( vNets, p );
       Vec_PtrPush( vvPis, vPis );
       Vec_PtrPush( vvPos, vPos );
@@ -1128,7 +1128,7 @@ static inline void Abc_BddNandRefresh( Abc_NandMan * p )
       if ( !out ) out = Abc_BddNandBuildAll( p );
       if ( !out )
 	{
-	  if ( !p->fMspf ) out = Abc_BddNandCspf( p );
+	  if ( p->nMspf < 2 ) out = Abc_BddNandCspf( p );
 	  else out = Abc_BddNandMspf( p );
 	}
       if ( !out ) break;
@@ -1153,7 +1153,6 @@ static inline void Abc_BddNandBuildFanoutCone_Refresh( Abc_NandMan * p, int star
 static inline void Abc_BddNandCFuncCspf_Refresh( Abc_NandMan * p, int id ) { if ( Abc_BddNandCFuncCspf( p, id ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandCspf_Refresh( Abc_NandMan * p ) { if ( Abc_BddNandCspf( p ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandCspfFaninCone_Refresh( Abc_NandMan * p, int startId ) { if ( Abc_BddNandCspfFaninCone( p, startId ) ) Abc_BddNandRefresh( p ); }
-static inline void Abc_BddNandMspf_Refresh( Abc_NandMan * p ) { if ( Abc_BddNandMspf( p ) ) Abc_BddNandRefresh( p ); }
 static inline int Abc_BddNandTryConnect_Refresh( Abc_NandMan * p, int fanin, int fanout )
 {
   int c = Abc_BddNandTryConnect( p, fanin, fanout );
@@ -1166,6 +1165,29 @@ static inline int Abc_BddNandTryConnect_Refresh( Abc_NandMan * p, int fanin, int
     }
   if ( c == -1 ) abort();
   return c;
+}
+static inline void Abc_BddNandMspf_Refresh( Abc_NandMan * p )
+{
+  if ( !Abc_BddNandMspf( p ) ) return;
+  if ( p->nVerbose > 1 ) printf( "Refresh\n" );
+  abctime clk0 = Abc_Clock();
+  while ( 1 )
+    {
+      Abc_BddManFree( p->pBdd );
+      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, (int)( p->nVerbose > 2 ) );
+      int out = 0;
+      out = Abc_BddNandDc( p );
+      if ( !out ) out = Abc_BddNandBuildAll( p );
+      if ( !out ) out = Abc_BddNandMspf( p );
+      if ( !out ) break;
+      p->nMem++;
+      if ( 1 << p->nMem == 0 )
+	{
+	  printf("Error: Refresh failed\n");
+	  abort();
+	}
+    }
+  if ( p->nVerbose > 1 ) ABC_PRT( "Refresh took", Abc_Clock() - clk0 );
 }
 
 /**Function*************************************************************
@@ -1215,7 +1237,8 @@ static inline void Abc_BddNandG1EagerReduce( Abc_NandMan * p, int id, int idj )
       return;
     }
   Abc_BddNandBuildAll_Refresh( p );
-  Abc_BddNandCspfEager( p );
+  if ( p->nMspf ) Abc_BddNandMspf_Refresh( p );
+  if ( p->nMspf < 2 ) Abc_BddNandCspfEager( p );
 }
 static inline void Abc_BddNandG1WeakReduce( Abc_NandMan * p, int id, int idj )
 {
@@ -1252,7 +1275,7 @@ static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak )
 	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) break;
 	  if ( Abc_BddNandTryConnect_Refresh( p, idj, id ) == 1 )
 	    {
-	      if ( p->fMspf ) Abc_BddNandG1MspfReduce( p, id, idj );
+	      if ( p->nMspf > 1 ) Abc_BddNandG1MspfReduce( p, id, idj );
 	      else if ( fWeak ) Abc_BddNandG1WeakReduce( p, id, idj );	
 	      else Abc_BddNandG1EagerReduce( p, id, idj );
 	    }
@@ -1265,13 +1288,13 @@ static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak )
 	  if ( p->pMark[idj] ) continue;
 	  if ( Abc_BddNandTryConnect_Refresh( p, idj, id ) )
 	    {
-	      if ( p->fMspf ) Abc_BddNandG1MspfReduce( p, id, idj );
+	      if ( p->nMspf > 1 ) Abc_BddNandG1MspfReduce( p, id, idj );
 	      else if ( fWeak ) Abc_BddNandG1WeakReduce( p, id, idj );
 	      else Abc_BddNandG1EagerReduce( p, id, idj );
 	    }
 	}
       // recalculate fanouts for option
-      if ( !p->fMspf && fWeak )
+      if ( p->nMspf < 2 && fWeak )
 	{
 	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) continue;
 	  Abc_BddNandCspfFaninCone_Refresh( p, id );
@@ -1298,7 +1321,7 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
   int i,j,k, id, idj, idk, out, wire, new_id;
   unsigned fi, fj, gi, gj, f1, f0, a, b, mergible, figj, fjgi, fx, gx, Value, eq;
   Vec_Int_t * targets;
-  if ( p->fMspf )
+  if ( p->nMspf )
     {
       printf("Error: G3 with MSPF is not implemented\n");
       abort();
@@ -1463,7 +1486,7 @@ static inline void Abc_BddNandG1multi( Abc_NandMan * p, int fWeak )
 	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) break;
 	  if ( Abc_BddNandTryConnect_Refresh( p, idj, id ) == 1 )
 	    {
-	      if ( p->fMspf ) Abc_BddNandG1MspfReduce( p, id, idj );	
+	      if ( p->nMspf > 1 ) Abc_BddNandG1MspfReduce( p, id, idj );	
 	      else if ( fWeak ) Abc_BddNandG1WeakReduce( p, id, idj );	
 	      else Abc_BddNandG1EagerReduce( p, id, idj );
 	    }
@@ -1475,12 +1498,12 @@ static inline void Abc_BddNandG1multi( Abc_NandMan * p, int fWeak )
 	  if ( p->pMark[idj] ) continue;
 	  if ( Abc_BddNandTryConnect_Refresh( p, idj, id ) == 1 )
 	    {
-	      if ( p->fMspf ) Abc_BddNandG1MspfReduce( p, id, idj );
+	      if ( p->nMspf > 1 ) Abc_BddNandG1MspfReduce( p, id, idj );
 	      else if ( fWeak ) Abc_BddNandG1WeakReduce( p, id, idj );
 	      else Abc_BddNandG1EagerReduce( p, id, idj );
 	    }
 	}
-      if ( !p->fMspf && fWeak )
+      if ( p->nMspf < 2 && fWeak )
 	{
 	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) continue;
 	  Abc_BddNandCspfFaninCone_Refresh( p, id );
@@ -1716,7 +1739,7 @@ static inline void Abc_BddNandPrintStats( Abc_NandMan * p, char * prefix, abctim
   printf( "\r%-10s: gates = %5d, wires = %5d, AIG node = %5d", prefix, Vec_IntSize( p->vObjs ), Abc_BddNandCountWire( p ), Abc_BddNandCountWire( p ) - Vec_IntSize( p->vObjs ) );
   ABC_PRT( ", time ", Abc_Clock() - clk0 );
 }
-Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep, int fDc, int nWindowSize,int fDcPropagate, int fMspf, int nVerbose )
+Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep, int fDc, int nWindowSize,int fDcPropagate, int nMspf, int nVerbose )
 {
   int i, id, nPos;
   int * pPos;
@@ -1742,7 +1765,7 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
 	}
       else
 	pNew = Gia_ManDup( pGia );
-      p = Abc_BddNandManAlloc( pNew, nMem, fMspf, nVerbose );
+      p = Abc_BddNandManAlloc( pNew, nMem, nMspf, nVerbose );
       Vec_IntForEachEntry( p->vPis, id, i )
 	{
 	  Vec_IntPush( p->vPiCkts, -1 );
@@ -1764,7 +1787,7 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
 	  }
     }
   else
-    Abc_BddNandGia2Nets( pGia, vNets, vPoCkts, vPoIdxs, vExternalCs, nMem, nWindowSize, fMspf, nVerbose );
+    Abc_BddNandGia2Nets( pGia, vNets, vPoCkts, vPoIdxs, vExternalCs, nMem, nWindowSize, nMspf, nVerbose );
   // optimize
   abctime clk0 = Abc_Clock();
   Vec_PtrForEachEntry( Abc_NandMan *, vNets, p, i )
@@ -1791,8 +1814,8 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
 	  p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, (int)( nVerbose > 2 ) );
 	}
       if ( nVerbose ) Abc_BddNandPrintStats( p, "initial", clk0 );
-      if ( !p->fMspf ) Abc_BddNandCspfEager( p );
-      else Abc_BddNandMspf( p );
+      if ( p->nMspf ) Abc_BddNandMspf_Refresh( p );
+      if ( p->nMspf < 2 ) Abc_BddNandCspfEager( p );
       if ( nVerbose ) Abc_BddNandPrintStats( p, "pf", clk0 );
       int wire = 0;
       while ( wire != Abc_BddNandCountWire( p ) )
@@ -1821,7 +1844,8 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
 	    printf( "Error: Invalid optimization type %d\n", nType );
 	    abort();
 	  }
-	  if ( !p->fMspf ) Abc_BddNandCspfEager( p );
+	  if ( p->nMspf ) Abc_BddNandMspf_Refresh( p );
+	  if ( p->nMspf < 2 ) Abc_BddNandCspfEager( p );
 	  if ( !fRep ) break;
 	}
       if ( fDcPropagate ) Abc_BddNandPropagateDc( vNets, i );

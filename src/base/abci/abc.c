@@ -46018,12 +46018,12 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     int fVerify = 1;
     int fRep = 1;
     int nWindowSize = 0;
-    int fMspf = 0;
+    int nMspf = 0;
     Gia_Man_t * pNew = NULL, * pMiter;
-    extern Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep, int fExdc, int nWindowSize, int fDcPropagate, int fMspf, int nVerbose );
+    extern Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep, int fExdc, int nWindowSize, int fDcPropagate, int nMspf, int nVerbose );
     //    extern void Abc_DdNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nMemMax, int nType, int nIte, int nOpt, int fReo, int nVerbose );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "GMPVcemprxzh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "GMHPVceprxzh" ) ) != EOF )
     {
         switch ( c )
         {
@@ -46032,9 +46032,6 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
             break;
 	case 'e':
             fVerify ^= 1;
-            break;
-	case 'm':
-            fMspf ^= 1;
             break;
 	case 'p':
             fRep ^= 1;
@@ -46057,6 +46054,17 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
             nType = atoi(argv[globalUtilOptind]);
             globalUtilOptind++;
             if ( nType < 0 )
+                goto usage;
+            break;
+        case 'H':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-G\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nMspf = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nMspf < 0 )
                 goto usage;
             break;
         case 'M':
@@ -46120,7 +46128,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
 	return 1;
     }
     
-    pNew = Abc_BddNandGiaTest( pAbc->pGia, nMem, nType, fRep, fExdc, nWindowSize, fDcPropagate, fMspf, nVerbose );
+    pNew = Abc_BddNandGiaTest( pAbc->pGia, nMem, nType, fRep, fExdc, nWindowSize, fDcPropagate, nMspf, nVerbose );
     if ( fVerify )
       {
 	if ( fExdc )
@@ -46175,11 +46183,10 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &cspf [-GMPV num] [-cemprxzh]\n" );
+    Abc_Print( -2, "usage: &cspf [-GMHPV num] [-ceprxzh]\n" );
     Abc_Print( -2, "\t        circuit minimization with permissible function using simple bdd\n" );
     Abc_Print( -2, "\t-c    : toggle using CUDD not simple BDD [default = %s]\n", fCudd? "yes": "no" );
     Abc_Print( -2, "\t-e    : toggle verification [default = %s]\n", fVerify? "yes": "no" );
-    Abc_Print( -2, "\t-m    : toggle using MSPF instead of CSPF [default = %s]\n", fMspf? "yes": "no" );
     Abc_Print( -2, "\t-p    : toggle repeating optimization while it is effective [default = %s]\n", fRep? "yes": "no" );
     Abc_Print( -2, "\t-r    : toggle dynamic variable reoredering (available only with CUDD) [default = %s]\n", fReo? "yes": "no" );
     Abc_Print( -2, "\t-x    : toggle using the later half outputs as external don't cares of the first half outputs [default = %s]\n", fExdc? "yes": "no" );
@@ -46190,6 +46197,10 @@ usage:
     Abc_Print( -2, "\t\t2: transduction method of gate substitution (weak)\n" );
     Abc_Print( -2, "\t\t3: transduction method of gate merging\n" );
     Abc_Print( -2, "\t\t4: transduction method of gate substitution of the first half outputs by the latter half outputs\n" );
+    Abc_Print( -2, "\t-H num: MSPF instead of CSPF [default = %d]\n", nMspf );
+    Abc_Print( -2, "\t\t0: none\n" );
+    Abc_Print( -2, "\t\t1: replace eager-CSPF by MSPF\n" );
+    Abc_Print( -2, "\t\t2: replace all CSPF by MSPF\n" );
     Abc_Print( -2, "\t-M num: number of BDD nodes to allocate initially 2^? (not for CUDD) [default = %d]\n", nMem );
     Abc_Print( -2, "\t-P num: number of AIG nodes in each window (0 means no limit) [default = %d]\n", nWindowSize );
     Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
