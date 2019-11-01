@@ -69,9 +69,6 @@ static inline int      Abc_BddNandObjIsPo( Abc_NandMan * p, int id ) { return (i
 static inline unsigned Abc_BddNandObjGetBddFunc( Abc_NandMan * p, int id ) { return p->pBddFuncs[id];            }
 static inline void     Abc_BddNandObjSetBddFunc( Abc_NandMan * p, int id, unsigned Value ) { p->pBddFuncs[id] = Value; }
 
-// TODO : modify counting 0 of bdd function
-static inline int      Abc_BddNandCount0s( Abc_NandMan * p, int id, int nOverflow ) { return Abc_BddCount0s( p->pBdd, Abc_BddNandObjGetBddFunc( p, id ), nOverflow ); }
-
 static inline int      Abc_BddNandObjIsEmpty( Abc_NandMan * p, int id ) { return (int)( p->pvFanins[id] == 0 && p->pvFanouts[id] == 0 ); }
 static inline int      Abc_BddNandObjIsDead( Abc_NandMan * p, int id ) { return (int)( Vec_IntSize( p->pvFanouts[id] ) == 0 ); }
 static inline int      Abc_BddNandObjIsEmptyOrDead( Abc_NandMan * p, int id ) { return ( Abc_BddNandObjIsEmpty( p, id ) || Abc_BddNandObjIsDead( p, id ) ); }
@@ -816,7 +813,6 @@ static inline int Abc_BddNandGFunc( Abc_NandMan * p, int id )
   SeeAlso     []
 
 ***********************************************************************/
-// TODO : consider change the method to rank
 static inline void Abc_BddNandRank( Abc_NandMan * p, int id )
 {
   if ( Abc_BddNandObjIsPi( p, id ) )
@@ -873,18 +869,15 @@ static inline void Abc_BddNandSortFaninAll( Abc_NandMan * p )
 static inline int Abc_BddNandRemoveRedundantFanin( Abc_NandMan * p, int id )
 {
   int j, k, idj, idk;
-  unsigned fanins, fi, fj, already1, c, dc1;
+  unsigned fanins, fj, c, dc1;
   Vec_IntForEachEntry( p->pvFanins[id], idj, j )
     {
       fanins = Abc_BddLitConst1();
       Vec_IntForEachEntry( p->pvFanins[id], idk, k )
 	if ( k != j )
 	  fanins = Abc_BddAnd( p->pBdd, fanins, Abc_BddNandObjGetBddFunc( p, idk ) );
-      fi = Abc_BddNandObjGetBddFunc( p, id );
       fj = Abc_BddNandObjGetBddFunc( p, idj );
-      already1 = Abc_BddAnd( p->pBdd, fi, fj );
       c = Abc_BddOr( p->pBdd, p->pGFuncs[id], Abc_BddLitNot( fanins ) );
-      c = Abc_BddOr( p->pBdd, c, already1 );
       dc1 = Abc_BddOr( p->pBdd, fj, c );
       if ( Abc_BddLitIsInvalid( dc1 ) ) return -1;
       if ( Abc_BddLitIsConst1( dc1 ) )
@@ -1181,10 +1174,9 @@ static inline void Abc_BddNandRefreshIfNeeded( Abc_NandMan * p )
 static inline void Abc_BddNandBuild_Refresh( Abc_NandMan * p, int id ) { if ( Abc_BddNandBuild( p, id ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandBuildAll_Refresh( Abc_NandMan * p ) { if ( Abc_BddNandBuildAll( p ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandBuildFanoutCone_Refresh( Abc_NandMan * p, int startId ) { if ( Abc_BddNandBuildFanoutCone( p, startId ) ) Abc_BddNandRefresh( p ); }
-static inline void Abc_BddNandRemoveRedundantFanin_Refresh( Abc_NandMan * p, int id ) { if ( Abc_BddNandRemoveRedundantFanin( p, id ) ) Abc_BddNandRefresh( p ); }
-static inline void Abc_BddNandCFuncCspf_Refresh( Abc_NandMan * p, int id ) { if ( Abc_BddNandCFuncCspf( p, id ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandCspf_Refresh( Abc_NandMan * p ) { if ( Abc_BddNandCspf( p ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandCspfFaninCone_Refresh( Abc_NandMan * p, int startId ) { if ( Abc_BddNandCspfFaninCone( p, startId ) ) Abc_BddNandRefresh( p ); }
+static inline void Abc_BddNandRemoveRedundantFanin_Refresh( Abc_NandMan * p, int id ) { if ( Abc_BddNandRemoveRedundantFanin( p, id ) ) Abc_BddNandRefresh( p ); }
 static inline int Abc_BddNandTryConnect_Refresh( Abc_NandMan * p, int fanin, int fanout )
 {
   int c = Abc_BddNandTryConnect( p, fanin, fanout );
@@ -1195,11 +1187,18 @@ static inline int Abc_BddNandTryConnect_Refresh( Abc_NandMan * p, int fanin, int
       if ( Abc_BddNandObjIsEmptyOrDead( p, fanout ) ) return 0;
       c = Abc_BddNandTryConnect( p, fanin, fanout );
     }
-  if ( c == -1 )
+  while ( c == -1 )
     {
-      //TODO: bug fix
-      printf("Error: adding a new wire failed due to out of memory\n");
-      abort();
+      p->nMem++;
+      if ( 1 << p->nMem == 0 )
+	{
+	  printf("Error: Refresh failed\n");
+	  abort();
+	}
+      Abc_BddNandRefresh( p );
+      if ( Abc_BddNandObjIsEmptyOrDead( p, fanin ) ) return 0;
+      if ( Abc_BddNandObjIsEmptyOrDead( p, fanout ) ) return 0;
+      c = Abc_BddNandTryConnect( p, fanin, fanout );
     }
   return c;
 }
@@ -1279,15 +1278,13 @@ static inline void Abc_BddNandG1EagerReduce( Abc_NandMan * p, int id, int idj )
 }
 static inline void Abc_BddNandG1WeakReduce( Abc_NandMan * p, int id, int idj )
 {
-  int wire =  Abc_BddNandCountWire( p );
-  //Abc_BddNandCFuncCspf_Refresh( p, id );
-  Abc_BddNandRemoveRedundantFanin_Refresh( p, id );
-  //TODO: After refresh make sure it runs again
+  int wire = Abc_BddNandCountWire( p );
   Abc_BddNandRemoveRedundantFanin_Refresh( p, id );
   if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ||
        Abc_BddNandObjIsEmptyOrDead( p, idj ) )
     return; // If this, we don't need to do below.
-  assert( wire > Abc_BddNandCountWire( p ) );
+  if ( wire == Abc_BddNandCountWire( p ) ) 
+      Abc_BddNandDisconnect( p, idj, id );
   Abc_BddNandBuild_Refresh( p, id );
 }
 static inline void Abc_BddNandG1MspfReduce( Abc_NandMan * p, int id, int idj )
