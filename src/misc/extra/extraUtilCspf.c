@@ -57,6 +57,7 @@ struct Abc_NandMan_
   Vec_Int_t * vPiIdxs;
   Vec_Ptr_t * vvDcGias;
 
+  int fRm;
   int nMspf;
 };
 
@@ -371,7 +372,7 @@ static inline void Abc_BddNandGia2Net( Abc_NandMan * p )
   SeeAlso     []
 
 ***********************************************************************/
-static inline Abc_NandMan * Abc_BddNandManAlloc( Gia_Man_t * pGia, int nMem, int nMspf, int nVerbose )
+static inline Abc_NandMan * Abc_BddNandManAlloc( Gia_Man_t * pGia, int nMem, int fRm, int nMspf, int nVerbose )
 {
   int i;
   Abc_NandMan * p = ABC_CALLOC( Abc_NandMan, 1 );
@@ -393,6 +394,7 @@ static inline Abc_NandMan * Abc_BddNandManAlloc( Gia_Man_t * pGia, int nMem, int
       abort();
     }
   p->nMem = nMem;
+  p->fRm = fRm;
   p->nMspf = nMspf;
   p->nVerbose = nVerbose;
   p->pGia = pGia;
@@ -510,7 +512,7 @@ static inline int Abc_BddNandCountNewFanins( Gia_Man_t * pGia, Gia_Obj_t * pObj,
   id1 = Gia_ObjId( pGia, pObj1 );
   return (int)(pParts[id0] != part) + (int)(pParts[id1] != part);
 }
-static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec_Int_t * vPoCkts, Vec_Int_t * vPoIdxs, Vec_Int_t * vExternalCs, int nMem, int nWindowSize, int nMspf, int nVerbose )
+static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec_Int_t * vPoCkts, Vec_Int_t * vPoIdxs, Vec_Int_t * vExternalCs, int nMem, int fRm, int nWindowSize, int nMspf, int nVerbose )
 {
   int i, id, lit, newId, part;
   int * pFanouts, * pParts;
@@ -627,7 +629,7 @@ static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec
 	}
       Vec_IntSort( vNodes, 0 );
       pNew = Gia_ManDupFromVecs( pGia, vPis, vNodes, vTempPos, 0 );
-      p = Abc_BddNandManAlloc( pNew, nMem, nMspf, (int)( nVerbose > 2 ) );
+      p = Abc_BddNandManAlloc( pNew, nMem, fRm, nMspf, (int)( nVerbose > 2 ) );
       Vec_PtrPush( vNets, p );
       Vec_PtrPush( vvPis, vPis );
       Vec_PtrPush( vvPos, vPos );
@@ -818,18 +820,11 @@ static inline int Abc_BddNandGFunc( Abc_NandMan * p, int id )
 static inline void Abc_BddNandRank( Abc_NandMan * p, int id )
 {
   if ( Abc_BddNandObjIsPi( p, id ) )
-    p->pRank[id] = 1 << 30; // assume this is the max
-  else if ( Vec_IntSize( p->vPis ) <= 20 )
     {
-      p->pRank[id] = Vec_IntSize( p->pvFanouts[id] ) << Vec_IntSize( p->vPis );
-      p->pRank[id] += Abc_BddNandCount0s( p, id, 0 );
+      p->pRank[id] = 1 << 30; // assume this is the max
+      return;
     }
-  else
-    {
-      int nOverflow = Vec_IntSize( p->vPis ) - 20;
-      p->pRank[id] = Vec_IntSize( p->pvFanouts[id] ) << 20;
-      p->pRank[id] += Abc_BddNandCount0s( p, id, nOverflow );
-    }
+  p->pRank[id] = Vec_IntSize( p->pvFanouts[id] );
   assert( p->pRank[id] >= 0 );
 }
 static inline void Abc_BddNandRankAll( Abc_NandMan * p )
@@ -913,7 +908,8 @@ static inline int Abc_BddNandCFuncCspf( Abc_NandMan * p, int id )
 {
   int j, k, idj, idk;
   unsigned fanins, fi, fj, already1, c, dc1;
-  if ( Abc_BddNandRemoveRedundantFanin( p, id ) ) return -1;
+  if ( p->fRm )
+    if ( Abc_BddNandRemoveRedundantFanin( p, id ) ) return -1;
   if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) return 0;
   if ( !p->pvCFuncs[id] ) p->pvCFuncs[id] = Vec_IntAlloc( Vec_IntSize( p->pvFanins[id] ) );
   Vec_IntClear( p->pvCFuncs[id] );
@@ -1199,7 +1195,12 @@ static inline int Abc_BddNandTryConnect_Refresh( Abc_NandMan * p, int fanin, int
       if ( Abc_BddNandObjIsEmptyOrDead( p, fanout ) ) return 0;
       c = Abc_BddNandTryConnect( p, fanin, fanout );
     }
-  if ( c == -1 ) abort();
+  if ( c == -1 )
+    {
+      //TODO: bug fix
+      printf("Error: adding a new wire failed due to out of memory\n");
+      abort();
+    }
   return c;
 }
 static inline void Abc_BddNandMspf_Refresh( Abc_NandMan * p )
@@ -1281,11 +1282,12 @@ static inline void Abc_BddNandG1WeakReduce( Abc_NandMan * p, int id, int idj )
   int wire =  Abc_BddNandCountWire( p );
   //Abc_BddNandCFuncCspf_Refresh( p, id );
   Abc_BddNandRemoveRedundantFanin_Refresh( p, id );
+  //TODO: After refresh make sure it runs again
+  Abc_BddNandRemoveRedundantFanin_Refresh( p, id );
   if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ||
        Abc_BddNandObjIsEmptyOrDead( p, idj ) )
     return; // If this, we don't need to do below.
-  if ( wire == Abc_BddNandCountWire( p ) )
-    Abc_BddNandDisconnect( p, idj, id );
+  assert( wire > Abc_BddNandCountWire( p ) );
   Abc_BddNandBuild_Refresh( p, id );
 }
 static inline void Abc_BddNandG1MspfReduce( Abc_NandMan * p, int id, int idj )
@@ -1776,7 +1778,7 @@ static inline void Abc_BddNandPrintStats( Abc_NandMan * p, char * prefix, abctim
   printf( "\r%-10s: gates = %5d, wires = %5d, AIG node = %5d", prefix, Vec_IntSize( p->vObjs ), Abc_BddNandCountWire( p ), Abc_BddNandCountWire( p ) - Vec_IntSize( p->vObjs ) );
   ABC_PRT( ", time ", Abc_Clock() - clk0 );
 }
-Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep, int fDc, int nWindowSize,int fDcPropagate, int nMspf, int nVerbose )
+Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, int fRep, int fDc, int nWindowSize,int fDcPropagate, int nMspf, int nVerbose )
 {
   int i, id, nPos;
   int * pPos;
@@ -1802,7 +1804,7 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
 	}
       else
 	pNew = Gia_ManDup( pGia );
-      p = Abc_BddNandManAlloc( pNew, nMem, nMspf, nVerbose );
+      p = Abc_BddNandManAlloc( pNew, nMem, fRm, nMspf, nVerbose );
       Vec_IntForEachEntry( p->vPis, id, i )
 	{
 	  Vec_IntPush( p->vPiCkts, -1 );
@@ -1824,7 +1826,7 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep,
 	  }
     }
   else
-    Abc_BddNandGia2Nets( pGia, vNets, vPoCkts, vPoIdxs, vExternalCs, nMem, nWindowSize, nMspf, nVerbose );
+    Abc_BddNandGia2Nets( pGia, vNets, vPoCkts, vPoIdxs, vExternalCs, nMem, fRm, nWindowSize, nMspf, nVerbose );
   // optimize
   abctime clk0 = Abc_Clock();
   Vec_PtrForEachEntry( Abc_NandMan *, vNets, p, i )
