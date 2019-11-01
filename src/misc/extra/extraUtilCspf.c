@@ -875,13 +875,48 @@ static inline void Abc_BddNandSortFaninAll( Abc_NandMan * p )
   SeeAlso     []
 
 ***********************************************************************/
+static inline int Abc_BddNandRemoveRedundantFanin( Abc_NandMan * p, int id )
+{
+  int j, k, idj, idk;
+  unsigned fanins, fi, fj, already1, c, dc1;
+  Vec_IntForEachEntry( p->pvFanins[id], idj, j )
+    {
+      fanins = Abc_BddLitConst1();
+      Vec_IntForEachEntry( p->pvFanins[id], idk, k )
+	if ( k != j )
+	  fanins = Abc_BddAnd( p->pBdd, fanins, Abc_BddNandObjGetBddFunc( p, idk ) );
+      fi = Abc_BddNandObjGetBddFunc( p, id );
+      fj = Abc_BddNandObjGetBddFunc( p, idj );
+      already1 = Abc_BddAnd( p->pBdd, fi, fj );
+      c = Abc_BddOr( p->pBdd, p->pGFuncs[id], Abc_BddLitNot( fanins ) );
+      c = Abc_BddOr( p->pBdd, c, already1 );
+      dc1 = Abc_BddOr( p->pBdd, fj, c );
+      if ( Abc_BddLitIsInvalid( dc1 ) ) return -1;
+      if ( Abc_BddLitIsConst1( dc1 ) )
+	{
+	  Abc_BddNandDisconnect( p, idj, id );
+	  if ( Vec_IntSize( p->pvFanins[id] ) == 0 )
+	    {
+	      Vec_IntForEachEntry( p->pvFanouts[id], idk, k )
+		if ( Vec_IntFind( p->pvFanins[idk], Abc_BddNandConst0() ) == -1 )
+		  Abc_BddNandConnect( p, Abc_BddNandConst0(), idk, 0 );
+	      Abc_BddNandRemoveNode( p, id );
+	      return 0;
+	    }
+	  j--;
+	  continue;
+	}
+    }
+  return 0;
+}
 static inline int Abc_BddNandCFuncCspf( Abc_NandMan * p, int id )
 {
   int j, k, idj, idk;
   unsigned fanins, fi, fj, already1, c, dc1;
-  if ( p->pvCFuncs[id] )
-    Vec_IntFree( p->pvCFuncs[id] );
-  p->pvCFuncs[id] = Vec_IntAlloc( Vec_IntSize( p->pvFanins[id] ) );
+  if ( Abc_BddNandRemoveRedundantFanin( p, id ) ) return -1;
+  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) return 0;
+  if ( !p->pvCFuncs[id] ) p->pvCFuncs[id] = Vec_IntAlloc( Vec_IntSize( p->pvFanins[id] ) );
+  Vec_IntClear( p->pvCFuncs[id] );
   Vec_IntForEachEntry( p->pvFanins[id], idj, j )
     {
       fanins = Abc_BddLitConst1();
@@ -1150,6 +1185,7 @@ static inline void Abc_BddNandRefreshIfNeeded( Abc_NandMan * p )
 static inline void Abc_BddNandBuild_Refresh( Abc_NandMan * p, int id ) { if ( Abc_BddNandBuild( p, id ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandBuildAll_Refresh( Abc_NandMan * p ) { if ( Abc_BddNandBuildAll( p ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandBuildFanoutCone_Refresh( Abc_NandMan * p, int startId ) { if ( Abc_BddNandBuildFanoutCone( p, startId ) ) Abc_BddNandRefresh( p ); }
+static inline void Abc_BddNandRemoveRedundantFanin_Refresh( Abc_NandMan * p, int id ) { if ( Abc_BddNandRemoveRedundantFanin( p, id ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandCFuncCspf_Refresh( Abc_NandMan * p, int id ) { if ( Abc_BddNandCFuncCspf( p, id ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandCspf_Refresh( Abc_NandMan * p ) { if ( Abc_BddNandCspf( p ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandCspfFaninCone_Refresh( Abc_NandMan * p, int startId ) { if ( Abc_BddNandCspfFaninCone( p, startId ) ) Abc_BddNandRefresh( p ); }
@@ -1243,7 +1279,8 @@ static inline void Abc_BddNandG1EagerReduce( Abc_NandMan * p, int id, int idj )
 static inline void Abc_BddNandG1WeakReduce( Abc_NandMan * p, int id, int idj )
 {
   int wire =  Abc_BddNandCountWire( p );
-  Abc_BddNandCFuncCspf_Refresh( p, id );
+  //Abc_BddNandCFuncCspf_Refresh( p, id );
+  Abc_BddNandRemoveRedundantFanin_Refresh( p, id );
   if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ||
        Abc_BddNandObjIsEmptyOrDead( p, idj ) )
     return; // If this, we don't need to do below.
