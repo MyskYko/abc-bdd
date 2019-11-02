@@ -1,11 +1,14 @@
-Send email to miyasaka@cad.t.u-tokyo.ac.jp for questions or comments
- - The command for bdd construction using the simple BDD package is "&bdd".
- - The command for CSPF-based optimization (transduction method) is "&cspf". Weak-reduce is "&cspf -G 1 -N 0 -O 1 <file.blif>" and Eager-reduce is "&cspf -G 1 -N 0 <file.blif>".
- - Both commands are applicable to a strashed combinational circuit. Please read the circuit by "&read".
+Please send email to miyasaka@cad.t.u-tokyo.ac.jp for questions or comments
+ - The command of bdd construction using the simple BDD package is "&bdd".
+ - The command of CSPF-based optimization (transduction method) is "&cspf".
+ - Both commands are applicable to a combinational AIG. Please read your AIG by "&read".
  
-The simplest package (without garbage collection and reallocation) can be found at https://github.com/MyskYko/abc/commit/8cb55037cb7ed745e06256ff8426cfa569dde40f and its command is "&test" at that commit.
+The simplest BDD package (without garbage collection and reallocation) can be found at https://github.com/MyskYko/abc/commit/8cb55037cb7ed745e06256ff8426cfa569dde40f and the command is "&test" at that commit.
 
-Dynamic Variable Reordering is now available.
+The code of the BDD package is "src/misc/extra/extraUtilMulti.c" and its header file is "src/misc/extra/extra.h".
+The code of CSPF-based optimization is "src/misc/extra/extraUtilCspf.c".
+
+Thank you.
 
 # ABC: System for Sequential Logic Synthesis and Formal Verification
 
