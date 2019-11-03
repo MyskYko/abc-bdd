@@ -941,7 +941,7 @@ static inline int Abc_BddNandCspf( Abc_NandMan * p )
   int i, id;
   Vec_IntForEachEntryReverse( p->vObjs, id, i )
     {
-      if ( !Vec_IntSize( p->pvFanouts[id] ) )
+      if ( Abc_BddNandObjIsDead( p, id ) )
 	{
 	  Abc_BddNandRemoveNode( p, id );
 	  continue;
@@ -959,7 +959,7 @@ static inline int Abc_BddNandCspfFaninCone( Abc_NandMan * p, int startId )
   Abc_BddNandDescendantSortedList( p, p->pvFanins, targets, startId );
   Vec_IntForEachEntryReverse( targets, id, i )
     {
-      if ( !Vec_IntSize( p->pvFanouts[id] ) )
+      if ( Abc_BddNandObjIsDead( p, id ) )
 	{
 	  Abc_BddNandRemoveNode( p, id );
 	  continue;
@@ -985,7 +985,7 @@ static inline int Abc_BddNandCspfFaninCone( Abc_NandMan * p, int startId )
 int Abc_BddNandIsFanoutShared_rec( Abc_NandMan * p, int id, int stage )
 {
   int j, idj, m;
-  if ( !p->pvFanouts[id] ) return 0;
+  if ( Abc_BddNandObjIsPo( p, id ) ) return 0;
   m = p->pMark[id] >> 1;
   if ( m == stage ) return 0;
   if ( m ) return 1;
@@ -1085,7 +1085,7 @@ static inline int Abc_BddNandMspf( Abc_NandMan * p )
   int i, c, id;
   Vec_IntForEachEntryReverse( p->vObjs, id, i )
     {
-      if ( !Vec_IntSize( p->pvFanouts[id] ) )
+      if ( Abc_BddNandObjIsDead( p, id ) )
 	{
 	  Abc_BddNandRemoveNode( p, id );
 	  continue;
@@ -1095,7 +1095,6 @@ static inline int Abc_BddNandMspf( Abc_NandMan * p )
       if ( c == -1 ) return -1;
       if ( c == 1 )
 	{
-	  // TODO: no neccesity to build ALL
 	  Abc_BddNandBuildAll( p );
 	  i = Vec_IntSize( p->vObjs );
 	}
@@ -1311,6 +1310,11 @@ static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak, int fHalf )
 {
   int i, j, id, idj;
   Vec_Int_t * targets, * targets2;
+  if ( fWeak && p->nMspf >= 2 )
+    {
+      printf("Error: G2 method cannot use MSPF internally\n");
+      abort();
+    }
   targets = Vec_IntDup( p->vObjs );
   if ( fHalf )
     {
@@ -1382,6 +1386,11 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
   int i,j,k, id, idj, idk, out, wire, new_id;
   unsigned fi, fj, gi, gj, f1, f0, a, b, mergible, figj, fjgi, fx, gx, Value, eq;
   Vec_Int_t * targets;
+  if ( p->nMspf >= 2 )
+    {
+      printf("Error: G3 method cannot use MSPF internally\n");
+      abort();
+    }
   new_id = Vec_IntSize( p->vPis ) + 1;
   while ( !Abc_BddNandObjIsEmpty( p, new_id ) )
     {
