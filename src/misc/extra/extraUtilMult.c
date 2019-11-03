@@ -769,7 +769,7 @@ unsigned Abc_BddUnivAbstract_rec( Abc_BddMan * p, unsigned x, Vec_Int_t * vVars 
 unsigned Abc_BddUnivAbstract( Abc_BddMan * p, unsigned x, Vec_Int_t * vVars )
 {
   if ( Abc_BddLitIsInvalid( x ) ) return x;
-  Abc_BddUnivAbstract_rec( p, x, vVars );
+  return Abc_BddUnivAbstract_rec( p, x, vVars );
 }
 
 /**Function*************************************************************

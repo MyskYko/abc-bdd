@@ -1031,7 +1031,10 @@ static inline int Abc_BddNandGFuncMspf( Abc_NandMan * p, int id )
   Vec_IntForEachEntry( p->vPos, idj, j )
     {
       idk = Vec_IntEntry( p->pvFanins[idj], 0 );
-      t = Abc_BddXnor( p->pBdd, Abc_BddNandObjGetBddFunc( p, idk ), Vec_IntEntry( posOld, j ) );
+      if ( id == idk )
+	t = Abc_BddXnor( p->pBdd, Abc_BddLitNot( Abc_BddNandObjGetBddFunc( p, idk ) ), Vec_IntEntry( posOld, j ) );
+      else
+	t = Abc_BddXnor( p->pBdd, Abc_BddNandObjGetBddFunc( p, idk ), Vec_IntEntry( posOld, j ) );
       t = Abc_BddOr( p->pBdd, t, p->pGFuncs[idj] );
       Value = Abc_BddAnd( p->pBdd, Value, t );
       if ( Abc_BddLitIsInvalid( Value ) )
@@ -1049,14 +1052,14 @@ static inline int Abc_BddNandCFuncMspf( Abc_NandMan * p, int id )
 {
   int j, k, idj, idk;
   unsigned fanins, fj, c, dc1;
-  if ( p->pvCFuncs[id] ) Vec_IntFree( p->pvCFuncs[id] );
-  p->pvCFuncs[id] = Vec_IntAlloc( Vec_IntSize( p->pvFanins[id] ) );
+  if ( !p->pvCFuncs[id] ) p->pvCFuncs[id] = Vec_IntAlloc( Vec_IntSize( p->pvFanins[id] ) );
+  Vec_IntClear( p->pvCFuncs[id] );
   Vec_IntForEachEntry( p->pvFanins[id], idj, j )
     {
       fanins = Abc_BddLitConst1();
       Vec_IntForEachEntry( p->pvFanins[id], idk, k )
 	if ( k != j )
-	  fanins = Abc_BddAnd( p->pBdd, fanins, Abc_BddNandObjGetBddFunc( p, idk ) );      
+	  fanins = Abc_BddAnd( p->pBdd, fanins, Abc_BddNandObjGetBddFunc( p, idk ) );
       c = Abc_BddOr( p->pBdd, p->pGFuncs[id], Abc_BddLitNot( fanins ) );
       fj = Abc_BddNandObjGetBddFunc( p, idj );
       dc1 = Abc_BddOr( p->pBdd, fj, c );
@@ -1285,7 +1288,7 @@ static inline void Abc_BddNandG1EagerReduce( Abc_NandMan * p, int id, int idj )
       return;
     }
   Abc_BddNandBuildAll_Refresh( p );
-  //  if ( p->nMspf ) Abc_BddNandMspf_Refresh( p );
+  if ( p->nMspf ) Abc_BddNandMspf_Refresh( p );
   if ( p->nMspf < 2 ) Abc_BddNandCspfEager( p );
 }
 static inline void Abc_BddNandG1WeakReduce( Abc_NandMan * p, int id, int idj )
