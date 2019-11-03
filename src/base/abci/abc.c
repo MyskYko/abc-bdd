@@ -46124,6 +46124,16 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
         Abc_Print( -1, "Abc_CommandAbc9Cspf(): External Don't Cares and the restricted candidates cannot be used for partitioned circuits\n" );
 	return 1;
     }
+    if ( nType > 3 )
+    {
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): G must be within 0-3\n" );
+	return 1;
+    }
+    if ( nType != 1 && nMspf >= 2 )
+    {
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): H=2 is available only when G=0 or 1\n" );
+	return 1;
+    }
     if ( !fCudd && fReo )
     {
         Abc_Print( -1, "Abc_CommandAbc9Cspf(): Reordring can be used only with cudd\n" );

@@ -1310,11 +1310,6 @@ static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak, int fHalf )
 {
   int i, j, id, idj;
   Vec_Int_t * targets, * targets2;
-  if ( fWeak && p->nMspf >= 2 )
-    {
-      printf("Error: G2 method cannot use MSPF internally\n");
-      abort();
-    }
   targets = Vec_IntDup( p->vObjs );
   if ( fHalf )
     {
@@ -1386,11 +1381,6 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
   int i,j,k, id, idj, idk, out, wire, new_id;
   unsigned fi, fj, gi, gj, f1, f0, a, b, mergible, figj, fjgi, fx, gx, Value, eq;
   Vec_Int_t * targets;
-  if ( p->nMspf >= 2 )
-    {
-      printf("Error: G3 method cannot use MSPF internally\n");
-      abort();
-    }
   new_id = Vec_IntSize( p->vPis ) + 1;
   while ( !Abc_BddNandObjIsEmpty( p, new_id ) )
     {
