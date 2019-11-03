@@ -35,30 +35,30 @@ ABC_NAMESPACE_IMPL_START
 typedef struct Abc_NandMan_ Abc_NandMan;
 struct Abc_NandMan_ 
 {
-  int nGiaObjs;
-  int nObjsAlloc;
-  Vec_Int_t * vPis;
-  Vec_Int_t * vPos;
-  Vec_Int_t * vObjs;
+  int          nGiaObjs;
+  int          nObjsAlloc;
+  Vec_Int_t *  vPis;
+  Vec_Int_t *  vPos;
+  Vec_Int_t *  vObjs;
   Vec_Int_t ** pvFanins;
   Vec_Int_t ** pvFanouts;
-  int * pBddFuncs;
-  int * pRank;
-  char * pMark;
-  unsigned * pGFuncs;
+  int *        pBddFuncs;
+  int *        pRank;
+  char *       pMark;
+  unsigned *   pGFuncs;
   Vec_Int_t ** pvCFuncs;
   
-  int nMem;
-  int nVerbose;
+  int          nMem;
+  int          nVerbose;
   
   Abc_BddMan * pBdd;
-  Gia_Man_t * pGia;
-  Vec_Int_t * vPiCkts;
-  Vec_Int_t * vPiIdxs;
-  Vec_Ptr_t * vvDcGias;
+  Gia_Man_t *  pGia;
+  Vec_Int_t *  vPiCkts;
+  Vec_Int_t *  vPiIdxs;
+  Vec_Ptr_t *  vvDcGias;
 
-  int fRm;
-  int nMspf;
+  int          fRm;
+  int          nMspf;
 };
 
 static inline int      Abc_BddNandConst0() { return 0; }  // = Gia_ObjId( pGia, Gia_ManConst0( pGia ) );
@@ -1176,7 +1176,22 @@ static inline void Abc_BddNandBuildAll_Refresh( Abc_NandMan * p ) { if ( Abc_Bdd
 static inline void Abc_BddNandBuildFanoutCone_Refresh( Abc_NandMan * p, int startId ) { if ( Abc_BddNandBuildFanoutCone( p, startId ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandCspf_Refresh( Abc_NandMan * p ) { if ( Abc_BddNandCspf( p ) ) Abc_BddNandRefresh( p ); }
 static inline void Abc_BddNandCspfFaninCone_Refresh( Abc_NandMan * p, int startId ) { if ( Abc_BddNandCspfFaninCone( p, startId ) ) Abc_BddNandRefresh( p ); }
-static inline void Abc_BddNandRemoveRedundantFanin_Refresh( Abc_NandMan * p, int id ) { if ( Abc_BddNandRemoveRedundantFanin( p, id ) ) Abc_BddNandRefresh( p ); }
+static inline void Abc_BddNandRemoveRedundantFanin_Refresh( Abc_NandMan * p, int id ) {
+  if ( !Abc_BddNandRemoveRedundantFanin( p, id ) ) return;
+  Abc_BddNandRefresh( p );
+  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) return;
+  while ( !Abc_BddNandRemoveRedundantFanin( p, id ) )
+    {
+      p->nMem++;
+      if ( 1 << p->nMem == 0 )
+	{
+	  printf("Error: Refresh failed\n");
+	  abort();
+	}
+      Abc_BddNandRefresh( p );
+      if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) return;
+    }
+}
 static inline int Abc_BddNandTryConnect_Refresh( Abc_NandMan * p, int fanin, int fanout )
 {
   int c = Abc_BddNandTryConnect( p, fanin, fanout );

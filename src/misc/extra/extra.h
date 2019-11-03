@@ -482,7 +482,7 @@ static inline unsigned Abc_BddEdge( Abc_BddMan * p, unsigned i )   { return p->p
 
 static inline int      Abc_BddVarOfBvar( Abc_BddMan * p, int i )   { return ( p->pVars )? p->pVars[i]: p->pSVars[i]; }
 static inline unsigned Abc_BddThenOfBvar( Abc_BddMan * p, int i )  { return p->pObjs[Abc_BddBvar2Lit( i, 0 )]; }
-static inline unsigned Abc_BddElseOfBvar( Abc_BddMan * p, int i )  { return p->pObjs[Abc_BddBvar2Lit( i, 1 )];                    }
+static inline unsigned Abc_BddElseOfBvar( Abc_BddMan * p, int i )  { return p->pObjs[Abc_BddBvar2Lit( i, 1 )]; }
 static inline int      Abc_BddNextOfBvar( Abc_BddMan * p, int i )  { return p->pNexts[i];                 }
 static inline int      Abc_BddMarkOfBvar( Abc_BddMan * p, int i )  { return p->pMark[i];                  }
 static inline unsigned Abc_BddEdgeOfBvar( Abc_BddMan * p, int i )  { return p->pEdges[i];                 }
@@ -522,11 +522,7 @@ extern int             Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p );
 extern Gia_Man_t *     Abc_Bdd2Gia( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern void            Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName, int fName );  
 extern unsigned        Abc_BddUnivAbstract( Abc_BddMan * p, unsigned x, Vec_Int_t * vVars );
-extern int             Abc_BddCount0s( Abc_BddMan * p, unsigned a, int depth );
-extern int             Abc_BddCount1s( Abc_BddMan * p, unsigned a, int depth );
-extern unsigned __int128 Abc_BddCount1s128( Abc_BddMan * p, unsigned a, int depth );
-extern unsigned __int128 Abc_BddCount0s128( Abc_BddMan * p, unsigned a, int depth );
-  
+
 /*=== extraUtilVc.c ================================================================*/
 
 extern unsigned        Abc_BddIteAnd( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 );
