@@ -46131,7 +46131,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     }
     if ( nType != 1 && nMspf >= 2 )
     {
-        Abc_Print( -1, "Abc_CommandAbc9Cspf(): H=2 is available only when G=0 or 1\n" );
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): H=2 is available only when G=1\n" );
 	return 1;
     }
     if ( !fCudd && fReo )
