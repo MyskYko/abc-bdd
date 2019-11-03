@@ -1381,11 +1381,6 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
   int i,j,k, id, idj, idk, out, wire, new_id;
   unsigned fi, fj, gi, gj, f1, f0, a, b, mergible, figj, fjgi, fx, gx, Value, eq;
   Vec_Int_t * targets;
-  if ( p->nMspf )
-    {
-      printf("Error: G3 with MSPF is not implemented\n");
-      abort();
-    }
   new_id = Vec_IntSize( p->vPis ) + 1;
   while ( !Abc_BddNandObjIsEmpty( p, new_id ) )
     {
@@ -1467,10 +1462,11 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	  //assert( !Abc_BddNandCheck( p ) );
 	  //assert( Abc_BddOr( p->pBdd, Abc_BddOr( p->pBdd, fx, gx ), Value ) == 1 );
 	  // check the F of new node satisfies F and G.
-	  if ( !Abc_BddLitIsConst1( eq ) ) {
-	    Abc_BddNandRemoveNode( p, new_id );
-	    continue;
-	  }
+	  if ( !Abc_BddLitIsConst1( eq ) )
+	    {
+	      Abc_BddNandRemoveNode( p, new_id );
+	      continue;
+	    }
 	  //assert( Abc_BddOr( p->pBdd, Abc_BddOr( p->pBdd, fx^1, gx ), Value^1 ) == 1 );
 	  // reduce the inputs
 	  Abc_BddNandObjSetBddFunc( p, new_id, Abc_BddLitNot( Value ) );
@@ -1487,7 +1483,7 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	      Abc_BddNandConnect( p, new_id, idk, 0 );
 	  Abc_BddNandObjEntry( p, new_id );
 	  Abc_BddNandSortFanin( p, new_id );
-	  out = Abc_BddNandCFuncCspf( p, new_id );
+	  out = Abc_BddNandRemoveRedundantFanin( p, new_id );
 	  wire = Vec_IntSize( p->pvFanins[id] ) + Vec_IntSize( p->pvFanins[idj] );
 	  if ( out || Vec_IntSize( p->pvFanins[new_id] ) > wire - 1 )
 	    {
