@@ -1307,11 +1307,19 @@ static inline void Abc_BddNandG1MspfReduce( Abc_NandMan * p, int id, int idj )
   Abc_BddNandBuildFanoutCone_Refresh( p, id );
   Abc_BddNandMspf_Refresh( p );
 }
-static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak )
+static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak, int fHalf )
 {
   int i, j, id, idj;
-  Vec_Int_t * targets;
+  Vec_Int_t * targets, * targets2;
   targets = Vec_IntDup( p->vObjs );
+  if ( fHalf )
+    {
+      Vec_IntForEachEntryStart( p->vPos, id, i, Vec_IntSize( p->vPos ) / 2 )
+	Abc_BddNandDescendantList_rec( p, p->pvFanins, targets2, id );
+      Abc_BddNandMarkClear( p );  
+      Abc_BddNandSortList( p, targets2 );
+    }
+  else targets2 = Vec_IntDup( p->vObjs );
   Vec_IntForEachEntryReverse( targets, id, i )
     {
       if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) continue;
@@ -1320,32 +1328,32 @@ static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak )
       Abc_BddNandMarkClear( p );
       p->pMark[id] = 1;
       Abc_BddNandMarkDescendant_rec( p, p->pvFanouts, id );
-      // try connecting pi
+      // try connecting each pi if possible
       Vec_IntForEachEntry( p->vPis, idj, j )
 	{
 	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) break;
-	  if ( Abc_BddNandTryConnect_Refresh( p, idj, id ) == 1 )
+	  if ( Abc_BddNandTryConnect_Refresh( p, idj, id ) )
 	    {
-	      if ( p->nMspf > 1 ) Abc_BddNandG1MspfReduce( p, id, idj );
-	      else if ( fWeak ) Abc_BddNandG1WeakReduce( p, id, idj );	
+	      if ( fWeak ) Abc_BddNandG1WeakReduce( p, id, idj );	
+	      else if ( p->nMspf > 1 ) Abc_BddNandG1MspfReduce( p, id, idj );	
 	      else Abc_BddNandG1EagerReduce( p, id, idj );
 	    }
 	}
-      // try connecting candidate
-      Vec_IntForEachEntry( targets, idj, j )
+      // try connecting each candidate if possible
+      Vec_IntForEachEntry( targets2, idj, j )
 	{
 	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) break;
 	  if ( Abc_BddNandObjIsEmptyOrDead( p, idj ) ) continue;
 	  if ( p->pMark[idj] ) continue;
 	  if ( Abc_BddNandTryConnect_Refresh( p, idj, id ) )
 	    {
-	      if ( p->nMspf > 1 ) Abc_BddNandG1MspfReduce( p, id, idj );
-	      else if ( fWeak ) Abc_BddNandG1WeakReduce( p, id, idj );
+	      if ( fWeak ) Abc_BddNandG1WeakReduce( p, id, idj );
+	      else if ( p->nMspf > 1 ) Abc_BddNandG1MspfReduce( p, id, idj );
 	      else Abc_BddNandG1EagerReduce( p, id, idj );
 	    }
 	}
-      // recalculate fanouts for option
-      if ( p->nMspf < 2 && fWeak )
+      // recalculate fanouts for weak method
+      if ( fWeak )
 	{
 	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) continue;
 	  Abc_BddNandCspfFaninCone_Refresh( p, id );
@@ -1354,6 +1362,7 @@ static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak )
 	}
     }
   Vec_IntFree( targets );
+  Vec_IntFree( targets2 );
 }
 
 /**Function*************************************************************
@@ -1501,69 +1510,6 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	}
     }
   Vec_IntFree( targets );
-}
-
-/**Function*************************************************************
-   
-  Synopsis    []
-
-  Description []
-               
-  SideEffects []
-
-  SeeAlso     []
-
-***********************************************************************/
-static inline void Abc_BddNandG1multi( Abc_NandMan * p, int fWeak )
-{
-  int i, j, id, idj;
-  Vec_Int_t * targets, * targets2;
-  targets = Vec_IntDup( p->vObjs );
-  targets2 = Vec_IntAlloc( 1 );
-  Vec_IntForEachEntryStart( p->vPos, id, i, Vec_IntSize( p->vPos ) / 2 )
-    Abc_BddNandDescendantList_rec( p, p->pvFanins, targets2, id );
-  Abc_BddNandMarkClear( p );  
-  Abc_BddNandSortList( p, targets2 );
-  Vec_IntForEachEntryReverse( targets, id, i )
-    {
-      if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) continue;
-      if ( p->nVerbose > 1 )
-	printf( "G1-multi for %d in %d gates\n", i, Vec_IntSize(targets) );
-      Abc_BddNandMarkClear( p );
-      p->pMark[id] = 1;
-      Abc_BddNandMarkDescendant_rec( p, p->pvFanouts, id );
-      Vec_IntForEachEntry( p->vPis, idj, j )
-	{
-	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) break;
-	  if ( Abc_BddNandTryConnect_Refresh( p, idj, id ) == 1 )
-	    {
-	      if ( p->nMspf > 1 ) Abc_BddNandG1MspfReduce( p, id, idj );	
-	      else if ( fWeak ) Abc_BddNandG1WeakReduce( p, id, idj );	
-	      else Abc_BddNandG1EagerReduce( p, id, idj );
-	    }
-	}
-      Vec_IntForEachEntry( targets2, idj, j )
-	{
-	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) break;
-	  if ( Abc_BddNandObjIsEmptyOrDead( p, idj ) ) continue;
-	  if ( p->pMark[idj] ) continue;
-	  if ( Abc_BddNandTryConnect_Refresh( p, idj, id ) == 1 )
-	    {
-	      if ( p->nMspf > 1 ) Abc_BddNandG1MspfReduce( p, id, idj );
-	      else if ( fWeak ) Abc_BddNandG1WeakReduce( p, id, idj );
-	      else Abc_BddNandG1EagerReduce( p, id, idj );
-	    }
-	}
-      if ( p->nMspf < 2 && fWeak )
-	{
-	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) continue;
-	  Abc_BddNandCspfFaninCone_Refresh( p, id );
-	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) continue;
-	  Abc_BddNandBuildAll_Refresh( p );
-	}
-    }
-  Vec_IntFree( targets );
-  Vec_IntFree( targets2 );
 }
 
 /**Function*************************************************************
@@ -1876,11 +1822,11 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, 
 	  case 0:
 	    break;
 	  case 1:
-	    Abc_BddNandG1( p, 0 );
+	    Abc_BddNandG1( p, 0, 0 );
 	    if ( nVerbose ) Abc_BddNandPrintStats( p, "g1", clk0 );
 	    break;
 	  case 2:
-	    Abc_BddNandG1( p, 1 );
+	    Abc_BddNandG1( p, 1, 0 );
 	    if ( nVerbose ) Abc_BddNandPrintStats( p, "g1-weak", clk0 );
 	    break;
 	  case 3:
@@ -1888,7 +1834,7 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, 
 	    if ( nVerbose ) Abc_BddNandPrintStats( p, "g3", clk0 );
 	    break;
 	  case 4:
-	    Abc_BddNandG1multi( p, 0 );
+	    Abc_BddNandG1( p, 0, 1 );
 	    if ( nVerbose ) Abc_BddNandPrintStats( p, "g1-multi", clk0 );
 	    break;
 	  default:
