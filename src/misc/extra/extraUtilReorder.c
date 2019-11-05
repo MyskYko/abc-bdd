@@ -462,6 +462,8 @@ void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 {
   int i, j, best_i, pos, nNodes, nSwap, fUp, bestPos, nBestNodes, nLimit;
   int * new2old, * descendingOrder;
+  if ( p->nVerbose )
+    printf("\tReordering\n");
   // initialize
   new2old = ABC_CALLOC( int, p->nVars );
   descendingOrder = ABC_CALLOC( int, p->nVars );

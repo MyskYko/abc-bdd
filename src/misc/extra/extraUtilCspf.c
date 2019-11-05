@@ -1154,7 +1154,7 @@ static inline void Abc_BddNandRefresh( Abc_NandMan * p )
   while ( 1 )
     {
       Abc_BddManFree( p->pBdd );
-      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, (int)( p->nVerbose > 2 ) );
+      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, (int)( p->nVerbose > 2 ) );
       int out = 0;
       out = Abc_BddNandDc( p );
       if ( !out ) out = Abc_BddNandBuildAll( p );
@@ -1231,7 +1231,7 @@ static inline void Abc_BddNandMspf_Refresh( Abc_NandMan * p )
   while ( 1 )
     {
       Abc_BddManFree( p->pBdd );
-      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, (int)( p->nVerbose > 2 ) );
+      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, (int)( p->nVerbose > 2 ) );
       int out = 0;
       out = Abc_BddNandDc( p );
       if ( !out ) out = Abc_BddNandBuildAll( p );
@@ -1699,7 +1699,7 @@ static inline void Abc_BddNandPropagateDc( Vec_Ptr_t * vNets, int from )
 	  // gia on top of it
 	  Vec_IntClear( vNodes );
 	  Vec_IntPush( vNodes, Value );
-	  pDc = Abc_Bdd2Gia( pFrom->pBdd, vNodes );
+	  pDc = Abc_BddGenGia( pFrom->pBdd, vNodes );
 	  while( Gia_ManCiNum( pDc ) < Vec_IntSize( pTo->vPos ) )
 	    {
 	      Vec_IntPush( vVars, Gia_ManCiNum( pDc ) );
@@ -1805,7 +1805,7 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, 
 	      abort();
 	    }
 	}
-      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, (int)( nVerbose > 2 ) );
+      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, (int)( nVerbose > 2 ) );
       while ( Abc_BddNandDc( p ) || Abc_BddNandBuildAll( p ) )
 	{
 	  p->nMem++;
@@ -1815,7 +1815,7 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, 
 	      abort();
 	    }
 	  Abc_BddManFree( p->pBdd );
-	  p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, (int)( nVerbose > 2 ) );
+	  p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, (int)( nVerbose > 2 ) );
 	}
       if ( nVerbose ) Abc_BddNandPrintStats( p, "initial", clk0 );
       if ( p->nMspf ) Abc_BddNandMspf_Refresh( p );

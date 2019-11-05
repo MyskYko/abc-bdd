@@ -491,6 +491,7 @@ static inline void     Abc_BddSetVarOfBvar( Abc_BddMan * p, int i, int Var ) { i
 static inline void     Abc_BddSetThenOfBvar( Abc_BddMan * p, int i, unsigned Then ) { p->pObjs[Abc_BddBvar2Lit( i, 0 )] = Then; }
 static inline void     Abc_BddSetElseOfBvar( Abc_BddMan * p, int i, unsigned Else ) { p->pObjs[Abc_BddBvar2Lit( i, 1 )] = Else; }
 static inline void     Abc_BddSetNextOfBvar( Abc_BddMan * p, int i, int Next ) { p->pNexts[i] = Next;     }
+static inline void     Abc_BddSetMarkOfBvar( Abc_BddMan * p, int i, int Mark ) { p->pMark[i] = Mark;      }
 static inline void     Abc_BddSetEdgeOfBvar( Abc_BddMan * p, int i, int Edge ) { p->pEdges[i] = Edge;     }
 
 static inline void     Abc_BddSetMark( Abc_BddMan * p, unsigned i, int m ) { p->pMark[Abc_BddLit2Bvar( i )] = m; }
@@ -505,7 +506,7 @@ static inline void     Abc_BddDecEdgeNonConst( Abc_BddMan * p, unsigned i) { if 
 static inline int      Abc_BddIsLimit( Abc_BddMan * p ) { return (unsigned)p->nObjs == p->nObjsAlloc || p->nObjs == Abc_BddBvarInvalid(); }
 
 extern unsigned        Abc_BddUniqueCreate( Abc_BddMan * p, int Var, unsigned Then, unsigned Else );
-extern Abc_BddMan *    Abc_BddManAlloc( int nVars, unsigned nObjs, int fVerbose );
+extern Abc_BddMan *    Abc_BddManAlloc( int nVars, unsigned nObjs, int fDynAlloc, int fVerbose );
 extern void            Abc_BddManRealloc( Abc_BddMan * p );
 extern void            Abc_BddManFree( Abc_BddMan * p );
 extern unsigned        Abc_BddAnd( Abc_BddMan * p, unsigned a, unsigned b );
@@ -519,7 +520,7 @@ extern void            Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFront
 extern void            Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts );
 extern void            Abc_BddRefreshConfig( Abc_BddMan * p, int fRealloc, int fGC, int nReorderThreshold );
 extern int             Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p );
-extern Gia_Man_t *     Abc_Bdd2Gia( Abc_BddMan * p, Vec_Int_t * vNodes );
+extern Gia_Man_t *     Abc_BddGenGia( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern void            Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName, int fName );  
 extern unsigned        Abc_BddUnivAbstract( Abc_BddMan * p, unsigned x, Vec_Int_t * vVars );
 
