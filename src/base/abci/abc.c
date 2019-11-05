@@ -46020,7 +46020,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     int nWindowSize = 0;
     Gia_Man_t * pNew = NULL, * pMiter;
     extern Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep, int fExdc, int nWindowSize, int fDcPropagate, int nVerbose );
-    //    extern void Abc_DdNandGiaTest( Gia_Man_t * pGia, char * FileName, int nMem, int nMemMax, int nType, int nIte, int nOpt, int fReo, int nVerbose );
+    extern void Abc_DdNandGiaTest( Gia_Man_t * pGia, int nType, int fReo, int nVerbose );
     Extra_UtilGetoptReset();
     while ( ( c = Extra_UtilGetopt( argc, argv, "GMPVcerpxzh" ) ) != EOF )
     {
@@ -46110,10 +46110,10 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
 	return 1;
     }
     if ( fCudd )
-      {
-      //Abc_DdNandGiaTest( pAbc->pGia, NULL, nMem, 30, nType, 0, 0, fReo, nVerbose );
-	Abc_Print( -1, "Abc_CommandAbc9Cspf(): CUDD is currently disabled\n" );
-	return 1;
+    {
+	Abc_DdNandGiaTest( pAbc->pGia, nType, fReo, nVerbose );
+	//Abc_Print( -1, "Abc_CommandAbc9Cspf(): CUDD is currently disabled\n" );
+	return 0;
     }
     
     pNew = Abc_BddNandGiaTest( pAbc->pGia, nMem, nType, fRep, fExdc, nWindowSize, fDcPropagate, nVerbose );
