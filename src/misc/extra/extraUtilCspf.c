@@ -456,6 +456,11 @@ static inline void Abc_BddNandSetPoInfo( Gia_Man_t * pGia, Vec_Ptr_t * vNets, Ve
   vId = Vec_IntAlloc( 1 );
   vCkts = Vec_IntAlloc( 1 );
   vIdxs = Vec_IntAlloc( 1 );
+  // const0
+  id = Abc_BddNandConst0();
+  Vec_IntPush( vId, id );
+  Vec_IntPush( vCkts, -2 );
+  Vec_IntPush( vIdxs, 0 );
   // Generate Po list
   Gia_ManForEachCi( pGia, pObj, i )
     {
@@ -488,6 +493,7 @@ static inline void Abc_BddNandSetPoInfo( Gia_Man_t * pGia, Vec_Ptr_t * vNets, Ve
       Vec_IntPush( vPoCkts, Vec_IntEntry( vCkts, k ) );
       Vec_IntPush( vPoIdxs, Vec_IntEntry( vIdxs, k ) );
       // set external don't care to be 0
+      if ( Vec_IntEntry( vCkts, k ) < 0 ) continue;
       p = Vec_PtrEntry( vNets, Vec_IntEntry( vCkts, k ) );
       pConst0 = Gia_ManStart( Vec_IntSize( p->vPis ) );
       Vec_IntForEachEntry( p->vPis, id, j )
@@ -542,7 +548,7 @@ static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec
       Vec_IntPush( vExternalPos, id );
       if ( Gia_ObjIsConst0( pObj ) || Gia_ObjIsCi( pObj ) ) continue;
       pFanouts[id]--;
-      Vec_IntPush( vCands, id );
+      Vec_IntPushUnique( vCands, id );
     }
   // Partition
   part = 0;
@@ -1575,7 +1581,10 @@ static inline Gia_Man_t * Abc_BddNandNets2Gia( Vec_Ptr_t * vNets, Vec_Int_t * vP
     }
   Vec_IntForEachEntry( vExternalCs, cond, i )
     {
-      Value = vvPoValues[Vec_IntEntry( vPoCkts, i ) + 1][Vec_IntEntry( vPoIdxs, i )];
+      if ( Vec_IntEntry( vPoCkts, i ) < -1 )
+	Value = Gia_ManConst0Lit( pNew );
+      else
+	Value = vvPoValues[Vec_IntEntry( vPoCkts, i ) + 1][Vec_IntEntry( vPoIdxs, i )];
       Gia_ManAppendCo( pNew, Abc_LitNotCond( Value, cond ) );
     }
   pNew = Gia_ManCleanup( pTemp = pNew );
