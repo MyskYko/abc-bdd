@@ -524,14 +524,14 @@ extern Gia_Man_t *     Abc_BddGenGia( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern void            Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName, int fName );  
 extern unsigned        Abc_BddUnivAbstract( Abc_BddMan * p, unsigned x, Vec_Int_t * vVars );
 
+/*=== extraUtilReorder.c ================================================================*/
+
+extern void            Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int fVerbose );
+
 /*=== extraUtilVc.c ================================================================*/
 
 extern unsigned        Abc_BddIteAnd( Abc_BddMan * p, unsigned c, unsigned d1, unsigned d0 );
 extern unsigned        Abc_BddVectorCompose( Abc_BddMan * p, unsigned F,  Vec_Int_t * Vars, unsigned * cache, int fAnd );
-
-/*=== extraUtilReorder.c ================================================================*/
-
-extern void            Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int fVerbose );
 
 /**AutomaticEnd***************************************************************/
 

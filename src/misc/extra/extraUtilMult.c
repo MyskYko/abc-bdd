@@ -811,7 +811,7 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
       p->ReoThold = 0.01 * nFinalReorder;
       i = Abc_BddCountNodesArrayShared( p, vNodes );
       clk = Abc_Clock();
-      Abc_BddReorder( p, vNodes, nVerbose );
+      Abc_BddReorder( p, vNodes, nVerbose - 1 );
       clk2 = Abc_Clock();
       j = Abc_BddCountNodesArrayShared( p, vNodes );
       printf( "Final Reorder Gain %d -> %d (%d)\n", i, j, j - i );
