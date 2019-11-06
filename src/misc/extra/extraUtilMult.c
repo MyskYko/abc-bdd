@@ -865,6 +865,7 @@ unsigned Abc_BddUnivAbstract_rec( Abc_BddMan * p, unsigned x, Vec_Int_t * vVars 
     return Abc_BddAnd_rec( p, Then, Else );
   return Abc_BddUniqueCreate( p, Var, Then, Else );
 }
+// univ abstract var in vars
 unsigned Abc_BddUnivAbstract( Abc_BddMan * p, unsigned x, Vec_Int_t * vVars )
 {
   if ( Abc_BddLitIsInvalid( x ) )

@@ -1642,7 +1642,8 @@ static inline Gia_Man_t * Abc_BddNandNets2Gia( Vec_Ptr_t * vNets, Vec_Int_t * vP
 	Values[id] = vvPoValues[Vec_IntEntry( p->vPiCkts, i ) + 1][Vec_IntEntry( p->vPiIdxs, i )];
       Vec_IntForEachEntry( p->vObjs, id, i )
 	{
-	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) continue;
+	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) )
+	    continue;
 	  if ( Vec_IntSize( p->pvFanins[id] ) == 1 )
 	    {
 	      id0 = Vec_IntEntry( p->pvFanins[id], 0 );
@@ -1707,10 +1708,11 @@ static inline Gia_Man_t * Abc_BddNandNets2Gia( Vec_Ptr_t * vNets, Vec_Int_t * vP
 ***********************************************************************/
 static inline void Abc_BddNandPropagateDc( Vec_Ptr_t * vNets, int from )
 {
+  // TODO: fDc
   int i, j, k, id, idj, pi, pij, index, best_i, best_pi;
-  unsigned Value, c;
-  Vec_Int_t ** pvPis;
+  unsigned x, y;
   Vec_Int_t * vVars, * vNodes;
+  Vec_Int_t ** pvPis;
   Abc_NandMan * pFrom, * pTo;
   Gia_Man_t * pDc, * pTemp;
   vVars = Vec_IntAlloc( 1 );
@@ -1720,11 +1722,12 @@ static inline void Abc_BddNandPropagateDc( Vec_Ptr_t * vNets, int from )
   for ( i = 0; i < Vec_PtrSize( vNets ); i++ )
     pvPis[i] = Vec_IntAlloc( 1 );
   Vec_IntForEachEntry( pFrom->vPis, id, pi )
-    if ( Vec_IntEntry( pFrom->vPiCkts, pi ) != -1 )
+    if ( Vec_IntEntry( pFrom->vPiCkts, pi ) >= 0 )
       Vec_IntPush( pvPis[Vec_IntEntry( pFrom->vPiCkts, pi )], pi );
   Vec_PtrForEachEntry( Abc_NandMan *, vNets, pTo, k )
     {
-      if ( !Vec_IntSize( pvPis[k] ) ) continue;
+      if ( !Vec_IntSize( pvPis[k] ) )
+	continue;
       Vec_IntForEachEntry( pvPis[k], pi, i )
 	{
 	  best_i = i;
@@ -1741,17 +1744,17 @@ static inline void Abc_BddNandPropagateDc( Vec_Ptr_t * vNets, int from )
       Vec_IntForEachEntry( pvPis[k], pi, i )
 	{
 	  id = Vec_IntEntry( pFrom->vPis, pi );
-	  Value = Abc_BddLitConst1();
+	  x = Abc_BddLitConst1();
 	  // calculate AND of G of fanouts
 	  Vec_IntForEachEntry( pFrom->pvFanouts[id], idj, j )
 	    {
 	      if ( Abc_BddNandObjIsPo( pFrom, idj ) )
-		Value = Abc_BddAnd( pFrom->pBdd, Value, pFrom->pGFuncs[idj] );
+		x = Abc_BddAnd( pFrom->pBdd, x, pFrom->pGFuncs[idj] );
 	      else
 		{
 		  index = Vec_IntFind( pFrom->pvFanins[idj], id );
-		  c = (unsigned)Vec_IntEntry( pFrom->pvCFuncs[idj], index );
-		  Value = Abc_BddAnd( pFrom->pBdd, Value, c );
+		  y = Vec_IntEntry( pFrom->pvCFuncs[idj], index );
+		  x = Abc_BddAnd( pFrom->pBdd, x, y );
 		}
 	    }
 	  // universify the inputs of Value other than those in pvPis[i]
@@ -1759,51 +1762,62 @@ static inline void Abc_BddNandPropagateDc( Vec_Ptr_t * vNets, int from )
 	  for ( pij = 0; pij < Vec_IntSize( pFrom->vPis ); pij++ )
 	    if ( Vec_IntFind( pvPis[k], pij ) == -1 )
 	      Vec_IntPush( vVars, pij );
-	  Value = Abc_BddUnivAbstract( pFrom->pBdd, Value, vVars );
-	  while ( Abc_BddLitIsInvalid( Value ) )
+	  x = Abc_BddUnivAbstract( pFrom->pBdd, x, vVars );
+	  while ( Abc_BddLitIsInvalid( x ) )
 	    {
 	      Abc_BddNandRefresh( pFrom );
-	      Value = Abc_BddLitConst1();
+	      x = Abc_BddLitConst1();
 	      Vec_IntForEachEntry( pFrom->pvFanouts[id], idj, j )
 		{
 		  if ( Abc_BddNandObjIsPo( pFrom, idj ) )
-		    Value = Abc_BddAnd( pFrom->pBdd, Value, pFrom->pGFuncs[idj] );
+		    x = Abc_BddAnd( pFrom->pBdd, x, pFrom->pGFuncs[idj] );
 		  else
 		    {
 		      index = Vec_IntFind( pFrom->pvFanins[idj], id );
-		      c = (unsigned)Vec_IntEntry( pFrom->pvCFuncs[idj], index );
-		      Value = Abc_BddAnd( pFrom->pBdd, Value, c );
+		      y = Vec_IntEntry( pFrom->pvCFuncs[idj], index );
+		      x = Abc_BddAnd( pFrom->pBdd, x, y );
 		    }
 		}
-	      Value = Abc_BddUnivAbstract( pFrom->pBdd, Value, vVars );
-	      pFrom->nMem++;
-	      if ( 1 << pFrom->nMem == 0 )
-		{
-		  printf("Error: Calculating propagation of DC failed due to shortage of nodes\n");
-		  abort();
-		}
+	      x = Abc_BddUnivAbstract( pFrom->pBdd, x, vVars );
+	      if ( Abc_BddLitIsInvalid( x ) )
+		Abc_BddNandMemIncrease( pFrom );
 	    }
-	  // gia on top of it
+	  // gia for dc
 	  Vec_IntClear( vNodes );
-	  Vec_IntPush( vNodes, Value );
+	  Vec_IntPush( vNodes, x );
 	  pDc = Abc_BddGenGia( pFrom->pBdd, vNodes );
-	  while( Gia_ManCiNum( pDc ) < Vec_IntSize( pTo->vPos ) )
+	  // sort inputs as the order of pos
+	  Vec_IntClear( vVars );
+	  pij = 0;
+	  for ( j = Vec_IntSize( pvPis[k] ); j < Vec_IntSize( pFrom->vPis ); j++ )
 	    {
+	      while ( Vec_IntFind( pvPis[k], pij ) != -1 )
+		pij++;
+	      Vec_IntPush( vVars, pij );
+	      pij++;
+	    }
+	  // add inputs as many as the pos
+	  while( Gia_ManCiNum( pDc ) < Vec_IntSize( pTo->vPos ) )
+            {
 	      Vec_IntPush( vVars, Gia_ManCiNum( pDc ) );
 	      Gia_ManAppendCi( pDc );
 	    }
+	  // finish sorting by adding missing inputs
 	  Vec_IntForEachEntry( pvPis[k], pij, j )
 	    Vec_IntInsert( vVars, Vec_IntEntry( pFrom->vPiIdxs, pij ), pij );
 	  pTemp = pDc;
+	  // permutate
 	  pDc = Gia_ManDupPerm( pDc, vVars );
 	  Gia_ManStop( pTemp );
 	  pTemp = pDc;
+	  // remove unnecessary inputs
 	  pDc = Gia_ManDupRemovePis( pDc, Gia_ManCiNum( pDc ) - Vec_IntSize( pTo->vPos ) );
 	  Gia_ManStop( pTemp );
 	  pTemp = pDc;
+	  // connect inputs to the pos
 	  pDc = Gia_ManDupOntop( pTo->pGia, pDc );
 	  Gia_ManStop( pTemp );
-	  // push it to pTo->vvDcGias[pFrom->vPiIdxs[pi]]
+	  // push it to dc list
 	  Vec_PtrPush( Vec_PtrEntry( pTo->vvDcGias, Vec_IntEntry( pFrom->vPiIdxs, pi ) ), pDc );
 	}
     }
@@ -1848,6 +1862,7 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, 
     {
       if ( fDc )
 	{
+	  // num should be even?
 	  pPos = ABC_CALLOC( int, nPos );
 	  for ( i = 0; i < nPos; i++ )
 	    pPos[i] = i;
