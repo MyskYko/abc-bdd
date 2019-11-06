@@ -502,7 +502,8 @@ static inline void Abc_BddNandSetPoInfo( Gia_Man_t * pGia, Vec_Ptr_t * vNets, Ve
       Vec_IntPush( vPoCkts, Vec_IntEntry( vCkts, k ) );
       Vec_IntPush( vPoIdxs, Vec_IntEntry( vIdxs, k ) );
       // set external don't care to be 0
-      if ( Vec_IntEntry( vCkts, k ) < 0 ) continue;
+      if ( Vec_IntEntry( vCkts, k ) < 0 )
+	continue;
       p = Vec_PtrEntry( vNets, Vec_IntEntry( vCkts, k ) );
       pConst0 = Gia_ManStart( Vec_IntSize( p->vPis ) );
       Vec_IntForEachEntry( p->vPis, id, j )
@@ -681,13 +682,13 @@ static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec
 static inline int Abc_BddNandBuild( Abc_NandMan * p, int id )
 {
   int j, idj;
-  unsigned Value;
-  Value = Abc_BddLitConst1();
+  unsigned x;
+  x = Abc_BddLitConst1();
   Vec_IntForEachEntry( p->pvFanins[id], idj, j )
-    Value = Abc_BddAnd( p->pBdd, Value, Abc_BddNandObjGetBddFunc( p, idj ) );
-  if ( Abc_BddLitIsInvalid( Value ) )
+    x = Abc_BddAnd( p->pBdd, x, Abc_BddNandObjGetBddFunc( p, idj ) );
+  if ( Abc_BddLitIsInvalid( x ) )
     return -1;
-  Abc_BddNandObjSetBddFunc( p, id, Abc_BddLitNot( Value ) );
+  Abc_BddNandObjSetBddFunc( p, id, Abc_BddLitNot( x ) );
   return 0;
 }
 static inline int Abc_BddNandBuildAll( Abc_NandMan * p )
@@ -717,15 +718,15 @@ static inline int Abc_BddNandBuildFanoutCone( Abc_NandMan * p, int startId )
 static inline int Abc_BddNandCheck( Abc_NandMan * p )
 {
   int i, j, id, idj;
-  unsigned Value;
+  unsigned x;
   Vec_IntForEachEntry( p->vObjs, id, i )
     {
-      Value = Abc_BddLitConst1();
+      x = Abc_BddLitConst1();
       Vec_IntForEachEntry( p->pvFanins[id], idj, j )
-	Value = Abc_BddAnd( p->pBdd, Value, Abc_BddNandObjGetBddFunc( p, idj ) );
-      if ( !Abc_BddLitIsEq( Abc_BddNandObjGetBddFunc( p, id ), Abc_BddLitNot( Value ) ) )
+	x = Abc_BddAnd( p->pBdd, x, Abc_BddNandObjGetBddFunc( p, idj ) );
+      if ( !Abc_BddLitIsEq( Abc_BddNandObjGetBddFunc( p, id ), Abc_BddLitNot( x ) ) )
 	{
-	  printf( "Eq-check faild: different at %d %10u %10u\n", id, Abc_BddNandObjGetBddFunc( p, id ), Abc_BddLitNot( Value ) );
+	  printf( "Eq-check faild: different at %d %10u %10u\n", id, Abc_BddNandObjGetBddFunc( p, id ), Abc_BddLitNot( x ) );
 	  return -1;
 	}
     }
@@ -734,16 +735,16 @@ static inline int Abc_BddNandCheck( Abc_NandMan * p )
 static inline int Abc_BddNandBuildInverted( Abc_NandMan * p, int id, int startId )
 {
   int j, idj;
-  unsigned Value;
-  Value = Abc_BddLitConst1();
+  unsigned x;
+  x = Abc_BddLitConst1();
   Vec_IntForEachEntry( p->pvFanins[id], idj, j )
     if ( idj == startId )
-      Value = Abc_BddAnd( p->pBdd, Value, Abc_BddLitNot( Abc_BddNandObjGetBddFunc( p, idj ) ) );
+      x = Abc_BddAnd( p->pBdd, x, Abc_BddLitNot( Abc_BddNandObjGetBddFunc( p, idj ) ) );
     else
-      Value = Abc_BddAnd( p->pBdd, Value, Abc_BddNandObjGetBddFunc( p, idj ) );
-  if ( Abc_BddLitIsInvalid( Value ) )
+      x = Abc_BddAnd( p->pBdd, x, Abc_BddNandObjGetBddFunc( p, idj ) );
+  if ( Abc_BddLitIsInvalid( x ) )
     return -1;
-  Abc_BddNandObjSetBddFunc( p, id, Abc_BddLitNot( Value ) );
+  Abc_BddNandObjSetBddFunc( p, id, Abc_BddLitNot( x ) );
   return 0;
 }
 static inline int Abc_BddNandBuildFanoutConeInverted( Abc_NandMan * p, int startId )
@@ -776,7 +777,7 @@ static inline int Abc_BddNandBuildFanoutConeInverted( Abc_NandMan * p, int start
 static inline int Abc_BddNandDc( Abc_NandMan * p )
 {
   int i, j;
-  unsigned Value;
+  unsigned x;
   Gia_Obj_t * pObj;
   Gia_Man_t * pGia;
   Vec_Ptr_t * vDcGias;
@@ -784,17 +785,17 @@ static inline int Abc_BddNandDc( Abc_NandMan * p )
     {
       if ( !Vec_PtrSize( vDcGias ) )
 	continue;
-      Value = Abc_BddLitConst1();
+      x = Abc_BddLitConst1();
       Vec_PtrForEachEntry( Gia_Man_t *, vDcGias, pGia, j )
 	{
 	  if ( Abc_BddGia( pGia, p->pBdd ) )
 	    return -1;
 	  pObj = Gia_ManCo( pGia, 0 );
-	  Value = Abc_BddAnd( p->pBdd, Value, pObj->Value );
-	  if ( Abc_BddLitIsInvalid( Value ) )
+	  x = Abc_BddAnd( p->pBdd, x, pObj->Value );
+	  if ( Abc_BddLitIsInvalid( x ) )
 	    return -1;
 	}
-      p->pGFuncs[Vec_IntEntry( p->vPos, i )] = Value;
+      p->pGFuncs[Vec_IntEntry( p->vPos, i )] = x;
     }
   return 0;
 }
@@ -813,7 +814,7 @@ static inline int Abc_BddNandDc( Abc_NandMan * p )
 static inline int Abc_BddNandGFunc( Abc_NandMan * p, int id )
 {
   int j, idj, index;
-  unsigned c;
+  unsigned x;
   p->pGFuncs[id] = Abc_BddLitConst1();
   Vec_IntForEachEntry( p->pvFanouts[id], idj, j )
     {
@@ -823,8 +824,8 @@ static inline int Abc_BddNandGFunc( Abc_NandMan * p, int id )
       else
 	{
 	  index = Vec_IntFind( p->pvFanins[idj], id );
-	  c = (unsigned)Vec_IntEntry( p->pvCFuncs[idj], index );
-	  p->pGFuncs[id] = Abc_BddAnd( p->pBdd, p->pGFuncs[id], c );
+	  x = Vec_IntEntry( p->pvCFuncs[idj], index );
+	  p->pGFuncs[id] = Abc_BddAnd( p->pBdd, p->pGFuncs[id], x );
 	}
     }
   if ( Abc_BddLitIsInvalid( p->pGFuncs[id] ) )
@@ -898,19 +899,18 @@ static inline void Abc_BddNandSortFaninAll( Abc_NandMan * p )
 static inline int Abc_BddNandRemoveRedundantFanin( Abc_NandMan * p, int id )
 {
   int j, k, idj, idk;
-  unsigned fanins, fj, c, dc1;
+  unsigned x;
   Vec_IntForEachEntry( p->pvFanins[id], idj, j )
     {
-      fanins = Abc_BddLitConst1();
+      x = Abc_BddLitConst1();
       Vec_IntForEachEntry( p->pvFanins[id], idk, k )
 	if ( k != j )
-	  fanins = Abc_BddAnd( p->pBdd, fanins, Abc_BddNandObjGetBddFunc( p, idk ) );
-      fj = Abc_BddNandObjGetBddFunc( p, idj );
-      c = Abc_BddOr( p->pBdd, p->pGFuncs[id], Abc_BddLitNot( fanins ) );
-      dc1 = Abc_BddOr( p->pBdd, fj, c );
-      if ( Abc_BddLitIsInvalid( dc1 ) )
+	  x = Abc_BddAnd( p->pBdd, x, Abc_BddNandObjGetBddFunc( p, idk ) );
+      x = Abc_BddOr( p->pBdd, Abc_BddLitNot( x ), p->pGFuncs[id] );
+      x = Abc_BddOr( p->pBdd, x, Abc_BddNandObjGetBddFunc( p, idj ) );
+      if ( Abc_BddLitIsInvalid( x ) )
 	return -1;
-      if ( Abc_BddLitIsConst1( dc1 ) )
+      if ( Abc_BddLitIsConst1( x ) )
 	{
 	  Abc_BddNandDisconnect( p, idj, id );
 	  if ( !Vec_IntSize( p->pvFanins[id] ) )
