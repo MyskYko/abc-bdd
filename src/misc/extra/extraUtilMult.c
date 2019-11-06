@@ -179,7 +179,7 @@ Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int fDynAlloc, int nVer
   p->pNexts      = ABC_CALLOC( int, p->nUniqueMask + 1 );
   p->pCache      = ABC_CALLOC( unsigned, 3 * (long long)( p->nCacheMask + 1 ) );
   p->pObjs       = ABC_CALLOC( unsigned, 2 * (long long)p->nObjsAlloc );
-  p->pMark       = ABC_CALLOC( unsigned char, p->nObjsAlloc );
+  p->pMarks      = ABC_CALLOC( unsigned char, p->nObjsAlloc );
   p->fRealloc    = 0;
   p->fGC         = 0;
   p->ReoThold    = 0;
@@ -201,7 +201,7 @@ Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int fDynAlloc, int nVer
       printf("Error: Number of variables is too many\n");
       abort();
     }
-  if ( !p->pUnique || !p->pNexts || !p->pCache || !p->pObjs || !p->pMark || (!p->pVars && !p->pSVars) )
+  if ( !p->pUnique || !p->pNexts || !p->pCache || !p->pObjs || !p->pMarks || (!p->pVars && !p->pSVars) )
     {
       printf("Error: Allocation failed\n");
       abort();
@@ -286,12 +286,12 @@ void Abc_BddManRealloc( Abc_BddMan * p )
   p->pUnique     = ABC_REALLOC( int, p->pUnique, p->nUniqueMask + 1 );
   p->pNexts      = ABC_REALLOC( int, p->pNexts, p->nUniqueMask + 1 );
   p->pObjs       = ABC_REALLOC( unsigned, p->pObjs, 2 * (long long)p->nObjsAlloc );
-  p->pMark       = ABC_REALLOC( unsigned char, p->pMark, p->nObjsAlloc );
+  p->pMarks      = ABC_REALLOC( unsigned char, p->pMarks, p->nObjsAlloc );
   if ( p->pVars )
     p->pVars     = ABC_REALLOC( unsigned char, p->pVars, p->nObjsAlloc );
   else
     p->pSVars    = ABC_REALLOC( unsigned short, p->pSVars, p->nObjsAlloc );
-  if ( !p->pUnique || !p->pNexts || !p->pObjs || !p->pMark || (!p->pVars && !p->pSVars) )
+  if ( !p->pUnique || !p->pNexts || !p->pObjs || !p->pMarks || (!p->pVars && !p->pSVars) )
     {
       printf("Error: Reallocation failed\n");
       abort();
@@ -299,7 +299,7 @@ void Abc_BddManRealloc( Abc_BddMan * p )
   memset( p->pUnique + ( nUniqueMaskOld + 1 ), 0, sizeof(int) * ( nUniqueMaskOld + 1 ) );
   memset( p->pNexts + ( nUniqueMaskOld + 1 ), 0, sizeof(int) * ( nUniqueMaskOld + 1 ) );
   memset( p->pObjs + 2 * (long long)nObjsAllocOld, 0, sizeof(unsigned) * 2 * (long long)nObjsAllocOld );
-  memset( p->pMark + nObjsAllocOld, 0, sizeof(unsigned char) * nObjsAllocOld );
+  memset( p->pMarks + nObjsAllocOld, 0, sizeof(unsigned char) * nObjsAllocOld );
   if ( p->pVars )
     memset( p->pVars + nObjsAllocOld, 0, sizeof(unsigned char) * nObjsAllocOld );
   else

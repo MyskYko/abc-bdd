@@ -422,7 +422,7 @@ struct Abc_BddMan_
   unsigned *         pCache;        // array of triples <arg0, arg1, AND(arg0, arg1)>
   unsigned *         pObjs;         // array of pairs cof0 for each node
   unsigned char *    pVars;         // array of variables for each node
-  unsigned char *    pMark;         // array of marks for each BDD node
+  unsigned char *    pMarks;        // array of marks for each BDD node
   unsigned           nUniqueMask;   // selection mask for unique table
   unsigned           nCacheMask;    // selection mask for computed table
   int                nMinRemoved;   // the minimum int of removed nodes
@@ -477,26 +477,26 @@ static inline int      Abc_BddVar( Abc_BddMan * p, unsigned x )    { return ( p-
 static inline unsigned Abc_BddThen( Abc_BddMan * p, unsigned x )   { return Abc_BddLitNotCond( p->pObjs[Abc_BddLitRegular( x )], Abc_BddLitIsCompl( x ) ); }
 static inline unsigned Abc_BddElse( Abc_BddMan * p, unsigned x )   { return Abc_BddLitNotCond( p->pObjs[Abc_BddLitNot( Abc_BddLitRegular( x ) )], Abc_BddLitIsCompl( x ) ); }
 static inline int      Abc_BddNext( Abc_BddMan * p, unsigned x )   { return p->pNexts[Abc_BddLit2Bvar( x )]; }
-static inline int      Abc_BddMark( Abc_BddMan * p, unsigned x )   { return p->pMark[Abc_BddLit2Bvar( x )]; }
+static inline int      Abc_BddMark( Abc_BddMan * p, unsigned x )   { return p->pMarks[Abc_BddLit2Bvar( x )]; }
 static inline unsigned Abc_BddEdge( Abc_BddMan * p, unsigned x )   { return p->pEdges[Abc_BddLit2Bvar( x )]; }
 
 static inline int      Abc_BddVarOfBvar( Abc_BddMan * p, int a )   { return ( p->pVars )? p->pVars[a]: p->pSVars[a]; }
 static inline unsigned Abc_BddThenOfBvar( Abc_BddMan * p, int a )  { return p->pObjs[Abc_BddBvar2Lit( a, 0 )]; }
 static inline unsigned Abc_BddElseOfBvar( Abc_BddMan * p, int a )  { return p->pObjs[Abc_BddBvar2Lit( a, 1 )]; }
 static inline int      Abc_BddNextOfBvar( Abc_BddMan * p, int a )  { return p->pNexts[a];                 }
-static inline int      Abc_BddMarkOfBvar( Abc_BddMan * p, int a )  { return p->pMark[a];                  }
+static inline int      Abc_BddMarkOfBvar( Abc_BddMan * p, int a )  { return p->pMarks[a];                 }
 static inline unsigned Abc_BddEdgeOfBvar( Abc_BddMan * p, int a )  { return p->pEdges[a];                 }
 
 static inline void     Abc_BddSetVarOfBvar( Abc_BddMan * p, int a, int Var ) { if ( p->pVars ) p->pVars[a] = Var; else p->pSVars[a] = Var; }
 static inline void     Abc_BddSetThenOfBvar( Abc_BddMan * p, int a, unsigned Then ) { p->pObjs[Abc_BddBvar2Lit( a, 0 )] = Then; }
 static inline void     Abc_BddSetElseOfBvar( Abc_BddMan * p, int a, unsigned Else ) { p->pObjs[Abc_BddBvar2Lit( a, 1 )] = Else; }
 static inline void     Abc_BddSetNextOfBvar( Abc_BddMan * p, int a, int Next ) { p->pNexts[a] = Next;     }
-static inline void     Abc_BddSetMarkOfBvar( Abc_BddMan * p, int a, int Mark ) { p->pMark[a] = Mark;      }
+static inline void     Abc_BddSetMarkOfBvar( Abc_BddMan * p, int a, int Mark ) { p->pMarks[a] = Mark;     }
 static inline void     Abc_BddSetEdgeOfBvar( Abc_BddMan * p, int a, int Edge ) { p->pEdges[a] = Edge;     }
 
-static inline void     Abc_BddSetMark( Abc_BddMan * p, unsigned x, int m ) { p->pMark[Abc_BddLit2Bvar( x )] = m; }
-static inline void     Abc_BddIncMark( Abc_BddMan * p, unsigned x ) { assert( ++p->pMark[Abc_BddLit2Bvar( x )] != Abc_BddMarkInvalid() ); }
-static inline void     Abc_BddDecMark( Abc_BddMan * p, unsigned x ) { assert( --p->pMark[Abc_BddLit2Bvar( x )] != Abc_BddMarkInvalid() ); }
+static inline void     Abc_BddSetMark( Abc_BddMan * p, unsigned x, int m ) { p->pMarks[Abc_BddLit2Bvar( x )] = m; }
+static inline void     Abc_BddIncMark( Abc_BddMan * p, unsigned x ) { assert( ++p->pMarks[Abc_BddLit2Bvar( x )] != Abc_BddMarkInvalid() ); }
+static inline void     Abc_BddDecMark( Abc_BddMan * p, unsigned x ) { assert( --p->pMarks[Abc_BddLit2Bvar( x )] != Abc_BddMarkInvalid() ); }
 
 static inline void     Abc_BddIncEdge( Abc_BddMan * p, unsigned x ) { assert( ++p->pEdges[Abc_BddLit2Bvar( x )] != Abc_BddEdgeInvalid() ); }
 static inline void     Abc_BddDecEdge( Abc_BddMan * p, unsigned x ) { assert( --p->pEdges[Abc_BddLit2Bvar( x )] != Abc_BddEdgeInvalid() ); }
