@@ -1464,7 +1464,7 @@ static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak, int fHalf )
 static inline void Abc_BddNandG3( Abc_NandMan * p )
 {
   int i,j,k, id, idj, idk, out, wire, new_id;
-  unsigned fi, fj, gi, gj, f1, f0, a, b, mergible, figj, fjgi, fx, gx, Value, eq;
+  unsigned fi, fj, f1, f0, gi, gj, x, y;
   Vec_Int_t * targets;
   new_id = Vec_IntSize( p->vPis ) + 1;
   while ( !Abc_BddNandObjIsEmpty( p, new_id ) )
@@ -1481,35 +1481,45 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
   // optimize
   Vec_IntForEachEntryReverse( targets, id, i )
     {
-      if ( !i ) break;
+      if ( !i )
+	break;
       for ( j = i - 1; (j >= 0) && (((idj) = Vec_IntEntry(targets, j)), 1); j-- )
 	{ //  Vec_IntForEachEntryReverseStart(targets, idj, j, i - 1)
 	  Abc_BddNandRefreshIfNeeded( p );
-	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) ) break;
-	  if ( Abc_BddNandObjIsEmptyOrDead( p, idj ) ) continue;
+	  if ( Abc_BddNandObjIsEmptyOrDead( p, id ) )
+	    break;
+	  if ( Abc_BddNandObjIsEmptyOrDead( p, idj ) )
+	    continue;
 	  if ( p->nVerbose > 1 )
 	    printf( "G3 between %d %d in %d gates\n", i, j, Vec_IntSize(targets) );
+	  // calculate intersection. if it is impossible, continue.
 	  fi = Abc_BddNandObjGetBddFunc( p, id );
 	  fj = Abc_BddNandObjGetBddFunc( p, idj );
 	  gi = p->pGFuncs[id];
 	  gj = p->pGFuncs[idj];
-	  // calculate intersection. if it is impossible, continue.
 	  f1 = Abc_BddAnd( p->pBdd, fi, fj );
 	  f0 = Abc_BddAnd( p->pBdd, Abc_BddLitNot( fi ), Abc_BddLitNot( fj ) );
-	  a = Abc_BddOr( p->pBdd, f1, f0 );
-	  b = Abc_BddOr( p->pBdd, gi, gj );
-	  mergible = Abc_BddOr( p->pBdd, a, b );
-	  if ( !Abc_BddLitIsConst1( mergible ) ) continue;
+	  x = Abc_BddOr( p->pBdd, f1, f0 );
+	  y = Abc_BddOr( p->pBdd, gi, gj );
+	  x = Abc_BddOr( p->pBdd, x, y );
+	  if ( !Abc_BddLitIsConst1( x ) )
+	    continue;
 	  // create BDD of intersection. both F and G.
-	  figj = Abc_BddAnd( p->pBdd, fi, gj );
-	  fjgi = Abc_BddAnd( p->pBdd, fj, gi );
-	  fx = Abc_BddOr( p->pBdd, figj, fjgi );
-	  fx = Abc_BddOr( p->pBdd, fx, f1 );
-	  gx = Abc_BddAnd( p->pBdd, gi, gj );
-	  if ( Abc_BddLitIsInvalid( fx ) ) continue;
-	  if ( Abc_BddLitIsInvalid( gx ) ) continue;
-	  Abc_BddNandObjSetBddFunc( p, new_id, fx );
-	  p->pGFuncs[new_id] = gx;
+	  x = Abc_BddAnd( p->pBdd, fi, Abc_BddLitNot( gi ) );
+	  y = Abc_BddAnd( p->pBdd, fj, Abc_BddLitNot( gj ) );
+	  x = Abc_BddOr( p->pBdd, x, y );
+	  x = Abc_BddOr( p->pBdd, x, f1 );
+	  y = Abc_BddAnd( p->pBdd, gi, gj );
+	  if ( Abc_BddLitIsInvalid( x ) )
+	    continue;
+	  if ( Abc_BddLitIsInvalid( y ) )
+	    continue;
+	  Abc_BddNandObjSetBddFunc( p, new_id, x );
+	  p->pGFuncs[new_id] = y;
+	  /*
+	  unsigned x_ = x;
+	  unsigned y_ = y;
+	  */
 	  p->pvFanins[new_id] = Vec_IntAlloc( 1 );
 	  p->pvFanouts[new_id] = Vec_IntAlloc( 1 );
 	  // for all living nodes, if it is not included in fanouts of i and j, and i and j themselves, try connect it to new node.
@@ -1518,26 +1528,30 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	  p->pMark[idj] = 1;
 	  Abc_BddNandMarkDescendant_rec( p, p->pvFanouts, id );
 	  Abc_BddNandMarkDescendant_rec( p, p->pvFanouts, idj );
-	  eq = Abc_BddOr( p->pBdd, Abc_BddLitNot( fx ), gx );
-	  Value = Abc_BddLitConst1();
+	  x = Abc_BddOr( p->pBdd, Abc_BddLitNot( x ), y );
+	  y = Abc_BddLitConst1();
 	  Vec_IntForEachEntry( p->vPis, idk, k ) 
 	    if ( Abc_BddNandTryConnect( p, idk, new_id ) )
 	      {
-		if ( Abc_BddLitIsConst1( eq ) ) break;
-		if ( Abc_BddLitIsInvalid( Value ) || Abc_BddLitIsInvalid( eq ) ) break;
-		Value = Abc_BddAnd( p->pBdd, Value, Abc_BddNandObjGetBddFunc( p, idk ) );
-		eq = Abc_BddOr( p->pBdd, eq, Abc_BddLitNot( Value ) );
+		if ( Abc_BddLitIsConst1( x ) ||
+		     Abc_BddLitIsInvalid( x ) ||
+		     Abc_BddLitIsInvalid( y ) )
+		  break;
+		y = Abc_BddAnd( p->pBdd, y, Abc_BddNandObjGetBddFunc( p, idk ) );
+		x = Abc_BddOr( p->pBdd, x, Abc_BddLitNot( y ) );
 	      }
 	  Vec_IntForEachEntry( targets, idk, k )
 	    {
-	      if ( Abc_BddNandObjIsEmptyOrDead( p, idk ) ) continue;
-	      if ( p->pMark[idj] ) continue;
+	      if ( Abc_BddNandObjIsEmptyOrDead( p, idk ) || p->pMark[idk] )
+		continue;
 	      if ( Abc_BddNandTryConnect( p, idk, new_id ) )
 		{
-		  if ( Abc_BddLitIsConst1( eq ) ) break;
-		  if ( Abc_BddLitIsInvalid( Value ) || Abc_BddLitIsInvalid( eq ) ) break;
-		  Value = Abc_BddAnd( p->pBdd, Value, Abc_BddNandObjGetBddFunc( p, idk ) );
-		  eq = Abc_BddOr( p->pBdd, eq, Abc_BddLitNot( Value ) );
+		  if ( Abc_BddLitIsConst1( x ) ||
+		       Abc_BddLitIsInvalid( x ) ||
+		       Abc_BddLitIsInvalid( y ) )
+		    break;
+		  y = Abc_BddAnd( p->pBdd, y, Abc_BddNandObjGetBddFunc( p, idk ) );
+		  x = Abc_BddOr( p->pBdd, x, Abc_BddLitNot( y ) );
 		}
 	    }
 	  if ( !Vec_IntSize( p->pvFanins[new_id] ) )
@@ -1545,23 +1559,20 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	      Abc_BddNandRemoveNode( p, new_id );
 	      continue;
 	    }
-	  //assert( !Abc_BddNandCheck( p ) );
-	  //assert( Abc_BddOr( p->pBdd, Abc_BddOr( p->pBdd, fx, gx ), Value ) == 1 );
+	  /*
+	  assert( Abc_BddOr( p->pBdd, Abc_BddOr( p->pBdd, x_, y_ ), y ) == 1 );
+	  unsigned z = Abc_BddOr( p->pBdd, Abc_BddLitNot( x_ ), y_ );
+	  z = Abc_BddOr( p->pBdd, z, Abc_BddLitNot( y ) );
+	  assert( z == x );
+	  */
 	  // check the F of new node satisfies F and G.
-	  if ( !Abc_BddLitIsConst1( eq ) )
+	  if ( !Abc_BddLitIsConst1( x ) )
 	    {
 	      Abc_BddNandRemoveNode( p, new_id );
 	      continue;
 	    }
-	  //assert( Abc_BddOr( p->pBdd, Abc_BddOr( p->pBdd, fx^1, gx ), Value^1 ) == 1 );
 	  // reduce the inputs
-	  Abc_BddNandObjSetBddFunc( p, new_id, Abc_BddLitNot( Value ) );
-	  p->pGFuncs[new_id] = Abc_BddAnd( p->pBdd, p->pGFuncs[id] ,p->pGFuncs[idj] );
-	  if ( Abc_BddLitIsInvalid( p->pGFuncs[new_id] ) )
-	    {
-	      Abc_BddNandRemoveNode( p, new_id );	  
-	      continue;
-	    }
+	  Abc_BddNandObjSetBddFunc( p, new_id, Abc_BddLitNot( y ) );
 	  Vec_IntForEachEntry( p->pvFanouts[id], idk, k )
 	    Abc_BddNandConnect( p, new_id, idk, 0 );
 	  Vec_IntForEachEntry( p->pvFanouts[idj], idk, k )
@@ -1570,7 +1581,7 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	  Abc_BddNandObjEntry( p, new_id );
 	  Abc_BddNandSortFanin( p, new_id );
 	  out = Abc_BddNandRemoveRedundantFanin( p, new_id );
-	  if ( Abc_BddNandObjIsEmptyOrDead( p, new_id ) ) continue;
+	  assert ( !Abc_BddNandObjIsEmptyOrDead( p, new_id ) );
 	  wire = Vec_IntSize( p->pvFanins[id] ) + Vec_IntSize( p->pvFanins[idj] );
 	  if ( out || Vec_IntSize( p->pvFanins[new_id] ) > wire - 1 )
 	    {
