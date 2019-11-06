@@ -930,7 +930,7 @@ static inline int Abc_BddNandRemoveRedundantFanin( Abc_NandMan * p, int id )
 static inline int Abc_BddNandCFuncCspf( Abc_NandMan * p, int id )
 {
   int j, k, idj, idk;
-  unsigned fanins, fi, fj, already1, c, dc1;
+  unsigned x, y;
   if ( p->fRm )
     if ( Abc_BddNandRemoveRedundantFanin( p, id ) )
       return -1;
@@ -941,18 +941,16 @@ static inline int Abc_BddNandCFuncCspf( Abc_NandMan * p, int id )
   Vec_IntClear( p->pvCFuncs[id] );
   Vec_IntForEachEntry( p->pvFanins[id], idj, j )
     {
-      fanins = Abc_BddLitConst1();
+      x = Abc_BddLitConst1();
       Vec_IntForEachEntryStart( p->pvFanins[id], idk, k, j + 1 )
-	fanins = Abc_BddAnd( p->pBdd, fanins, Abc_BddNandObjGetBddFunc( p, idk ) );
-      fi = Abc_BddNandObjGetBddFunc( p, id );
-      fj = Abc_BddNandObjGetBddFunc( p, idj );
-      already1 = Abc_BddAnd( p->pBdd, fi, fj );
-      c = Abc_BddOr( p->pBdd, p->pGFuncs[id], Abc_BddLitNot( fanins ) );
-      c = Abc_BddOr( p->pBdd, c, already1 );
-      dc1 = Abc_BddOr( p->pBdd, fj, c );
-      if ( Abc_BddLitIsInvalid( dc1 ) )
+	x = Abc_BddAnd( p->pBdd, x, Abc_BddNandObjGetBddFunc( p, idk ) );
+      x = Abc_BddOr( p->pBdd, Abc_BddLitNot( x ), p->pGFuncs[id] );
+      y = Abc_BddAnd( p->pBdd, Abc_BddNandObjGetBddFunc( p, id ), Abc_BddNandObjGetBddFunc( p, idj ) );
+      x = Abc_BddOr( p->pBdd, x, y );
+      y = Abc_BddOr( p->pBdd, x, Abc_BddNandObjGetBddFunc( p, idj ) );
+      if ( Abc_BddLitIsInvalid( y ) )
 	return -1;
-      if ( Abc_BddLitIsConst1( dc1 ) )
+      if ( Abc_BddLitIsConst1( y ) )
 	{
 	  Abc_BddNandDisconnect( p, idj, id );
 	  if ( !Vec_IntSize( p->pvFanins[id] ) )
@@ -966,7 +964,7 @@ static inline int Abc_BddNandCFuncCspf( Abc_NandMan * p, int id )
 	  j--;
 	  continue;
 	}
-      Vec_IntPush( p->pvCFuncs[id], c );
+      Vec_IntPush( p->pvCFuncs[id], x );
     }
   return 0;
 }
@@ -990,8 +988,10 @@ static inline int Abc_BddNandCspf( Abc_NandMan * p )
 static inline int Abc_BddNandCspfFaninCone( Abc_NandMan * p, int startId )
 {
   int i, id;
-  Vec_Int_t * targets = Vec_IntAlloc( 1 );
-  if ( Abc_BddNandCFuncCspf( p, startId ) ) return -1;
+  Vec_Int_t * targets;
+  targets = Vec_IntAlloc( 1 );
+  if ( Abc_BddNandCFuncCspf( p, startId ) )
+    return -1;
   Abc_BddNandDescendantSortedList( p, p->pvFanins, targets, startId );
   Vec_IntForEachEntryReverse( targets, id, i )
     {
@@ -1000,8 +1000,10 @@ static inline int Abc_BddNandCspfFaninCone( Abc_NandMan * p, int startId )
 	  Abc_BddNandRemoveNode( p, id );
 	  continue;
 	}
-      if ( Abc_BddNandGFunc( p, id ) ) return -1;
-      if ( Abc_BddNandCFuncCspf( p, id ) ) return -1;
+      if ( Abc_BddNandGFunc( p, id ) )
+	return -1;
+      if ( Abc_BddNandCFuncCspf( p, id ) )
+	return -1;
     }
   Vec_IntFree( targets );
   return 0;
@@ -1021,10 +1023,13 @@ static inline int Abc_BddNandCspfFaninCone( Abc_NandMan * p, int startId )
 int Abc_BddNandIsFanoutShared_rec( Abc_NandMan * p, int id, int stage )
 {
   int j, idj, m;
-  if ( Abc_BddNandObjIsPo( p, id ) ) return 0;
+  if ( Abc_BddNandObjIsPo( p, id ) )
+    return 0;
   m = p->pMark[id] >> 1;
-  if ( m == stage ) return 0;
-  if ( m ) return 1;
+  if ( m == stage )
+    return 0;
+  if ( m )
+    return 1;
   p->pMark[id] += stage << 1;
   Vec_IntForEachEntry( p->pvFanouts[id], idj, j )
     if ( Abc_BddNandIsFanoutShared_rec( p, idj, stage ) )
@@ -1042,8 +1047,10 @@ static inline int Abc_BddNandIsFanoutShared( Abc_NandMan * p, int id )
 	break;
       }
   for ( i = 0; i < p->nObjsAlloc; i++ )
-    if ( p->pMark[i] % 2 ) p->pMark[i] = 1;
-    else p->pMark[i] = 0;
+    if ( p->pMark[i] % 2 )
+      p->pMark[i] = 1;
+    else
+      p->pMark[i] = 0;
   return r;
 }
 static inline int Abc_BddNandGFuncMspf( Abc_NandMan * p, int id )
@@ -1051,7 +1058,8 @@ static inline int Abc_BddNandGFuncMspf( Abc_NandMan * p, int id )
   int j, idj, idk;
   unsigned Value, t;
   Vec_Int_t * posOld;
-  if ( !Abc_BddNandIsFanoutShared( p, id ) ) return Abc_BddNandGFunc( p, id );
+  if ( !Abc_BddNandIsFanoutShared( p, id ) )
+    return Abc_BddNandGFunc( p, id );
   posOld = Vec_IntAlloc( Vec_IntSize( p->vPos ) );
   Vec_IntForEachEntry( p->vPos, idj, j )
     {
