@@ -519,6 +519,7 @@ extern void            Abc_BddRemoveNodeByBvar( Abc_BddMan * p, int a );
 extern void            Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFrontiers );
 extern void            Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts );
 extern void            Abc_BddGiaRefreshConfig( Abc_BddMan * p, int fRealloc, int fGC, int nReorderThreshold );
+extern int             Abc_BddGiaRefresh( Abc_BddMan * p, int * nRefresh );
 extern int             Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p );
 extern Gia_Man_t *     Abc_BddGenGia( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern void            Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName, int fName );  

@@ -703,7 +703,7 @@ void Abc_BddGiaRefreshConfig( Abc_BddMan * p,  int fRealloc, int fGC, int nReord
 	p->liveBvars[i] = Vec_IntAlloc( 1 );
     }
 }
-static inline int Abc_BddGiaRefresh( Abc_BddMan * p, int * nRefresh )
+int Abc_BddGiaRefresh( Abc_BddMan * p, int * nRefresh )
 {
   *nRefresh += 1;
   if ( p->nVerbose > 1 )
