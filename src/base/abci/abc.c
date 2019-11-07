@@ -46124,6 +46124,11 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
         Abc_Print( -1, "Abc_CommandAbc9Cspf(): External Don't Cares and the restricted candidates cannot be used for partitioned circuits\n" );
 	return 1;
     }
+    if ( Gia_ManCoNum( pAbc->pGia ) % 2 && ( fExdc || fSpec ) )
+    {
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): External Don't Cares and the restricted candidates cannot be used for a circuit with odd outputs\n" );
+	return 1;
+    }
     if ( nType > 3 )
     {
         Abc_Print( -1, "Abc_CommandAbc9Cspf(): G must be within 0-3\n" );

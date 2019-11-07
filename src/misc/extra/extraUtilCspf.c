@@ -494,7 +494,7 @@ static inline void Abc_BddNandSetPoInfo( Gia_Man_t * pGia, Vec_Ptr_t * vNets, Ve
   // Assign Pi info
   Vec_PtrForEachEntry( Abc_NandMan *, vNets, p, j )
     {
-      vPis = (Vec_Int_t *)Vec_PtrEntry( vvPis, j );
+      vPis = Vec_PtrEntry( vvPis, j );
       Vec_IntForEachEntry( vPis, id, i )
 	{
 	  k = Vec_IntFind( vId, id );
@@ -1708,7 +1708,6 @@ static inline Gia_Man_t * Abc_BddNandNets2Gia( Vec_Ptr_t * vNets, Vec_Int_t * vP
 ***********************************************************************/
 static inline void Abc_BddNandPropagateDc( Vec_Ptr_t * vNets, int from )
 {
-  // TODO: fDc
   int i, j, k, id, idj, pi, pij, index, best_i, best_pi;
   unsigned x, y;
   Vec_Int_t * vVars, * vNodes;
@@ -1857,12 +1856,11 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, 
   vPoCkts = Vec_IntAlloc( 1 );
   vPoIdxs = Vec_IntAlloc( 1 );
   vExternalCs = Vec_IntAlloc( 1 );
-  nPos = Gia_ManCoNum( pGia ) / 2;
   if ( !nWindowSize )
     {
       if ( fDc )
 	{
-	  // num should be even?
+	  nPos = Gia_ManCoNum( pGia ) / 2;
 	  pPos = ABC_CALLOC( int, nPos );
 	  for ( i = 0; i < nPos; i++ )
 	    pPos[i] = i;
@@ -1898,26 +1896,12 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, 
   abctime clk0 = Abc_Clock();
   Vec_PtrForEachEntry( Abc_NandMan *, vNets, p, i )
     {
-      while ( ( 1 << p->nMem ) <= Vec_IntSize( p->vPis ) + 2 )
-	{
-	  p->nMem++;
-	  if ( 1 << p->nMem == 0 )
-	    {
-	      printf("Error: Number of inputs is too large\n");
-	      abort();
-	    }
-	}
-      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, (int)( nVerbose > 2 ) );
+      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 1, (int)( nVerbose > 2 ) );
       while ( Abc_BddNandDc( p ) || Abc_BddNandBuildAll( p ) )
 	{
-	  p->nMem++;
-	  if ( 1 << p->nMem == 0 )
-	    {
-	      printf("Error: Building Bdd failed\n");
-	      abort();
-	    }
+	  Abc_BddNandMemIncrease( p );
 	  Abc_BddManFree( p->pBdd );
-	  p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, (int)( nVerbose > 2 ) );
+	  p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 1, (int)( nVerbose > 2 ) );
 	}
       if ( nVerbose ) Abc_BddNandPrintStats( p, "initial", clk0 );
       if ( p->nMspf ) Abc_BddNandMspf_Refresh( p );
