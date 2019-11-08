@@ -478,26 +478,28 @@ static inline Gia_Man_t * Abc_BddNandGiaExpand( Gia_Man_t * pGia, Vec_Int_t * vP
   Gia_ManConst0( pGia )->Value = 0;
   Gia_ManForEachCi( pGia, pObj, i )
     pObj->Value = Gia_ManAppendCi( pNew );
-  Vec_IntForEachEntry( vPis, id, i )
-    Gia_ManObj( pGia, id )->Value = Gia_ManAppendCi( pNew );
+  if ( vPis )
+    Vec_IntForEachEntry( vPis, id, i )
+      Gia_ManObj( pGia, id )->Value = Gia_ManAppendCi( pNew );
   Gia_ManForEachAnd( pGia, pObj, i )
-    if ( Vec_IntFind( vPis, Gia_ObjId( pGia, pObj ) ) == -1 )
+    if ( !vPis || Vec_IntFind( vPis, Gia_ObjId( pGia, pObj ) ) == -1 )
       pObj->Value = Gia_ManHashAnd( pNew, Gia_ObjFanin0Copy( pObj ), Gia_ObjFanin1Copy( pObj ) );
   Gia_ManForEachPo( pGia, pObj, i )
     pObj->Value = Gia_ManAppendCo( pNew, Gia_ObjFanin0Copy( pObj ) );
-  Vec_IntForEachEntry( vPos, id, i )
-    Gia_ManAppendCo( pNew, Gia_ManObj( pGia, id )->Value );
+  if ( vPos )
+    Vec_IntForEachEntry( vPos, id, i )
+      Gia_ManAppendCo( pNew, Gia_ManObj( pGia, id )->Value );
   Gia_ManHashStop( pNew );
   pNew = Gia_ManCleanup( pTmp = pNew );  
   Gia_ManStop( pTmp );
   return pNew;
 }
-static inline void Abc_BddNandSetPoInfo( Gia_Man_t * pGia, Vec_Ptr_t * vNets, Vec_Ptr_t * vvPis, Vec_Ptr_t * vvPos, Vec_Int_t * vExternalPos, Vec_Int_t * vPoCkts, Vec_Int_t * vPoIdxs )
+static inline void Abc_BddNandSetPoInfo( Gia_Man_t * pGia, Vec_Ptr_t * vNets, Vec_Ptr_t * vvPis, Vec_Ptr_t * vvPos, Vec_Int_t * vExternalPos, Vec_Int_t * vPoCkts, Vec_Int_t * vPoIdxs, int fDc )
 {
   int i, j, k, id;
   Gia_Obj_t * pObj;
   Vec_Int_t * vId, * vCkts, * vIdxs, * vPis, * vPos;
-  Gia_Man_t * pConst0;
+  Gia_Man_t * pDc, * pTmp;
   Abc_NandMan * p;
   vId = Vec_IntAlloc( 1 );
   vCkts = Vec_IntAlloc( 1 );
@@ -542,11 +544,31 @@ static inline void Abc_BddNandSetPoInfo( Gia_Man_t * pGia, Vec_Ptr_t * vNets, Ve
       if ( Vec_IntEntry( vCkts, k ) < 0 )
 	continue;
       p = Vec_PtrEntry( vNets, Vec_IntEntry( vCkts, k ) );
-      pConst0 = Gia_ManStart( Vec_IntSize( p->vPis ) );
-      Vec_IntForEachEntry( p->vPis, id, j )
-	Gia_ManAppendCi( pConst0 );
-      Gia_ManAppendCo( pConst0, Gia_ManConst0Lit() );
-      Vec_PtrPush( Vec_PtrEntry( p->vvDcGias, Vec_IntEntry( vIdxs, k ) ), pConst0 );
+      if ( fDc )
+	{
+	  pDc = Abc_BddNandGiaExpand( pGia, p->vOrgPis, NULL );
+	  j = i + Vec_IntSize( vExternalPos );
+	  pTmp = pDc;
+	  pDc = Gia_ManDupCones( pDc, &j, 1, 0 );
+	  Gia_ManStop( pTmp );
+	  for ( j = 0; j < Gia_ManCiNum( pGia ); j++ )
+	    {
+	      pTmp = pDc;
+	      pDc = Gia_ManDupUniv( pDc, j );
+	      Gia_ManStop( pTmp );
+	    }
+	  pTmp = pDc;
+	  pDc = Gia_ManDupLastPis( pDc, Vec_IntSize( p->vOrgPis ) );
+	  Gia_ManStop( pTmp );
+	}
+      else
+	{
+	  pDc = Gia_ManStart( Vec_IntSize( p->vPis ) );
+	  Vec_IntForEachEntry( p->vPis, id, j )
+	    Gia_ManAppendCi( pDc );
+	  Gia_ManAppendCo( pDc, Gia_ManConst0Lit() );
+	}
+      Vec_PtrPush( Vec_PtrEntry( p->vvDcGias, Vec_IntEntry( vIdxs, k ) ), pDc );
     }
   Vec_IntFree( vId );
   Vec_IntFree( vCkts );
@@ -581,9 +603,22 @@ static inline int Abc_BddNandGia2NetsNext( Gia_Man_t * pGia, Vec_Int_t * v,  int
     }
   return Abc_BddNandConst0();
 }
-static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec_Int_t * vPoCkts, Vec_Int_t * vPoIdxs, Vec_Int_t * vExternalCs, int nMem, int fRm, int nWindowSize, int nMspf, int nVerbose )
+static inline void recursive_dec( Gia_Man_t * pGia, int * pFanouts, Gia_Obj_t * pObj )
 {
-  int i, id, lit, newId, part;
+  int id;
+  if ( Gia_ObjIsConst0( pObj ) || Gia_ObjIsCi( pObj ) )
+    return;
+  id = Gia_ObjId( pGia, pObj );
+  pFanouts[id]--;
+  assert( pFanouts[id] >= 0 );
+  if ( pFanouts[id] )
+    return;
+  recursive_dec( pGia, pFanouts, Gia_ObjFanin0( pObj ) );
+  recursive_dec( pGia, pFanouts, Gia_ObjFanin1( pObj ) );
+}
+static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec_Int_t * vPoCkts, Vec_Int_t * vPoIdxs, Vec_Int_t * vExternalCs, int nMem, int fRm, int fDc, int nWindowSize, int nMspf, int nVerbose )
+{
+  int i, id, lit, newId, part, nPos;
   int * pFanouts, * pParts;
   Vec_Int_t * vPis, * vPos, * vTempPos, * vNodes, * vExternalPos, * vCands;
   Vec_Ptr_t * vvPis, * vvPos;
@@ -606,17 +641,27 @@ static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec
   vTempPos = Vec_IntAlloc( 1 );
   vNodes = Vec_IntAlloc( 1 );
   // get po information
+  if ( fDc )
+    nPos = Gia_ManCoNum( pGia ) / 2;
+  else
+    nPos = Gia_ManCoNum( pGia );
   Gia_ManForEachCo( pGia, pObj, i )
-    {
-      Vec_IntPush( vExternalCs, Gia_ObjFaninC0( pObj ) );
-      pObj = Gia_ObjFanin0( pObj );
-      id = Gia_ObjId( pGia, pObj );
-      Vec_IntPush( vExternalPos, id );
-      if ( Gia_ObjIsConst0( pObj ) || Gia_ObjIsCi( pObj ) )
-	continue;
-      pFanouts[id]--;
-      Vec_IntPushUnique( vCands, id );
-    }
+    if ( i < nPos )
+      {
+	Vec_IntPush( vExternalCs, Gia_ObjFaninC0( pObj ) );
+	pObj = Gia_ObjFanin0( pObj );
+	id = Gia_ObjId( pGia, pObj );
+	Vec_IntPush( vExternalPos, id );
+	if ( Gia_ObjIsConst0( pObj ) || Gia_ObjIsCi( pObj ) )
+	  continue;
+	pFanouts[id]--;
+	Vec_IntPushUnique( vCands, id );
+      }
+    else
+      {
+	pObj = Gia_ObjFanin0( pObj );
+	recursive_dec( pGia, pFanouts, pObj );
+      }
   // Partition
   part = 0;
   while ( 1 )
@@ -691,7 +736,7 @@ static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec
 	break;
     }
   // create map to inputs
-  Abc_BddNandSetPoInfo( pGia, vNets, vvPis, vvPos, vExternalPos, vPoCkts, vPoIdxs );
+  Abc_BddNandSetPoInfo( pGia, vNets, vvPis, vvPos, vExternalPos, vPoCkts, vPoIdxs, fDc );
   Gia_ManStop( pGia );
   ABC_FREE( pFanouts );
   ABC_FREE( pParts );
@@ -1649,11 +1694,11 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 static inline Gia_Man_t * Abc_BddNandNets2Gia( Vec_Ptr_t * vNets, Vec_Int_t * vPoCkts, Vec_Int_t * vPoIdxs, Vec_Int_t * vExternalCs, int fDc, Gia_Man_t * pOld )
 {
   int i, j, k, id, idj, id0, id1, Value, cond, nPos;
-  int * Values;
+  int * Values, * pPos;
   int ** vvPoValues;
   Vec_Ptr_t * vDcGias;
   Gia_Obj_t * pObj;
-  Gia_Man_t * pNew, * pTmp;
+  Gia_Man_t * pNew, * pTmp, * pDc;
   Gia_Man_t ** pDcGias;
   Abc_NandMan * p;
   vvPoValues = ABC_CALLOC( int *, Vec_PtrSize( vNets ) + 1 );
@@ -1712,14 +1757,13 @@ static inline Gia_Man_t * Abc_BddNandNets2Gia( Vec_Ptr_t * vNets, Vec_Int_t * vP
   if ( fDc )
     {
       nPos = Gia_ManCoNum( pOld ) / 2;
-      pDcGias = ABC_CALLOC( Gia_Man_t *, nPos );
-      p = Vec_PtrEntry( vNets, 0 );
-      Vec_PtrForEachEntry( Vec_Ptr_t *, p->vvDcGias, vDcGias, i )
-	pDcGias[i] = Vec_PtrEntry( vDcGias, 0 );
-      pTmp = pNew;
-      pNew = Gia_ManDupAppendCones( pNew, pDcGias, nPos, 0 );
-      Gia_ManStop( pTmp );
-      ABC_FREE( pDcGias );
+      pPos = ABC_CALLOC( int, nPos );
+      for ( i = 0; i < nPos; i++ )
+	pPos[i] = nPos + i;
+      pDc = Gia_ManDupCones( pOld, pPos, nPos, 0 );
+      ABC_FREE( pPos );
+      Gia_ManDupAppendShare( pNew, pDc );
+      Gia_ManStop( pDc );
     }
   for ( i = 0; i < Vec_PtrSize( vNets ) + 1; i++ )
     ABC_FREE( vvPoValues[i] );
@@ -1900,7 +1944,7 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, 
 	  }
     }
   else
-    Abc_BddNandGia2Nets( pGia, vNets, vPoCkts, vPoIdxs, vExternalCs, nMem, fRm, nWindowSize, nMspf, nVerbose );
+    Abc_BddNandGia2Nets( pGia, vNets, vPoCkts, vPoIdxs, vExternalCs, nMem, fRm, fDc, nWindowSize, nMspf, nVerbose );
   // optimize
   abctime clk0 = Abc_Clock();
   Vec_PtrForEachEntry( Abc_NandMan *, vNets, p, i )
