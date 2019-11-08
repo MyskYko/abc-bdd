@@ -1655,7 +1655,8 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	  Abc_BddNandObjEntry( p, new_id );
 	  Abc_BddNandSortFanin( p, new_id );
 	  out = Abc_BddNandRemoveRedundantFanin( p, new_id );
-	  assert ( !Abc_BddNandObjIsEmptyOrDead( p, new_id ) );
+	  if ( Abc_BddNandObjIsEmptyOrDead( p, new_id ) )
+	    continue;
 	  wire = Vec_IntSize( p->pvFanins[id] ) + Vec_IntSize( p->pvFanins[idj] );
 	  if ( out || Vec_IntSize( p->pvFanins[new_id] ) > wire - 1 )
 	    {

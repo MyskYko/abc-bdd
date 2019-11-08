@@ -46165,16 +46165,18 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
 	    for ( i = 0; i < nDcPos; i++ )
 	      {
 		vDcPos[i] = nDcPos + nDcPos + i;
-		if ( Gia_ObjIsConst0( Gia_ObjChild0( Gia_ManCo( p00, i ) ) ) &&
-		     Gia_ObjIsConst0( Gia_Not( Gia_ObjChild0( Gia_ManCo( p00, i + nDcPos ) ) ) ) )
+		if ( Gia_ObjChild0( Gia_ManCo( p00, i ) ) == Gia_Not( Gia_ObjChild0( Gia_ManCo( p00, i + nDcPos ) ) ) )
+		  v = Gia_ObjChild0( Gia_ManCo( p00, i ) );
+		else if ( Gia_ObjFanin0( Gia_ManCo( p00, i ) ) == Gia_ObjFanin0( Gia_ManCo( p00, i + nDcPos ) ) )
 		  v = Gia_ManConst0Lit( p00 );
 		else
 		  v = Gia_ManAppendAnd( p00,
 					Gia_Obj2Lit( p00, Gia_ObjChild0( Gia_ManCo( p00, i ) ) ),
 					Abc_LitNot( Gia_Obj2Lit( p00, Gia_ObjChild0( Gia_ManCo( p00, i + nDcPos ) ) ) ) );
 		Gia_ManAppendCo( p00, v );
-		if ( Gia_ObjIsConst0( Gia_ObjChild0( Gia_ManCo( p10, i ) ) ) &&
-		     Gia_ObjIsConst0( Gia_Not( Gia_ObjChild0( Gia_ManCo( p10, i + nDcPos ) ) ) ) )
+		if ( Gia_ObjChild0( Gia_ManCo( p10, i ) ) == Gia_Not( Gia_ObjChild0( Gia_ManCo( p10, i + nDcPos ) ) ) )
+		  v = Gia_ObjChild0( Gia_ManCo( p10, i ) );
+		else if ( Gia_ObjFanin0( Gia_ManCo( p10, i ) ) == Gia_ObjFanin0( Gia_ManCo( p10, i + nDcPos ) ) )
 		  v = Gia_ManConst0Lit( p10 );
 		else
 		  v = Gia_ManAppendAnd( p10,
