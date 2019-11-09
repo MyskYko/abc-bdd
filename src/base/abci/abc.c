@@ -46119,24 +46119,39 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
         Abc_Print( -1, "Abc_CommandAbc9Cspf(): There is no AIG.\n" );
         return 1;
     }
-    if ( nWindowSize && fSpec )
+    if ( !nWindowSize && fDcPropagate )
     {
-        Abc_Print( -1, "Abc_CommandAbc9Cspf(): The restricted candidates cannot be used for partitioned circuits\n" );
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): DC propagation can be used only for partitioned circuits\n" );
 	return 1;
     }
-    if ( Gia_ManCoNum( pAbc->pGia ) % 2 && ( fExdc || fSpec ) )
+    if ( nWindowSize && fSpec )
     {
-        Abc_Print( -1, "Abc_CommandAbc9Cspf(): External Don't Cares and the restricted candidates cannot be used for a circuit with the odd number of outputs\n" );
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): The restricted candidates can be used only for non-partitioned circuits\n" );
 	return 1;
+    }
+    if ( Gia_ManCoNum( pAbc->pGia ) % 2 && fExdc )
+    {
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): External DC can be used only for a circuit with the even number of outputs\n" );
+	return 1;
+    }
+    if ( Gia_ManCoNum( pAbc->pGia ) % 2 && fSpec )
+    {
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): The restricted candidates can be used only for a circuit with the even number of outputs\n" );
+	return 1;
+    }
+    if ( fExdc && fSpec )
+    {
+	Abc_Print( -1, "Abc_CommandAbc9Cspf(): External DC and the restricted candidates cannot be used at the same time\n" );
+	return -1;
     }
     if ( nType > 3 )
     {
-        Abc_Print( -1, "Abc_CommandAbc9Cspf(): G must be within 0-3\n" );
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): Optimization type \"-G\" must be within 0-3\n" );
 	return 1;
     }
     if ( nType != 1 && nMspf >= 2 )
     {
-        Abc_Print( -1, "Abc_CommandAbc9Cspf(): H=2 is available only when G=1\n" );
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): H=2 can be used only for G=1\n" );
 	return 1;
     }
     if ( !fCudd && fReo )
@@ -46212,7 +46227,7 @@ usage:
     Abc_Print( -2, "\t        circuit minimization with permissible function using simple bdd\n" );
     Abc_Print( -2, "\t-c    : toggle using CUDD not simple BDD [default = %s]\n", fCudd? "yes": "no" );
     Abc_Print( -2, "\t-e    : toggle verification [default = %s]\n", fVerify? "yes": "no" );
-    Abc_Print( -2, "\t-m    : toggle removing redundancy while CSPF definitely [default = %s]\n", fRm? "yes": "no" );
+    Abc_Print( -2, "\t-m    : toggle removing redundancy definitely during CSPF [default = %s]\n", fRm? "yes": "no" );
     Abc_Print( -2, "\t-p    : toggle repeating optimization while it is effective [default = %s]\n", fRep? "yes": "no" );
     Abc_Print( -2, "\t-r    : toggle dynamic variable reoredering (available only with CUDD) [default = %s]\n", fReo? "yes": "no" );
     Abc_Print( -2, "\t-x    : toggle using the later half outputs as external don't cares of the first half outputs [default = %s]\n", fExdc? "yes": "no" );
