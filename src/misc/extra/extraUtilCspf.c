@@ -1537,7 +1537,7 @@ static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak, int fHalf )
 ***********************************************************************/
 static inline void Abc_BddNandG3( Abc_NandMan * p )
 {
-  int i,j,k, id, idj, idk, out, wire, new_id;
+  int i, j, k, id, idj, idk, c, wire, new_id;
   unsigned fi, fj, f1, f0, gi, gj, x, y;
   Vec_Int_t * targets;
   new_id = Vec_IntSize( p->vPis ) + 1;
@@ -1604,21 +1604,10 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	  Abc_BddNandMarkDescendant_rec( p, p->pvFanouts, idj );
 	  x = Abc_BddOr( p->pBdd, Abc_BddLitNot( x ), y );
 	  y = Abc_BddLitConst1();
-	  Vec_IntForEachEntry( p->vPis, idk, k ) 
-	    if ( Abc_BddNandTryConnect( p, idk, new_id ) )
-	      {
-		if ( Abc_BddLitIsConst1( x ) ||
-		     Abc_BddLitIsInvalid( x ) ||
-		     Abc_BddLitIsInvalid( y ) )
-		  break;
-		y = Abc_BddAnd( p->pBdd, y, p->pBddFuncs[idk] );
-		x = Abc_BddOr( p->pBdd, x, Abc_BddLitNot( y ) );
-	      }
-	  Vec_IntForEachEntry( targets, idk, k )
+	  Vec_IntForEachEntry( p->vPis, idk, k )
 	    {
-	      if ( Abc_BddNandObjIsEmptyOrDead( p, idk ) || p->pMark[idk] )
-		continue;
-	      if ( Abc_BddNandTryConnect( p, idk, new_id ) )
+	      c = Abc_BddNandTryConnect( p, idk, new_id );
+	      if ( c == 1 )
 		{
 		  if ( Abc_BddLitIsConst1( x ) ||
 		       Abc_BddLitIsInvalid( x ) ||
@@ -1627,8 +1616,33 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 		  y = Abc_BddAnd( p->pBdd, y, p->pBddFuncs[idk] );
 		  x = Abc_BddOr( p->pBdd, x, Abc_BddLitNot( y ) );
 		}
+	      else if ( c == -1 )
+		break;
 	    }
-	  if ( !Vec_IntSize( p->pvFanins[new_id] ) )
+	  if ( c == -1 )
+	    {
+	      Abc_BddNandRemoveNode( p, new_id );
+	      continue;
+	    }
+	  Vec_IntForEachEntry( targets, idk, k )
+	    {
+	      if ( Abc_BddNandObjIsEmptyOrDead( p, idk ) || p->pMark[idk] )
+		continue;
+	      c = Abc_BddNandTryConnect( p, idk, new_id );
+	      if ( c == 1 )
+		{
+		  if ( Abc_BddLitIsConst1( x ) ||
+		       Abc_BddLitIsInvalid( x ) ||
+		       Abc_BddLitIsInvalid( y ) )
+		    break;
+		  y = Abc_BddAnd( p->pBdd, y, p->pBddFuncs[idk] );
+		  x = Abc_BddOr( p->pBdd, x, Abc_BddLitNot( y ) );
+		}
+	      else if ( c == -1 )
+		break;
+	    }
+	  // check the F of new node satisfies F and G.
+	  if ( c == -1 || !Vec_IntSize( p->pvFanins[new_id] ) || !Abc_BddLitIsConst1( x ) )
 	    {
 	      Abc_BddNandRemoveNode( p, new_id );
 	      continue;
@@ -1639,12 +1653,6 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	  z = Abc_BddOr( p->pBdd, z, Abc_BddLitNot( y ) );
 	  assert( z == x );
 	  */
-	  // check the F of new node satisfies F and G.
-	  if ( !Abc_BddLitIsConst1( x ) )
-	    {
-	      Abc_BddNandRemoveNode( p, new_id );
-	      continue;
-	    }
 	  // reduce the inputs
 	  p->pBddFuncs[new_id] = Abc_BddLitNot( y );
 	  Vec_IntForEachEntry( p->pvFanouts[id], idk, k )
@@ -1654,11 +1662,10 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	      Abc_BddNandConnect( p, new_id, idk, 0 );
 	  Abc_BddNandObjEntry( p, new_id );
 	  Abc_BddNandSortFanin( p, new_id );
-	  out = Abc_BddNandRemoveRedundantFanin( p, new_id );
-	  if ( Abc_BddNandObjIsEmptyOrDead( p, new_id ) )
-	    continue;
+	  c = Abc_BddNandRemoveRedundantFanin( p, new_id );
+	  assert( !Abc_BddNandObjIsEmptyOrDead( p, new_id ) );
 	  wire = Vec_IntSize( p->pvFanins[id] ) + Vec_IntSize( p->pvFanins[idj] );
-	  if ( out || Vec_IntSize( p->pvFanins[new_id] ) > wire - 1 )
+	  if ( c || Vec_IntSize( p->pvFanins[new_id] ) > wire - 1 )
 	    {
 	      Abc_BddNandRemoveNode( p, new_id );
 	      continue;
@@ -1921,9 +1928,6 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, 
       else
 	pNew = Gia_ManDup( pGia );
       p = Abc_BddNandManAlloc( pNew, nMem, fRm, nMspf, nVerbose );
-      p->vOrgPis = Vec_IntAlloc( Gia_ManCiNum( pNew ) );
-      Gia_ManForEachCi( pNew, pObj, i )
-	Vec_IntPush( p->vOrgPis, Gia_ObjId( pNew, pObj ) );
       Vec_IntForEachEntry( p->vPis, id, i )
 	{
 	  Vec_IntPush( p->vPiCkts, -1 );
@@ -1988,7 +1992,7 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, 
 	  if ( p->nMspf < 2 ) Abc_BddNandCspfEager( p );
 	  if ( !fRep ) break;
 	}
-      if ( fDcPropagate ) Abc_BddNandPropagateDc( vNets, i, pGia );
+      if ( nWindowSize && fDcPropagate ) Abc_BddNandPropagateDc( vNets, i, pGia );
     }
   if ( nVerbose ) ABC_PRT( "total ", Abc_Clock() - clk0 );
   pNew = Abc_BddNandNets2Gia( vNets, vPoCkts, vPoIdxs, vExternalCs, fDc, pGia );
