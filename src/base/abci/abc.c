@@ -46179,7 +46179,6 @@ int Abc_CommandAbc9CspfCudd( Abc_Frame_t * pAbc, int argc, char ** argv )
     int nType = 0;
     int fReo = 0;
     int fRep = 1;
-    Gia_Man_t * pNew = NULL, * pMiter;
     extern void Abc_DdNandGiaTest( Gia_Man_t * pGia, int nType, int fReo, int fRep, int nVerbose );
     Extra_UtilGetoptReset();
     while ( ( c = Extra_UtilGetopt( argc, argv, "GVprh" ) ) != EOF )

@@ -64,8 +64,6 @@ static inline DdNode * Abc_DdOr( DdManager * p, DdNode * a, DdNode * b, int nBdd
   DdNode * c = Abc_DdAnd( p, Cudd_Not( a ), Cudd_Not( b ), nBddSizeMax );
   return Cudd_Not( c );
 }
-static inline void Abc_DdRef( DdNode * a, char * where ) { Cudd_Ref( a ); }
-static inline void Abc_DdDeref( DdManager * p, DdNode * a, char * where ) { Cudd_RecursiveDeref( p, a ); }
 
 /**Function*************************************************************
 
@@ -223,16 +221,16 @@ static inline void Abc_DdNandRemoveNode( Abc_DdNandMan * p, int id )
   p->pvFanouts[id] = 0;
   if( p->pBddFuncs[id] )
     {
-      Abc_DdDeref( p->pDd, p->pBddFuncs[id], "rmnode" );
+      Cudd_RecursiveDeref( p->pDd, p->pBddFuncs[id] );
       p->pBddFuncs[id] = NULL;
     }
   // TODO deref G and C
   if ( p->pGFuncs[id] )
-    Abc_DdDeref( p->pDd, p->pGFuncs[id], "rmnode g" );
+    Cudd_RecursiveDeref( p->pDd, p->pGFuncs[id] );
   if ( p->pvCFuncs[id] )
     {
       Vec_PtrForEachEntry( DdNode *, p->pvCFuncs[id], x, j )
-	Abc_DdDeref( p->pDd, x, "cspfc before" );
+	Cudd_RecursiveDeref( p->pDd, x );
       Vec_PtrClear( p->pvCFuncs[id] );
     }
   Vec_IntRemove( p->vObjs, id );
@@ -547,14 +545,14 @@ static inline void Abc_DdNandBuild( Abc_DdNandMan * p, int id )
   int j, idj;
   DdNode * Value, * Value_;
   if ( Abc_DdNandObjValue( p, id ) )
-    Abc_DdDeref( p->pDd, Abc_DdNandObjValue( p, id ), "build before" );
+    Cudd_RecursiveDeref( p->pDd, Abc_DdNandObjValue( p, id ) );
   Value_ = p->pDd->one;
-  Abc_DdRef( Value_, "+build init" );
+  Cudd_Ref( Value_ );
   Vec_IntForEachEntry( p->pvFanins[id], idj, j )
     {
       Value = Abc_DdAnd( p->pDd, Value_, Abc_DdNandObjValue( p, idj ), p->nBddSizeMax );
-      Abc_DdRef( Value, "+build rec" );
-      Abc_DdDeref( p->pDd, Value_, "build rec" );
+      Cudd_Ref( Value );
+      Cudd_RecursiveDeref( p->pDd, Value_ );
       Value_ = Value;
     }
   Abc_DdNandObjValueWrite( p, id, Cudd_Not( Value_ ) );
@@ -592,9 +590,9 @@ static inline void Abc_DdNandCspfG( Abc_DdNandMan * p, int id )
   int j, idj, index;
   DdNode * Value, * c;
   if ( p->pGFuncs[id] )
-    Abc_DdDeref( p->pDd, p->pGFuncs[id], "cspfg before" );
+    Cudd_RecursiveDeref( p->pDd, p->pGFuncs[id] );
   p->pGFuncs[id] = p->pDd->one;
-  Abc_DdRef( p->pGFuncs[id], "+cspfg init" );
+  Cudd_Ref( p->pGFuncs[id] );
   Vec_IntForEachEntry( p->pvFanouts[id], idj, j )
     {
       if ( Abc_DdNandIsPoNode( p, idj ) )
@@ -612,8 +610,8 @@ static inline void Abc_DdNandCspfG( Abc_DdNandMan * p, int id )
 	  c = Vec_PtrEntry( p->pvCFuncs[idj], index );
 	  Value = Abc_DdAnd( p->pDd, p->pGFuncs[id], c, p->nBddSizeMax );
 	}
-      Abc_DdRef( Value, "+cspfg rec" );
-      Abc_DdDeref( p->pDd, p->pGFuncs[id], "cspfg rec" );
+      Cudd_Ref( Value );
+      Cudd_RecursiveDeref( p->pDd, p->pGFuncs[id] );
       p->pGFuncs[id] = Value;
     }
 }
@@ -622,37 +620,37 @@ static inline void Abc_DdNandCspfC( Abc_DdNandMan * p, int id ) {
   DdNode * x, * fanins, * fk, * Value, * fi, * fj, * already1, * c, * DC1;
   if ( !p->pvCFuncs[id] ) p->pvCFuncs[id] = Vec_PtrAlloc( 1 );
   Vec_PtrForEachEntry( DdNode *, p->pvCFuncs[id], x, i )
-    Abc_DdDeref( p->pDd, x, "cspfc before" );
+    Cudd_RecursiveDeref( p->pDd, x );
   Vec_PtrClear( p->pvCFuncs[id] );
   Vec_IntForEachEntry( p->pvFanins[id], idj, j )
     {
       fanins = p->pDd->one;
-      Abc_DdRef( fanins, "+cspfc init" );
+      Cudd_Ref( fanins );
       Vec_IntForEachEntryStart( p->pvFanins[id], idk, k, j+1 )
 	{
 	  fk = Abc_DdNandObjValue( p, idk );
 	  Value = Abc_DdAnd( p->pDd, fanins, fk, p->nBddSizeMax );
-	  Abc_DdRef( Value, "+cspfc rec" );
-	  Abc_DdDeref( p->pDd, fanins, "cspfc rec" );
+	  Cudd_Ref( Value );
+	  Cudd_RecursiveDeref( p->pDd, fanins );
 	  fanins = Value;
 	}
       fi = Abc_DdNandObjValue( p, id );
       fj = Abc_DdNandObjValue( p, idj );
       already1 = Abc_DdAnd( p->pDd, fi, fj, p->nBddSizeMax );
-      Abc_DdRef( already1, "+cspfc already1" );
+      Cudd_Ref( already1 );
       c = Abc_DdOr( p->pDd, p->pGFuncs[id], Cudd_Not( fanins ), p->nBddSizeMax );
-      Abc_DdRef( c, "+cspfc c" );
-      Abc_DdDeref( p->pDd, fanins, "cspfs c done" );
+      Cudd_Ref( c );
+      Cudd_RecursiveDeref( p->pDd, fanins );
       Value = Abc_DdOr( p->pDd, c, already1, p->nBddSizeMax );
-      Abc_DdRef( Value, "+cspfc value" );
-      Abc_DdDeref( p->pDd, already1, "cspfc value done" );
-      Abc_DdDeref( p->pDd, c, "cspfc value done2" );
+      Cudd_Ref( Value );
+      Cudd_RecursiveDeref( p->pDd, already1 );
+      Cudd_RecursiveDeref( p->pDd, c );
       DC1 = Abc_DdOr( p->pDd, fj, Value, p->nBddSizeMax );
-      Abc_DdRef( DC1, "+cspfc DC1" );
+      Cudd_Ref( DC1 );
       if ( DC1 == p->pDd->one )
 	{
-	  Abc_DdDeref( p->pDd, Value, "cspfc found v" );
-	  Abc_DdDeref( p->pDd, DC1, "cspfc found dc" );
+	  Cudd_RecursiveDeref( p->pDd, Value );
+	  Cudd_RecursiveDeref( p->pDd, DC1 );
 	  Abc_DdNandDisconnect( p, idj, id );
 	  if ( Vec_IntSize( p->pvFanins[id] ) == 0 )
 	    {
@@ -665,7 +663,7 @@ static inline void Abc_DdNandCspfC( Abc_DdNandMan * p, int id ) {
 	  j--;
 	  continue;
 	}
-      Abc_DdDeref( p->pDd, DC1, "cspfc end" );
+      Cudd_RecursiveDeref( p->pDd, DC1 );
       Vec_PtrPush( p->pvCFuncs[id], Value );
     }
 }
@@ -744,18 +742,18 @@ static inline int Abc_DdNandTryConnect( Abc_DdNandMan * p, int fanin, int fanout
   DdNode * ffanout = Abc_DdNandObjValue( p, fanout );
   DdNode * gfanout = p->pGFuncs[fanout];
   DdNode * connectable = Abc_DdOr( p->pDd, ffanout, gfanout, p->nBddSizeMax );
-  Abc_DdRef( connectable, "+connect connectable" );
+  Cudd_Ref( connectable );
   DdNode * Value = Abc_DdOr( p->pDd, ffanin, connectable, p->nBddSizeMax );
-  Abc_DdRef( Value, "+connect value" );
-  Abc_DdDeref( p->pDd, connectable, "connect value done" );
+  Cudd_Ref( Value );
+  Cudd_RecursiveDeref( p->pDd, connectable );
   connectable = Value;
   if ( connectable == p->pDd->one )
     {
       Abc_DdNandConnect( p, fanin, fanout, 1 );
-      Abc_DdDeref( p->pDd, connectable, "connect connect done" );
+      Cudd_RecursiveDeref( p->pDd, connectable );
       return 1;
     }
-  Abc_DdDeref( p->pDd, connectable, "connect connect done" );
+  Cudd_RecursiveDeref( p->pDd, connectable );
   return 0;
 }
 /**Function*************************************************************
@@ -787,17 +785,7 @@ static inline void Abc_DdNandG1EagerReduce( Abc_DdNandMan * p, int id, int idj )
   Abc_DdNandBuildAll( p );
   Abc_DdNandCspfEager( p );
 }
-static inline void Abc_DdNandG1WeakReduce( Abc_DdNandMan * p, int id, int idj )
-{
-  int wire =  Abc_DdNandCountWire( p );
-  Abc_DdNandCspfC( p, id );
-  if ( Abc_DdNandIsEmptyOrDeadNode( p, id ) ) return;
-  if ( Abc_DdNandIsEmptyOrDeadNode( p, idj ) ) return;
-  if ( wire == Abc_DdNandCountWire( p ) )
-    Abc_DdNandDisconnect( p, idj, id );
-  Abc_DdNandBuild( p, id );
-}
-static inline void Abc_DdNandG1( Abc_DdNandMan * p, int fWeak )
+static inline void Abc_DdNandG1( Abc_DdNandMan * p )
 {
   int i, j, id, idj;
   Vec_Int_t * targets = Vec_IntDup( p->vObjs );
@@ -816,10 +804,7 @@ static inline void Abc_DdNandG1( Abc_DdNandMan * p, int fWeak )
 	{
 	  if ( Abc_DdNandIsEmptyOrDeadNode( p, id ) ) break;
 	  if ( Abc_DdNandTryConnect( p, idj, id ) )
-	    {
-	      if ( fWeak ) Abc_DdNandG1WeakReduce( p, id, idj );	
-	      else Abc_DdNandG1EagerReduce( p, id, idj );
-	    }
+	    Abc_DdNandG1EagerReduce( p, id, idj );
 	}
       // try connecting candidate
       Vec_IntForEachEntry( targets, idj, j )
@@ -829,19 +814,7 @@ static inline void Abc_DdNandG1( Abc_DdNandMan * p, int fWeak )
 	  if ( id == idj ) continue;
 	  if ( Vec_IntFind( fanouts, idj ) != -1 ) continue;
 	  if ( Abc_DdNandTryConnect( p, idj, id ) )
-	    {
-	      if ( fWeak ) Abc_DdNandG1WeakReduce( p, id, idj );
-	      else Abc_DdNandG1EagerReduce( p, id, idj );
-	    }
-	}
-      // recalculate fanouts for option
-      if ( fWeak )
-	{
-	  if ( Abc_DdNandIsEmptyOrDeadNode( p, id ) ) continue;
-	  Abc_DdNandCspfC( p, id );
-	  if ( Abc_DdNandIsEmptyOrDeadNode( p, id ) ) continue;
-	  Abc_DdNandCspfFaninCone( p, id );
-	  Abc_DdNandBuildAll( p );
+	    Abc_DdNandG1EagerReduce( p, id, idj );
 	}
       Vec_IntFree( fanouts );
     }
@@ -870,6 +843,7 @@ void Abc_DdNandGiaTest( Gia_Man_t * pGia, int nType, int fDvr, int fRep, int nVe
   Abc_DdNandMan * p = Abc_DdNandManAlloc( pGia, fDvr, nVerbose );
   Abc_DdNandGenNet( p, pGia );
   Abc_DdManAlloc( p );
+  //  printf( "%d\n", Cudd_ReadKeys(p->pDd) - Cudd_ReadDead(p->pDd) );
   abctime clk0 = Abc_Clock();
   Abc_DdNandBuildAll( p );
   if ( nVerbose ) Abc_DdNandPrintStats( p, "initial", clk0 );
@@ -882,7 +856,7 @@ void Abc_DdNandGiaTest( Gia_Man_t * pGia, int nType, int fDvr, int fRep, int nVe
       switch ( nType )
 	{
 	case 1:
-	  Abc_DdNandG1( p, 0 );
+	  Abc_DdNandG1( p );
 	  if ( nVerbose ) Abc_DdNandPrintStats( p, "g1", clk0 );
 	  break;
 	default:
@@ -894,6 +868,15 @@ void Abc_DdNandGiaTest( Gia_Man_t * pGia, int nType, int fDvr, int fRep, int nVe
     }
   if ( nVerbose ) ABC_PRT( "total ", Abc_Clock() - clk0 );
   Abc_DdNandPrintNet( p );
+  /*  
+  int i, j, id;
+  Vec_IntForEachEntry( p->vObjs, id, i )
+    {
+      Abc_DdNandRemoveNode( p, id );
+      i--;
+    }
+  printf( "%d\n", Cudd_ReadKeys(p->pDd) - Cudd_ReadDead(p->pDd) );
+  */
   Abc_DdNandManFree( p );
 }
 
