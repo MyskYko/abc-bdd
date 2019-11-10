@@ -864,7 +864,7 @@ static inline void Abc_DdNandPrintStats( Abc_DdNandMan * p, char * prefix, abcti
   printf( "\r%-10s: gates = %5d, wires = %5d, AIG node = %5d", prefix, Vec_IntSize( p->vObjs ), Abc_DdNandCountWire( p ), Abc_DdNandCountWire( p ) - Vec_IntSize( p->vObjs ) );
   ABC_PRT( ", time ", Abc_Clock() - clk0 );
 }
-void Abc_DdNandGiaTest( Gia_Man_t * pGia, int nType, int fDvr, int nVerbose )
+void Abc_DdNandGiaTest( Gia_Man_t * pGia, int nType, int fDvr, int fRep, int nVerbose )
 {
   int wire;
   Abc_DdNandMan * p = Abc_DdNandManAlloc( pGia, fDvr, nVerbose );
@@ -874,7 +874,7 @@ void Abc_DdNandGiaTest( Gia_Man_t * pGia, int nType, int fDvr, int nVerbose )
   Abc_DdNandBuildAll( p );
   if ( nVerbose ) Abc_DdNandPrintStats( p, "initial", clk0 );
   Abc_DdNandCspfEager( p );
-  if ( nVerbose ) Abc_DdNandPrintStats( p, "cspf", clk0 );
+  if ( nVerbose ) Abc_DdNandPrintStats( p, "cspf", clk0 );  
   wire = 0;
   while ( wire != Abc_DdNandCountWire( p ) )
     {
@@ -889,7 +889,9 @@ void Abc_DdNandGiaTest( Gia_Man_t * pGia, int nType, int fDvr, int nVerbose )
 	  break;
 	}
       Abc_DdNandCspfEager( p );
-    }    
+      if ( !fRep )
+	break;
+    }
   if ( nVerbose ) ABC_PRT( "total ", Abc_Clock() - clk0 );
   Abc_DdNandPrintNet( p );
   Abc_DdNandManFree( p );
