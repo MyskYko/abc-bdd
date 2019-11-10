@@ -46205,7 +46205,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &cspf [-GMHPV num] [-cemprxyzh]\n" );
+    Abc_Print( -2, "usage: &cspf [-GMHPV num] [-empxyzh]\n" );
     Abc_Print( -2, "\t        circuit minimization with permissible function using simple bdd\n" );
     Abc_Print( -2, "\t-e    : toggle verification [default = %s]\n", fVerify? "yes": "no" );
     Abc_Print( -2, "\t-m    : toggle removing redundancy definitely during CSPF [default = %s]\n", fRm? "yes": "no" );
