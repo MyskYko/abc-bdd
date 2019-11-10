@@ -128,6 +128,32 @@ static inline void Abc_BddCountEdgeAndBvar( Abc_BddMan * p, Vec_Int_t * pFunctio
    SeeAlso     []
 
 ***********************************************************************/
+static inline void Abc_BddPrintOrdering( Abc_BddMan * p )
+{
+  int i, j;
+  printf( "Ordering :\n" );
+  for ( i = 0; i < p->nVars; i++ )
+    {
+      for ( j = 0; j < p->nVars; j++ )
+	if ( Abc_BddVar( p, Abc_BddLitIthVar( j ) ) == i )
+	  break;
+      printf( "%d,", j );
+    }
+  printf( "\n" );
+  printf( "----------\n" );
+}
+
+/**Function*************************************************************
+   
+   Synopsis    []
+
+   Description []
+               
+   SideEffects []
+
+   SeeAlso     []
+
+***********************************************************************/
 static inline void Abc_BddShiftBvar( Abc_BddMan * p, int a, int d )
 {
   int Var;
@@ -382,11 +408,11 @@ static inline int Abc_BddSwap( Abc_BddMan * p, int v, int * nNodes, int dLimit )
    SeeAlso     []
 
 ***********************************************************************/
-static inline void Abc_BddShift( Abc_BddMan * p, int * pos, int * nNodes, int nSwap, int fUp, int * bestPos, int * nBestNodes, int * new2old, Vec_Int_t * pFunctions, int nLimit, int nVerbose )
+static inline void Abc_BddShift( Abc_BddMan * p, int * pos, int * nNodes, int nSwap, int fUp, int * bestPos, int * nBestNodes, int * new2old, Vec_Int_t * pFunctions, int nLimit )
 {
-  int j, k, r, dLimit, fRefresh;
+  int i, r, dLimit, fRefresh;
   fRefresh = 0;
-  for ( j = 0; j < nSwap; j++ )
+  for ( i = 0; i < nSwap; i++ )
     {
       dLimit = nLimit - *nNodes;
       if ( fUp )
@@ -414,7 +440,7 @@ static inline void Abc_BddShift( Abc_BddMan * p, int * pos, int * nNodes, int nS
 	      printf("Error: Number of nodes exceeds the limit during reordering\n");
 	      abort();
 	    }
-	  j--;
+	  i--;
 	  continue;
 	}
       fRefresh = 0;
@@ -426,12 +452,10 @@ static inline void Abc_BddShift( Abc_BddMan * p, int * pos, int * nNodes, int nS
 	  *nBestNodes = *nNodes;
 	  *bestPos = *pos;
 	}
-      if ( nVerbose > 1 )
+      if ( p->nVerbose >= 2 )
 	{
-	  printf("\n");
-	  for ( k = 0; k < p->nVars; k++ )
-	    printf( "%d,", new2old[k] );
-	  printf("  pos %d  nodenum %d\n", *pos, *nNodes);
+	  printf( "pos : %d\nnNode : %d\n", *pos, *nNodes );
+          Abc_BddPrintOrdering( p );
 	}
     }
 }
@@ -447,14 +471,12 @@ static inline void Abc_BddShift( Abc_BddMan * p, int * pos, int * nNodes, int nS
    SeeAlso     []
 
 ***********************************************************************/
-void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
+void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions )
 {
-  int i, j, best_i, pos, nNodes, nSwap, fUp, bestPos, nBestNodes, nLimit;
+  int i, j, k, best_i, pos, nNodes, nSwap, fUp, bestPos, nBestNodes, nLimit;
   int * new2old, * descendingOrder;
   if ( p->nVerbose )
-    printf("\tReordering\n");
-  if ( nVerbose < 0 )
-    nVerbose = 0;
+    printf( "\tReordering\n" );
   // initialize
   new2old = ABC_CALLOC( int, p->nVars );
   descendingOrder = ABC_CALLOC( int, p->nVars );
@@ -477,18 +499,13 @@ void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
   nNodes = 0;
   for ( i = 0; i < p->nVars; i++ )
     nNodes += Vec_IntSize( p->liveBvars[i] );
-  if ( nVerbose )
+  if ( p->nVerbose  >= 2 )
     {
-      printf( "###############################\n" );
-      printf( "# begin reordering\n" );
-      printf( "###############################\n" );
-      printf( "num_nodes : " );
+      printf( "nNode for each level :\n" );
       for ( i = 0; i < p->nVars; i++ )
-	printf( "%d,", Vec_IntSize( p->liveBvars[i] ) );
-      printf( "\nindex (descending order) : " );
-      for ( i = 0; i < p->nVars; i++ )
-	printf( "%d,", descendingOrder[i] );
+	printf( "(%d),", Vec_IntSize( p->liveBvars[i] ) );
       printf( "\n" );
+      Abc_BddPrintOrdering( p );
     }
   // shift
   for ( i = 0; i < p->nVars; i++ )
@@ -504,24 +521,24 @@ void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 	  }
       bestPos = pos;
       nBestNodes = nNodes;
+      if ( p->nVerbose >= 2 )
+	{
+	  for ( k = 0; k < p->nVars; k++ )
+	    if ( Abc_BddVar( p, Abc_BddLitIthVar( k ) ) == j )
+	      break;
+	  printf( "\tBegin shift %d (%d/%d)\n", k, i + 1, p->nVars );
+	}
       if( pos < p->nVars >> 1 )
 	{
 	  fUp ^= 1;
 	  nSwap = pos;
 	}
       else nSwap = p->nVars - pos - 1;
-      if ( nVerbose )
-	{
-	  printf( "begin shift %d (%d/%d)\n", descendingOrder[i], i + 1, p->nVars );
-	  printf( "\t%d goes %s by %d\n", descendingOrder[i], fUp? "up": "down", nSwap );
-	}
-      Abc_BddShift( p, &pos, &nNodes, nSwap, fUp, &bestPos, &nBestNodes, new2old, pFunctions, nLimit, nVerbose );
+      Abc_BddShift( p, &pos, &nNodes, nSwap, fUp, &bestPos, &nBestNodes, new2old, pFunctions, nLimit );
       fUp ^= 1;
       if ( fUp ) nSwap = pos;
       else nSwap = p->nVars - pos - 1;
-      if ( nVerbose )
-	printf( "\n\t%d goes %s by %d\n", descendingOrder[i], fUp? "up": "down", nSwap );
-      Abc_BddShift( p, &pos, &nNodes, nSwap, fUp, &bestPos, &nBestNodes, new2old, pFunctions, nLimit, nVerbose );
+      Abc_BddShift( p, &pos, &nNodes, nSwap, fUp, &bestPos, &nBestNodes, new2old, pFunctions, nLimit );
       if ( pos < bestPos )
 	{
 	  fUp = 0;
@@ -532,25 +549,12 @@ void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int nVerbose )
 	  fUp = 1;
 	  nSwap = pos - bestPos;
 	}
-      if ( nVerbose )
-	{
-	  printf( "\n\tbest position %d, nNodes %d\n", bestPos, nBestNodes );
-	  printf( "\t%d goes %s by %d\n", descendingOrder[i], fUp? "up": "down", nSwap );
-        }
-      Abc_BddShift( p, &pos, &nNodes, nSwap, fUp, &bestPos, &nBestNodes, new2old, pFunctions, nLimit, nVerbose );
-      if ( nVerbose )
-	printf( "\nend shift %d (%d/%d)\n", descendingOrder[i], i + 1, p->nVars );
+      Abc_BddShift( p, &pos, &nNodes, nSwap, fUp, &bestPos, &nBestNodes, new2old, pFunctions, nLimit );
     }
   // finish
   Abc_BddUncountEdge( p, pFunctions );
   ABC_FREE( new2old );
   ABC_FREE( descendingOrder );
-  if ( nVerbose )
-    {
-      printf( "###############################\n" );
-      printf( "# end reordering\n" );
-      printf( "###############################\n" );
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////

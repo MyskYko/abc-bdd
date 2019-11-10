@@ -45991,6 +45991,10 @@ usage:
     Abc_Print( -2, "\t-M num: memory size to allocate (2^(num) nodes) [default = %d]\n", nMem );
     Abc_Print( -2, "\t-R num: threshold to terminate reordering while building BDDs. (num)%% more nodes than before reordering. 0=off. [default = %d]\n", nReorderThreshold );
     Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
+    Abc_Print( -2, "\t\t0: Only results\n" );
+    Abc_Print( -2, "\t\t1: Refresh procedures\n" );
+    Abc_Print( -2, "\t\t2: Reordering procedures\n" );
+    Abc_Print( -2, "\t\t3: Each node entry\n" );
     Abc_Print( -2, "\t-W <file>: file to write blif of constructed BDDs\n" );
     Abc_Print( -2, "\t-h    : print the command usage\n");
     return 1;

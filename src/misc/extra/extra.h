@@ -527,7 +527,7 @@ extern unsigned        Abc_BddUnivAbstract( Abc_BddMan * p, unsigned x, Vec_Int_
 
 /*=== extraUtilReorder.c ================================================================*/
 
-extern void            Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions, int fVerbose );
+extern void            Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions );
 
 /*=== extraUtilVc.c ================================================================*/
 
