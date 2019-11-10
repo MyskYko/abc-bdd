@@ -1283,7 +1283,7 @@ static inline void Abc_BddNandRefresh( Abc_NandMan * p )
   while ( 1 )
     {
       Abc_BddManFree( p->pBdd );
-      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 1, (int)( p->nVerbose > 2 ) );
+      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, (int)( p->nVerbose > 2 ) );
       out = Abc_BddNandDc( p );
       if ( !out )
 	out = Abc_BddNandBuildAll( p );
@@ -1297,6 +1297,11 @@ static inline void Abc_BddNandRefresh( Abc_NandMan * p )
       if ( !out )
 	break;
       Abc_BddNandMemIncrease( p );
+    }
+  if ( p->pBdd->nObjs > 1 << (p->nMem - 1) )
+    {
+      Abc_BddNandMemIncrease( p );
+      Abc_BddManRealloc( p->pBdd );
     }
   if ( p->nVerbose > 1 )
     ABC_PRT( "Refresh took", Abc_Clock() - clk0 );
@@ -1365,7 +1370,7 @@ static inline void Abc_BddNandMspf_Refresh( Abc_NandMan * p )
   while ( 1 )
     {
       Abc_BddManFree( p->pBdd );
-      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 1, (int)( p->nVerbose > 2 ) );
+      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, (int)( p->nVerbose > 2 ) );
       out = Abc_BddNandDc( p );
       if ( !out )
 	out = Abc_BddNandBuildAll( p );
@@ -1374,6 +1379,11 @@ static inline void Abc_BddNandMspf_Refresh( Abc_NandMan * p )
       if ( !out )
 	break;
       Abc_BddNandMemIncrease( p );
+    }
+  if ( p->pBdd->nObjs > 1 << (p->nMem - 1) )
+    {
+      Abc_BddNandMemIncrease( p );
+      Abc_BddManRealloc( p->pBdd );
     }
   if ( p->nVerbose > 1 )
     ABC_PRT( "Refresh took", Abc_Clock() - clk0 );
@@ -1955,11 +1965,12 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, 
   Vec_PtrForEachEntry( Abc_NandMan *, vNets, p, i )
     {
       p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 1, (int)( nVerbose > 2 ) );
+      p->nMem = Abc_Base2Log( p->pBdd->nObjsAlloc );
       while ( Abc_BddNandDc( p ) || Abc_BddNandBuildAll( p ) )
 	{
 	  Abc_BddNandMemIncrease( p );
 	  Abc_BddManFree( p->pBdd );
-	  p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 1, (int)( nVerbose > 2 ) );
+	  p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, (int)( nVerbose > 2 ) );
 	}
       if ( nVerbose ) Abc_BddNandPrintStats( p, "initial", clk0 );
       if ( p->nMspf ) Abc_BddNandMspf_Refresh( p );
