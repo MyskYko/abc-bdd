@@ -76,7 +76,7 @@ static inline void     Abc_BddNandMemIncrease( Abc_NandMan * p ) {
   p->nMem++;
   if ( 1 << p->nMem == 0 )
     {
-      printf("Error: Refresh failed\n");
+      printf( "Error: Refresh failed\n" );
       abort();
     }
 }
@@ -401,7 +401,7 @@ static inline Abc_NandMan * Abc_BddNandManAlloc( Gia_Man_t * pGia, int nMem, int
   p->pvCFuncs  = ABC_CALLOC( Vec_Int_t *, p->nObjsAlloc );
   if ( !p->pvFanins || !p->pvFanouts || !p->pBddFuncs || !p->pRank || !p->pMark || !p->pGFuncs || !p->pvCFuncs )
     {
-      printf("Error: Allocation failed\n");
+      printf( "Error: Allocation failed\n" );
       abort();
     }
   p->nMem = nMem;
@@ -630,7 +630,7 @@ static inline void Abc_BddNandGia2Nets( Gia_Man_t * pOld, Vec_Ptr_t * vNets, Vec
   pParts = ABC_CALLOC( int, pGia->nObjs );
   if ( !pFanouts || !pParts )
     {
-      printf("Error: Allocation failed\n");
+      printf( "Error: Allocation failed\n" );
       abort();
     }
   Abc_BddGiaCountFanout( pGia, pFanouts );
@@ -1275,7 +1275,7 @@ static inline void Abc_BddNandRefresh( Abc_NandMan * p )
 {
   int out;
   abctime clk0;
-  if ( p->nVerbose > 1 )
+  if ( p->nVerbose >= 2 )
     {
       printf( "Refresh\n" );
       clk0 = Abc_Clock();
@@ -1283,7 +1283,7 @@ static inline void Abc_BddNandRefresh( Abc_NandMan * p )
   while ( 1 )
     {
       Abc_BddManFree( p->pBdd );
-      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, (int)( p->nVerbose > 2 ) );
+      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, 0 );
       out = Abc_BddNandDc( p );
       if ( !out )
 	out = Abc_BddNandBuildAll( p );
@@ -1303,8 +1303,11 @@ static inline void Abc_BddNandRefresh( Abc_NandMan * p )
       Abc_BddNandMemIncrease( p );
       Abc_BddManRealloc( p->pBdd );
     }
-  if ( p->nVerbose > 1 )
-    ABC_PRT( "Refresh took", Abc_Clock() - clk0 );
+  if ( p->nVerbose >= 2 )
+    {
+      printf( "Allocated by 2^%d\n", p->nMem );
+      ABC_PRT( "Refresh took", Abc_Clock() - clk0 );
+    }
 }
 static inline void Abc_BddNandRefreshIfNeeded( Abc_NandMan * p )
 {
@@ -1360,7 +1363,7 @@ static inline void Abc_BddNandMspf_Refresh( Abc_NandMan * p )
 {
   int out;
   abctime clk0;
-  if ( p->nVerbose > 1 )
+  if ( p->nVerbose >= 2 )
     {
       printf( "Refresh mspf\n" );
       clk0 = Abc_Clock();
@@ -1370,7 +1373,7 @@ static inline void Abc_BddNandMspf_Refresh( Abc_NandMan * p )
   while ( 1 )
     {
       Abc_BddManFree( p->pBdd );
-      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, (int)( p->nVerbose > 2 ) );
+      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, 0 );
       out = Abc_BddNandDc( p );
       if ( !out )
 	out = Abc_BddNandBuildAll( p );
@@ -1385,8 +1388,11 @@ static inline void Abc_BddNandMspf_Refresh( Abc_NandMan * p )
       Abc_BddNandMemIncrease( p );
       Abc_BddManRealloc( p->pBdd );
     }
-  if ( p->nVerbose > 1 )
-    ABC_PRT( "Refresh took", Abc_Clock() - clk0 );
+  if ( p->nVerbose >= 2 )
+    {
+      printf( "Allocated by 2^%d\n", p->nMem );
+      ABC_PRT( "Refresh took", Abc_Clock() - clk0 );
+    }
 }
 
 /**Function*************************************************************
@@ -1480,7 +1486,7 @@ static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak, int fHalf )
     {
       if ( Abc_BddNandObjIsEmptyOrDead( p, id ) )
 	continue;
-      if ( p->nVerbose > 1 )
+      if ( p->nVerbose >= 3 )
 	printf( "G1 for %d in %d gates\n", i, Vec_IntSize(targets) );
       Abc_BddNandMarkClear( p );
       p->pMark[id] = 1;
@@ -1556,7 +1562,7 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
       new_id++;
       if ( new_id >= p->nObjsAlloc )
 	{
-	  printf("Error: Too many new merged nodes\n");
+	  printf( "Error: Too many new merged nodes\n" );
 	  abort();
 	}
     }
@@ -1574,7 +1580,7 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
 	    break;
 	  if ( Abc_BddNandObjIsEmptyOrDead( p, idj ) )
 	    continue;
-	  if ( p->nVerbose > 1 )
+	  if ( p->nVerbose >= 3 )
 	    printf( "G3 between %d %d in %d gates\n", i, j, Vec_IntSize(targets) );
 	  // calculate intersection. if it is impossible, continue.
 	  fi = p->pBddFuncs[id];
@@ -1964,18 +1970,24 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, 
   abctime clk0 = Abc_Clock();
   Vec_PtrForEachEntry( Abc_NandMan *, vNets, p, i )
     {
-      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 1, (int)( nVerbose > 2 ) );
+      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 1, 0 );
       p->nMem = Abc_Base2Log( p->pBdd->nObjsAlloc );
       while ( Abc_BddNandDc( p ) || Abc_BddNandBuildAll( p ) )
 	{
 	  Abc_BddNandMemIncrease( p );
 	  Abc_BddManFree( p->pBdd );
-	  p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, (int)( nVerbose > 2 ) );
+	  p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, 0 );
 	}
-      if ( nVerbose ) Abc_BddNandPrintStats( p, "initial", clk0 );
-      if ( p->nMspf ) Abc_BddNandMspf_Refresh( p );
-      if ( p->nMspf < 2 ) Abc_BddNandCspfEager( p );
-      if ( nVerbose ) Abc_BddNandPrintStats( p, "pf", clk0 );
+      if ( nVerbose >= 2 )
+	printf( "Allocated by 2^%d\n", p->nMem );
+      if ( nVerbose )
+	Abc_BddNandPrintStats( p, "initial", clk0 );
+      if ( p->nMspf )
+	Abc_BddNandMspf_Refresh( p );
+      if ( p->nMspf < 2 )
+	Abc_BddNandCspfEager( p );
+      if ( nVerbose )
+	Abc_BddNandPrintStats( p, "pf", clk0 );
       int wire = 0;
       while ( wire != Abc_BddNandCountWire( p ) )
 	{
@@ -1999,13 +2011,18 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, 
 	    printf( "Error: Invalid optimization type %d\n", nType );
 	    abort();
 	  }
-	  if ( p->nMspf ) Abc_BddNandMspf_Refresh( p );
-	  if ( p->nMspf < 2 ) Abc_BddNandCspfEager( p );
-	  if ( !fRep ) break;
+	  if ( p->nMspf )
+	    Abc_BddNandMspf_Refresh( p );
+	  if ( p->nMspf < 2 )
+	    Abc_BddNandCspfEager( p );
+	  if ( !fRep )
+	    break;
 	}
-      if ( nWindowSize && fDcPropagate ) Abc_BddNandPropagateDc( vNets, i, pGia );
+      if ( nWindowSize && fDcPropagate )
+	Abc_BddNandPropagateDc( vNets, i, pGia );
     }
-  if ( nVerbose ) ABC_PRT( "total ", Abc_Clock() - clk0 );
+  if ( nVerbose )
+    ABC_PRT( "total ", Abc_Clock() - clk0 );
   pNew = Abc_BddNandNets2Gia( vNets, vPoCkts, vPoIdxs, vExternalCs, fDc, pGia );
   Vec_IntFree( vPoCkts );
   Vec_IntFree( vPoIdxs );

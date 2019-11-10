@@ -46141,11 +46141,6 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
 	Abc_Print( -1, "Abc_CommandAbc9Cspf(): External DC and the restricted candidates cannot be used at the same time\n" );
 	return -1;
     }
-    if ( nType > 3 )
-    {
-        Abc_Print( -1, "Abc_CommandAbc9Cspf(): Optimization type \"-G\" must be within 0-3\n" );
-	return 1;
-    }
     if ( nType != 1 && nMspf >= 2 )
     {
         Abc_Print( -1, "Abc_CommandAbc9Cspf(): H=2 can be used only for G=1\n" );
@@ -46229,6 +46224,10 @@ usage:
     Abc_Print( -2, "\t-M num: number of BDD nodes to allocate initially 2^? (not for CUDD) [default = %d]\n", nMem );
     Abc_Print( -2, "\t-P num: number of AIG nodes in each window (0 means no limit) [default = %d]\n", nWindowSize );
     Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
+    Abc_Print( -2, "\t\t0: Nothing\n" );
+    Abc_Print( -2, "\t\t1: Results for each optimization\n" );
+    Abc_Print( -2, "\t\t2: Refresh procedures\n" );
+    Abc_Print( -2, "\t\t3: Optimization procedures\n" );
     Abc_Print( -2, "\t-h    : print the command usage\n");
     return 1;
 }
