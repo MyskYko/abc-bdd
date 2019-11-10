@@ -133,7 +133,7 @@ void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int 
       assert( nObjsAllocInit != 0 );
     }
   if ( nVerbose ) printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
-  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, nVerbose > 2 );
+  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), nObjsAllocInit, 0, nVerbose > 2 );
   Abc_BddGia( pGia, p );
   abctime clk1 = Abc_Clock();
   if ( nVerbose ) ABC_PRT( "BDD (latch) construction time", clk1 - clk );
@@ -200,6 +200,7 @@ void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int 
   printf( "init %d\n", nInit );
   printf( "iteration %d\n", nIte );
   printf( "num used nodes = %u\n", p->nObjs );
+  /*
   unsigned __int128  a = Abc_BddCount1s128( p, X, Gia_ManCiNum( pGia ) - nLatch );
   unsigned long long a_low = a;
   unsigned long long a_high = a >> 64;
@@ -212,6 +213,7 @@ void Abc_BddGiaIig( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFile, int 
   unsigned long long c_high = c >> 64;
   printf("num 1s = %llu (2^64) + %llu / %llu (2^64) + %llu\n", a_high, a_low, b_high, b_low );
   printf("num 0s = %llu (2^64) + %llu\n", c_high, c_low );
+  */
   if ( pFile != NULL ) ;//Abc_BddPrint( p, X, Gia_ManCiNum( pGia ) - nLatch, pFile );
   ABC_FREE( cache );
   Vec_IntFree( vars );
@@ -243,7 +245,7 @@ void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFil
       assert( nObjsAllocInit != 0 );
     }
   if ( nVerbose ) printf( "Allocate nodes by 2^%d\n", Abc_Base2Log( nObjsAllocInit ) );
-  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ) + nLatch, nObjsAllocInit, nVerbose > 2 );
+  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ) + nLatch, nObjsAllocInit, 0, nVerbose > 2 );
   Abc_BddGia( pGia, p );
   abctime clk1 = Abc_Clock();
   if ( nVerbose ) ABC_PRT( "BDD (latch) construction time", clk1 - clk );
@@ -327,7 +329,7 @@ void Abc_BddGiaIigReverse( Gia_Man_t * pGia, int nVerbose, int nMem, FILE * pFil
   printf( "iteration %d\n", nIte );
   printf( "nObjs = %u\n", p->nObjs );
   if ( pFile != NULL ) ;//Abc_BddPrint( p, X, Gia_ManCiNum( pGia ) - nLatch, pFile );
-  printf("num 1s = %d\n", Abc_BddCount1s( p, X, Gia_ManCiNum( pGia ) ) );
+  //  printf("num 1s = %d\n", Abc_BddCount1s( p, X, Gia_ManCiNum( pGia ) ) );
   ABC_FREE( cache );
   Vec_IntFree( vars );
   Vec_IntFree( vLatchVars );

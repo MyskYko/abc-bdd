@@ -45895,11 +45895,11 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
     int nMem = 0;
     int fRealloc = 1;
     int fGC = 1;
-    int fName = 0;
+    int fSort = 0;
     int nReorderThreshold = 0;
     int nFinalReorder = 0;
     char * pFileName = NULL;
-    extern void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fName, int fRealloc, int fGC, int nReorderThreshold, int nFinalReorder );
+    extern void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fSort, int fRealloc, int fGC, int nReorderThreshold, int nFinalReorder );
     Extra_UtilGetoptReset();
     while ( ( c = Extra_UtilGetopt( argc, argv, "FMRVWagnh" ) ) != EOF )
     {
@@ -45912,7 +45912,7 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
             fGC ^= 1;
             break;
         case 'n':
-            fName ^= 1;
+            fSort ^= 1;
             break;
         case 'F':
 	  if ( globalUtilOptind >= argc )
@@ -45978,15 +45978,15 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
         Abc_Print( -1, "Abc_CommandAbc9Bdd(): There is no AIG.\n" );
         return 1;
     }
-    Abc_BddGiaTest( pAbc->pGia, nVerbose, nMem, pFileName, fName, fRealloc, fGC, nReorderThreshold, nFinalReorder );
+    Abc_BddGiaTest( pAbc->pGia, nVerbose, nMem, pFileName, fSort, fRealloc, fGC, nReorderThreshold, nFinalReorder );
     return 0;
     
 usage:
     Abc_Print( -2, "usage: &bdd [-W <file>] [-FMRV num] [-agnh]\n" );
-    Abc_Print( -2, "\t        BDD construction with simple BDD package\n" );
+    Abc_Print( -2, "\t        BDD construction with a simple BDD package\n" );
     Abc_Print( -2, "\t-a    : toggle reallocating by double when nodes reach the limit (after garbage collection) [default = %s]\n", fRealloc? "yes": "no" );
     Abc_Print( -2, "\t-g    : toggle garbage collecting when nodes reach the limit [default = %s]\n", fGC? "yes": "no" );
-    Abc_Print( -2, "\t-n    : toggle keeping the names of the inputs instead of the order [default = %s]\n", fName? "yes": "no" );
+    Abc_Print( -2, "\t-n    : toggle sorting the inputs of the written blif according to the ordering [default = %s]\n", fSort? "yes": "no" );
     Abc_Print( -2, "\t-F num: threshold to terminate reordering after building BDDs. (num)%% more nodes than before reordering. 0=off. [default = %d]\n", nFinalReorder );
     Abc_Print( -2, "\t-M num: memory size to allocate (2^(num) nodes) [default = %d]\n", nMem );
     Abc_Print( -2, "\t-R num: threshold to terminate reordering while building BDDs. (num)%% more nodes than before reordering. 0=off. [default = %d]\n", nReorderThreshold );
@@ -46014,14 +46014,17 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     int nType = 0;
     int nMem = 21;
     int fExdc = 0;
+    int fSpec = 0;
     int fDcPropagate = 0;
     int fVerify = 1;
     int fRep = 1;
+    int fRm = 1;
     int nWindowSize = 0;
+    int nMspf = 0;
     Gia_Man_t * pNew = NULL, * pMiter;
-    extern Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRep, int fExdc, int nWindowSize, int fDcPropagate, int nVerbose );
+    extern Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, int fRep, int fExdc, int fSpec, int nWindowSize, int fDcPropagate, int nMspf, int nVerbose );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "GMPVepxzh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "GMHPVempxyzh" ) ) != EOF )
     {
         switch ( c )
         {
@@ -46031,8 +46034,14 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
 	case 'p':
             fRep ^= 1;
             break;
+	case 'm':
+            fRm ^= 1;
+            break;
 	case 'x':
             fExdc ^= 1;
+            break;
+	case 'y':
+            fSpec ^= 1;
             break;
 	case 'z':
             fDcPropagate ^= 1;
@@ -46046,6 +46055,17 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
             nType = atoi(argv[globalUtilOptind]);
             globalUtilOptind++;
             if ( nType < 0 )
+                goto usage;
+            break;
+        case 'H':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-H\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nMspf = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nMspf < 0 )
                 goto usage;
             break;
         case 'M':
@@ -46087,18 +46107,48 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
             goto usage;
         }
     }
-    if ( pAbc->pGia == NULL )
+    if ( !pAbc->pGia )
     {
         Abc_Print( -1, "Abc_CommandAbc9Cspf(): There is no AIG.\n" );
         return 1;
     }
-    if ( nWindowSize != 0 && fExdc )
+    if ( !nWindowSize && fDcPropagate )
     {
-        Abc_Print( -1, "Abc_CommandAbc9Cspf(): External Don't Cares cannot be used for partitioned circuits\n" );
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): DC propagation can be used only for partitioned circuits\n" );
+	return 1;
+    }
+    if ( nWindowSize && fSpec )
+    {
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): The restricted candidates can be used only for non-partitioned circuits\n" );
+	return 1;
+    }
+    if ( Gia_ManCoNum( pAbc->pGia ) % 2 && fExdc )
+    {
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): External DC can be used only for a circuit with the even number of outputs\n" );
+	return 1;
+    }
+    if ( Gia_ManCoNum( pAbc->pGia ) % 2 && fSpec )
+    {
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): The restricted candidates can be used only for a circuit with the even number of outputs\n" );
+	return 1;
+    }
+    if ( fExdc && fSpec )
+    {
+	Abc_Print( -1, "Abc_CommandAbc9Cspf(): External DC and the restricted candidates cannot be used at the same time\n" );
+	return -1;
+    }
+    if ( nType > 3 )
+    {
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): Optimization type \"-G\" must be within 0-3\n" );
+	return 1;
+    }
+    if ( nType != 1 && nMspf >= 2 )
+    {
+        Abc_Print( -1, "Abc_CommandAbc9Cspf(): H=2 can be used only for G=1\n" );
 	return 1;
     }
     
-    pNew = Abc_BddNandGiaTest( pAbc->pGia, nMem, nType, fRep, fExdc, nWindowSize, fDcPropagate, nVerbose );
+    pNew = Abc_BddNandGiaTest( pAbc->pGia, nMem, nType, fRm, fRep, fExdc, fSpec, nWindowSize, fDcPropagate, nMspf, nVerbose );
     if ( fVerify )
       {
 	if ( fExdc )
@@ -46112,16 +46162,18 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
 	    for ( i = 0; i < nDcPos; i++ )
 	      {
 		vDcPos[i] = nDcPos + nDcPos + i;
-		if ( Gia_ObjIsConst0( Gia_ObjChild0( Gia_ManCo( p00, i ) ) ) &&
-		     Gia_ObjIsConst0( Gia_Not( Gia_ObjChild0( Gia_ManCo( p00, i + nDcPos ) ) ) ) )
+		if ( Gia_ObjChild0( Gia_ManCo( p00, i ) ) == Gia_Not( Gia_ObjChild0( Gia_ManCo( p00, i + nDcPos ) ) ) )
+		  v = Gia_ObjChild0( Gia_ManCo( p00, i ) );
+		else if ( Gia_ObjFanin0( Gia_ManCo( p00, i ) ) == Gia_ObjFanin0( Gia_ManCo( p00, i + nDcPos ) ) )
 		  v = Gia_ManConst0Lit( p00 );
 		else
 		  v = Gia_ManAppendAnd( p00,
 					Gia_Obj2Lit( p00, Gia_ObjChild0( Gia_ManCo( p00, i ) ) ),
 					Abc_LitNot( Gia_Obj2Lit( p00, Gia_ObjChild0( Gia_ManCo( p00, i + nDcPos ) ) ) ) );
 		Gia_ManAppendCo( p00, v );
-		if ( Gia_ObjIsConst0( Gia_ObjChild0( Gia_ManCo( p10, i ) ) ) &&
-		     Gia_ObjIsConst0( Gia_Not( Gia_ObjChild0( Gia_ManCo( p10, i + nDcPos ) ) ) ) )
+		if ( Gia_ObjChild0( Gia_ManCo( p10, i ) ) == Gia_Not( Gia_ObjChild0( Gia_ManCo( p10, i + nDcPos ) ) ) )
+		  v = Gia_ObjChild0( Gia_ManCo( p10, i ) );
+		else if ( Gia_ObjFanin0( Gia_ManCo( p10, i ) ) == Gia_ObjFanin0( Gia_ManCo( p10, i + nDcPos ) ) )
 		  v = Gia_ManConst0Lit( p10 );
 		else
 		  v = Gia_ManAppendAnd( p10,
@@ -46153,18 +46205,23 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &cspf [-GMPV num] [-ceprxzh]\n" );
+    Abc_Print( -2, "usage: &cspf [-GMHPV num] [-cemprxyzh]\n" );
     Abc_Print( -2, "\t        circuit minimization with permissible function using simple bdd\n" );
     Abc_Print( -2, "\t-e    : toggle verification [default = %s]\n", fVerify? "yes": "no" );
+    Abc_Print( -2, "\t-m    : toggle removing redundancy definitely during CSPF [default = %s]\n", fRm? "yes": "no" );
     Abc_Print( -2, "\t-p    : toggle repeating optimization while it is effective [default = %s]\n", fRep? "yes": "no" );
     Abc_Print( -2, "\t-x    : toggle using the later half outputs as external don't cares of the first half outputs [default = %s]\n", fExdc? "yes": "no" );
+    Abc_Print( -2, "\t-y    : toggle using the later half outputs as input candidates of the first half outputs for G1,2 [default = %s]\n", fSpec? "yes": "no" );
     Abc_Print( -2, "\t-z    : toggle propagating don't cares in partitioned circuits [default = %s]\n", fDcPropagate? "yes": "no" );
     Abc_Print( -2, "\t-G num: optimization heuristic type [default = %d]\n", nType );
     Abc_Print( -2, "\t\t0: calculate permissible functions while removing apparent redundancy\n" );
     Abc_Print( -2, "\t\t1: transduction method of gate substitution (eager)\n" );
     Abc_Print( -2, "\t\t2: transduction method of gate substitution (weak)\n" );
     Abc_Print( -2, "\t\t3: transduction method of gate merging\n" );
-    Abc_Print( -2, "\t\t4: transduction method of gate substitution of the first half outputs by the latter half outputs\n" );
+    Abc_Print( -2, "\t-H num: MSPF instead of CSPF [default = %d]\n", nMspf );
+    Abc_Print( -2, "\t\t0: none\n" );
+    Abc_Print( -2, "\t\t1: replace eager-CSPF by MSPF\n" );
+    Abc_Print( -2, "\t\t2: replace all CSPF by MSPF\n" );
     Abc_Print( -2, "\t-M num: number of BDD nodes to allocate initially 2^? (not for CUDD) [default = %d]\n", nMem );
     Abc_Print( -2, "\t-P num: number of AIG nodes in each window (0 means no limit) [default = %d]\n", nWindowSize );
     Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
