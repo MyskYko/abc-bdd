@@ -153,7 +153,7 @@ void Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts )
    SeeAlso     []
 
 ***********************************************************************/
-Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int fDynAlloc, int nVerbose )
+Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int fDynAlloc, Vec_Int_t * vOrdering, int nVerbose )
 {
   int i;
   Abc_BddMan * p;
@@ -209,7 +209,10 @@ Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int fDynAlloc, int nVer
   Abc_BddSetVarOfBvar( p, Abc_BddBvarConst(), Abc_BddVarConst( p ) );
   p->nObjs = 1;
   for ( i = 0; i < nVars; i++ )
-    Abc_BddUniqueCreate( p, i, Abc_BddLitConst1(), Abc_BddLitConst0() );
+    if ( vOrdering )
+      Abc_BddUniqueCreate( p, Vec_IntEntry( vOrdering, i ), Abc_BddLitConst1(), Abc_BddLitConst0() );
+    else
+      Abc_BddUniqueCreate( p, i, Abc_BddLitConst1(), Abc_BddLitConst0() );
   return p;
 }
 void Abc_BddManFree( Abc_BddMan * p )
@@ -798,7 +801,7 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
   Vec_Int_t * vNodes;
   abctime clk, clk2, time;
   clk = Abc_Clock();
-  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), 1 << nMem, fRealloc, nVerbose );
+  p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), 1 << nMem, fRealloc, NULL, nVerbose );
   Abc_BddGiaRefreshConfig( p, fRealloc, fGC, nReorderThreshold );
   assert( !Abc_BddGia( pGia, p ) );
   clk2 = Abc_Clock();

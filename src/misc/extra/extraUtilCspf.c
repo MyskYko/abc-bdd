@@ -61,6 +61,7 @@ struct Abc_NandMan_
   int          nMspf;
 
   Vec_Int_t *  vOrgPis;
+  Vec_Int_t *  vOrdering;
 };
 
 static inline int      Abc_BddNandConst0() { return 0; }  // = Gia_ObjId( pGia, Gia_ManConst0( pGia ) );
@@ -74,7 +75,7 @@ static inline int      Abc_BddNandObjIsEmptyOrDead( Abc_NandMan * p, int id ) { 
 
 static inline void     Abc_BddNandMemIncrease( Abc_NandMan * p ) {
   p->nMem++;
-  if ( 1 << p->nMem == 0 )
+  if ( p->nMem >= 32 )
     {
       printf( "Error: Refresh failed\n" );
       abort();
@@ -408,6 +409,8 @@ static inline Abc_NandMan * Abc_BddNandManAlloc( Gia_Man_t * pGia, int nMem, int
   p->fRm = fRm;
   p->nMspf = nMspf;
   p->nVerbose = nVerbose;
+  p->vOrgPis = NULL;
+  p->vOrdering = NULL;
   p->pGia = pGia;
   p->vPiCkts = Vec_IntAlloc( 1 );
   p->vPiIdxs = Vec_IntAlloc( 1 );
@@ -429,6 +432,8 @@ static inline void Abc_BddNandManFree( Abc_NandMan * p )
   Vec_IntFree( p->vPiIdxs );
   if ( p->vOrgPis )
     Vec_IntFree( p->vOrgPis );
+  if ( p->vOrdering )
+    Vec_IntFree( p->vOrdering );
   ABC_FREE( p->pBddFuncs );
   ABC_FREE( p->pRank );
   ABC_FREE( p->pMark );
@@ -1273,7 +1278,9 @@ static inline int Abc_BddNandTryConnect( Abc_NandMan * p, int fanin, int fanout 
 ***********************************************************************/
 static inline void Abc_BddNandRefresh( Abc_NandMan * p )
 {
-  int out;
+  unsigned hash;
+  int i, a, Var, out;
+  int * q, * next;
   abctime clk0;
   if ( p->nVerbose >= 2 )
     {
@@ -1283,7 +1290,7 @@ static inline void Abc_BddNandRefresh( Abc_NandMan * p )
   while ( 1 )
     {
       Abc_BddManFree( p->pBdd );
-      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, 0 );
+      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, p->vOrdering, 0 );
       out = Abc_BddNandDc( p );
       if ( !out )
 	out = Abc_BddNandBuildAll( p );
@@ -1326,7 +1333,7 @@ static inline void Abc_BddNandRemoveRedundantFanin_Refresh( Abc_NandMan * p, int
   Abc_BddNandRefresh( p );
   if ( Abc_BddNandObjIsEmptyOrDead( p, id ) )
     return;
-  while ( !Abc_BddNandRemoveRedundantFanin( p, id ) )
+  while ( Abc_BddNandRemoveRedundantFanin( p, id ) )
     {
       Abc_BddNandMemIncrease( p );
       Abc_BddNandRefresh( p );
@@ -1373,7 +1380,7 @@ static inline void Abc_BddNandMspf_Refresh( Abc_NandMan * p )
   while ( 1 )
     {
       Abc_BddManFree( p->pBdd );
-      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, 0 );
+      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, p->vOrdering, 0 );
       out = Abc_BddNandDc( p );
       if ( !out )
 	out = Abc_BddNandBuildAll( p );
@@ -1917,15 +1924,15 @@ static inline void Abc_BddNandPrintStats( Abc_NandMan * p, char * prefix, abctim
   printf( "\r%-10s: gates = %5d, wires = %5d, AIG node = %5d", prefix, Vec_IntSize( p->vObjs ), Abc_BddNandCountWire( p ), Abc_BddNandCountWire( p ) - Vec_IntSize( p->vObjs ) );
   ABC_PRT( ", time ", Abc_Clock() - clk0 );
 }
-Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, int fRep, int fDc, int fSpec, int nWindowSize,int fDcPropagate, int nMspf, int nVerbose )
+Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType, int fRm, int fRep, int fDc, int fSpec, int nWindowSize,int fDcPropagate, int nMspf, int nVerbose )
 {
-  int i, id, nPos;
+  int i, j, id, nPos;
   int * pPos;
   Abc_NandMan * p;
   Gia_Obj_t * pObj;
   Gia_Man_t * pNew;
   Vec_Ptr_t * vNets, * vDcGias;
-  Vec_Int_t * vPoCkts, * vPoIdxs, * vExternalCs;
+  Vec_Int_t * vPoCkts, * vPoIdxs, * vExternalCs, * vFuncs;
   vNets = Vec_PtrAlloc( 1 );
   vPoCkts = Vec_IntAlloc( 1 );
   vPoIdxs = Vec_IntAlloc( 1 );
@@ -1970,13 +1977,32 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, 
   abctime clk0 = Abc_Clock();
   Vec_PtrForEachEntry( Abc_NandMan *, vNets, p, i )
     {
-      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 1, 0 );
+      p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 1, NULL, 0 );
       p->nMem = Abc_Base2Log( p->pBdd->nObjsAlloc );
       while ( Abc_BddNandDc( p ) || Abc_BddNandBuildAll( p ) )
 	{
 	  Abc_BddNandMemIncrease( p );
 	  Abc_BddManFree( p->pBdd );
-	  p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, 0 );
+	  p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, NULL, 0 );
+	}
+      if ( fReo )
+	{
+	  vFuncs = Vec_IntAlloc( 1 );
+	  Vec_IntForEachEntry( p->vObjs, id, i )
+	    Vec_IntPush( vFuncs, p->pBddFuncs[id] );
+	  Vec_IntForEachEntry( p->vPos, id, i )
+	    Vec_IntPush( vFuncs, p->pGFuncs[id] );
+	  Abc_BddGiaRefreshConfig( p->pBdd, 1, 1, 10 );
+	  Abc_BddReorder( p->pBdd, vFuncs );
+	  Abc_BddGiaRefreshConfig( p->pBdd, 0, 0, 0 );
+	  p->vOrdering = Vec_IntAlloc( 1 );
+	  for ( j = 0; j < p->pBdd->nVars; j++ )
+	    {
+	      for ( i = 0; i < p->pBdd->nVars; i++ )
+		if ( Abc_BddVar( p->pBdd, Abc_BddLitIthVar( j ) ) == i ) break;
+	      Vec_IntPush( p->vOrdering, i );
+	    }
+	  Vec_IntFree( vFuncs );
 	}
       if ( nVerbose >= 2 )
 	printf( "Allocated by 2^%d\n", p->nMem );

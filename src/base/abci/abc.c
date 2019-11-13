@@ -46021,25 +46021,29 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     int fSpec = 0;
     int fDcPropagate = 0;
     int fVerify = 1;
+    int fReo = 0;
     int fRep = 1;
-    int fRm = 1;
+    int fRm = 0;
     int nWindowSize = 0;
     int nMspf = 0;
     Gia_Man_t * pNew = NULL, * pMiter;
-    extern Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int nType, int fRm, int fRep, int fExdc, int fSpec, int nWindowSize, int fDcPropagate, int nMspf, int nVerbose );
+    extern Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType, int fRm, int fRep, int fExdc, int fSpec, int nWindowSize, int fDcPropagate, int nMspf, int nVerbose );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "GMHPVempxyzh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "GMHPVemprxyzh" ) ) != EOF )
     {
         switch ( c )
         {
 	case 'e':
             fVerify ^= 1;
             break;
+	case 'm':
+            fRm ^= 1;
+            break;
 	case 'p':
             fRep ^= 1;
             break;
-	case 'm':
-            fRm ^= 1;
+	case 'r':
+            fReo ^= 1;
             break;
 	case 'x':
             fExdc ^= 1;
@@ -46147,7 +46151,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
 	return 1;
     }
     
-    pNew = Abc_BddNandGiaTest( pAbc->pGia, nMem, nType, fRm, fRep, fExdc, fSpec, nWindowSize, fDcPropagate, nMspf, nVerbose );
+    pNew = Abc_BddNandGiaTest( pAbc->pGia, nMem, fReo, nType, fRm, fRep, fExdc, fSpec, nWindowSize, fDcPropagate, nMspf, nVerbose );
     if ( fVerify )
       {
 	if ( fExdc )
@@ -46204,11 +46208,12 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &cspf [-GMHPV num] [-empxyzh]\n" );
+    Abc_Print( -2, "usage: &cspf [-GMHPV num] [-emprxyzh]\n" );
     Abc_Print( -2, "\t        circuit minimization with permissible function using simple bdd\n" );
     Abc_Print( -2, "\t-e    : toggle verification [default = %s]\n", fVerify? "yes": "no" );
     Abc_Print( -2, "\t-m    : toggle removing redundancy definitely during CSPF [default = %s]\n", fRm? "yes": "no" );
     Abc_Print( -2, "\t-p    : toggle repeating optimization while it is effective [default = %s]\n", fRep? "yes": "no" );
+    Abc_Print( -2, "\t-r    : toggle dynamic variable reoredering [default = %s]\n", fReo? "yes": "no" );
     Abc_Print( -2, "\t-x    : toggle using the later half outputs as external don't cares of the first half outputs [default = %s]\n", fExdc? "yes": "no" );
     Abc_Print( -2, "\t-y    : toggle using the later half outputs as input candidates of the first half outputs for G1,2 [default = %s]\n", fSpec? "yes": "no" );
     Abc_Print( -2, "\t-z    : toggle propagating don't cares in partitioned circuits [default = %s]\n", fDcPropagate? "yes": "no" );

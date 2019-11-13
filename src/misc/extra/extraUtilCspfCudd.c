@@ -362,7 +362,6 @@ static inline void Abc_DdManAlloc( Abc_DdNandMan * p )
       printf("Error: Allocation failed\n");
       abort();
     }
-  if ( p->fDvr ) Cudd_AutodynEnable( p->pDd, CUDD_REORDER_SYMM_SIFT );
   id = 0;
   Abc_DdNandObjValueWrite( p, id, Cudd_Not( p->pDd->one ) );
   idj = Abc_DdNandCompl( p, id );
@@ -680,6 +679,7 @@ static inline void Abc_DdNandCspf( Abc_DdNandMan * p )
       Abc_DdNandCspfG( p, id );
       Abc_DdNandCspfC( p, id );
     }
+  
   return Abc_DdNandBuildAll( p );
 }
 static inline void Abc_DdNandCspfFaninCone( Abc_DdNandMan * p, int startId )
@@ -687,6 +687,7 @@ static inline void Abc_DdNandCspfFaninCone( Abc_DdNandMan * p, int startId )
   int i, id;
   Vec_Int_t * targets = Vec_IntAlloc( 1 );
   Abc_DdNandDescendantSortedList( p, p->pvFanins, targets, startId );
+  Vec_IntPush( targets, startId );
   Vec_IntForEachEntryReverse( targets, id, i )
     {
       if ( Abc_DdNandIsDeadNode( p, id ) )
@@ -698,7 +699,6 @@ static inline void Abc_DdNandCspfFaninCone( Abc_DdNandMan * p, int startId )
       Abc_DdNandCspfC( p, id );
     }
   Vec_IntFree( targets );
-  Abc_DdNandBuildAll( p );
 }
 
 /**Function*************************************************************
@@ -770,15 +770,10 @@ static inline int Abc_DdNandTryConnect( Abc_DdNandMan * p, int fanin, int fanout
 static inline void Abc_DdNandG1EagerReduce( Abc_DdNandMan * p, int id, int idj )
 {
   int wire =  Abc_DdNandCountWire( p );
-  Abc_DdNandCspfC( p, id );
-  if ( Abc_DdNandIsEmptyOrDeadNode( p, id ) ) return;
   Abc_DdNandCspfFaninCone( p, id );
   if ( wire == Abc_DdNandCountWire( p ) )
     {
       Abc_DdNandDisconnect( p, idj, id );
-      Abc_DdNandBuildFanoutCone( p, id );
-      Abc_DdNandCspfC( p, id );
-      if ( Abc_DdNandIsEmptyOrDeadNode( p, id ) ) return;
       Abc_DdNandCspfFaninCone( p, id );
       return;
     }
@@ -846,6 +841,7 @@ void Abc_DdNandGiaTest( Gia_Man_t * pGia, int nType, int fDvr, int fRep, int nVe
   //  printf( "%d\n", Cudd_ReadKeys(p->pDd) - Cudd_ReadDead(p->pDd) );
   abctime clk0 = Abc_Clock();
   Abc_DdNandBuildAll( p );
+  if ( p->fDvr ) Cudd_ReduceHeap( p->pDd,  CUDD_REORDER_SYMM_SIFT, 1 );
   if ( nVerbose ) Abc_DdNandPrintStats( p, "initial", clk0 );
   Abc_DdNandCspfEager( p );
   if ( nVerbose ) Abc_DdNandPrintStats( p, "cspf", clk0 );  
