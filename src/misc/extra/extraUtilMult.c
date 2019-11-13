@@ -116,7 +116,7 @@ static inline unsigned Abc_BddCacheInsert( Abc_BddMan * p, unsigned Arg1, unsign
   pEnt[2] = Res;
   return Res;
 }
-static inline void Abc_BddCacheRemove( Abc_BddMan * p ) {
+void Abc_BddCacheRemove( Abc_BddMan * p ) {
   ABC_FREE( p->pCache );
   p->pCache = ABC_CALLOC( unsigned, 3 * (long long)( p->nCacheMask + 1 ) );
 }
@@ -284,7 +284,7 @@ void Abc_BddManRealloc( Abc_BddMan * p )
   if ( p->nVerbose )
     printf( "\tReallocate nodes by 2^%d\n", Abc_Base2Log( p->nObjsAlloc ) );
   p->nUniqueMask = ( 1 << Abc_Base2Log( p->nObjsAlloc ) ) - 1;
-  assert( (nUniqueMaskOld << 1) ^ 01 == p->nUniqueMask );
+  assert( ((nUniqueMaskOld << 1) ^ 01) == p->nUniqueMask );
   p->nCacheMask  = ( 1 << Abc_Base2Log( p->nObjsAlloc ) ) - 1;
   p->pUnique     = ABC_REALLOC( int, p->pUnique, p->nUniqueMask + 1 );
   p->pNexts      = ABC_REALLOC( int, p->pNexts, p->nUniqueMask + 1 );

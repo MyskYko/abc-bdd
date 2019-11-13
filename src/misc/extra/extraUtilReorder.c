@@ -555,6 +555,7 @@ void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions )
   Abc_BddUncountEdge( p, pFunctions );
   ABC_FREE( new2old );
   ABC_FREE( descendingOrder );
+  Abc_BddCacheRemove( p );
 }
 
 ////////////////////////////////////////////////////////////////////////

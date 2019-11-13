@@ -46022,7 +46022,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     int fDcPropagate = 0;
     int fVerify = 1;
     int fReo = 0;
-    int fRep = 1;
+    int fRep = 0;
     int fRm = 0;
     int nWindowSize = 0;
     int nMspf = 0;

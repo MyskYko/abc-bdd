@@ -507,6 +507,7 @@ static inline int      Abc_BddIsLimit( Abc_BddMan * p ) { return (unsigned)p->nO
 
 extern unsigned        Abc_BddUniqueCreate( Abc_BddMan * p, int Var, unsigned Then, unsigned Else );
 extern Abc_BddMan *    Abc_BddManAlloc( int nVars, unsigned nObjs, int fDynAlloc, Vec_Int_t * vOrdering, int fVerbose );
+extern void            Abc_BddCacheRemove( Abc_BddMan * p );
 extern void            Abc_BddManRealloc( Abc_BddMan * p );
 extern void            Abc_BddManFree( Abc_BddMan * p );
 extern unsigned        Abc_BddAnd( Abc_BddMan * p, unsigned x, unsigned y );
