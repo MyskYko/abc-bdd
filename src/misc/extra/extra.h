@@ -470,9 +470,6 @@ static inline int      Abc_BddLitIsConst1( unsigned x )            { return Abc_
 static inline int      Abc_BddLitIsConst( unsigned x )             { return Abc_BddBvarIsConst( Abc_BddLit2Bvar( x ) ); }
 static inline int      Abc_BddLitIsInvalid( unsigned x )           { return Abc_BddBvarIsInvalid( Abc_BddLit2Bvar( x ) ); }
 
-static inline int      Abc_BddBvarIsRemoved( Abc_BddMan * p, int a ) { return (( p->pVars )? p->pVars[a]: p->pSVars[a]) == Abc_BddVarRemoved( p ); }
-static inline void     Abc_BddSetBvarRemoved( Abc_BddMan * p, int a ) { if ( p->pVars ) p->pVars[a] = Abc_BddVarRemoved( p ); else p->pSVars[a] = Abc_BddVarRemoved( p ); }
-
 static inline int      Abc_BddVar( Abc_BddMan * p, unsigned x )    { return ( p->pVars )? p->pVars[Abc_BddLit2Bvar( x )]: p->pSVars[Abc_BddLit2Bvar( x )]; }
 static inline unsigned Abc_BddThen( Abc_BddMan * p, unsigned x )   { return Abc_BddLitNotCond( p->pObjs[Abc_BddLitRegular( x )], Abc_BddLitIsCompl( x ) ); }
 static inline unsigned Abc_BddElse( Abc_BddMan * p, unsigned x )   { return Abc_BddLitNotCond( p->pObjs[Abc_BddLitNot( Abc_BddLitRegular( x ) )], Abc_BddLitIsCompl( x ) ); }
@@ -493,6 +490,10 @@ static inline void     Abc_BddSetElseOfBvar( Abc_BddMan * p, int a, unsigned Els
 static inline void     Abc_BddSetNextOfBvar( Abc_BddMan * p, int a, int Next ) { p->pNexts[a] = Next;     }
 static inline void     Abc_BddSetMarkOfBvar( Abc_BddMan * p, int a, int Mark ) { p->pMarks[a] = Mark;     }
 static inline void     Abc_BddSetEdgeOfBvar( Abc_BddMan * p, int a, int Edge ) { p->pEdges[a] = Edge;     }
+
+static inline int      Abc_BddBvarIsRemoved( Abc_BddMan * p, int a ) { return Abc_BddVarOfBvar( p, a ) == Abc_BddVarRemoved( p ); }
+static inline void     Abc_BddSetBvarRemoved( Abc_BddMan * p, int a ) { Abc_BddSetVarOfBvar( p, a, Abc_BddVarRemoved( p ) ); }
+static inline int      Abc_BddBvarIsVar( Abc_BddMan * p, int a ) { return a <= p->nVars && !Abc_BddBvarIsConst( a ); }
 
 static inline void     Abc_BddSetMark( Abc_BddMan * p, unsigned x, int m ) { p->pMarks[Abc_BddLit2Bvar( x )] = m; }
 static inline void     Abc_BddIncMark( Abc_BddMan * p, unsigned x ) { assert( ++p->pMarks[Abc_BddLit2Bvar( x )] != Abc_BddMarkInvalid() ); }

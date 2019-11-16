@@ -596,11 +596,14 @@ void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName, int
 ***********************************************************************/
 void Abc_BddGenGiaNode_rec( Abc_BddMan * p, int a, int * Values, Gia_Man_t * pGia )
 {
-  int VarBvar, ThenBvar, ElseBvar, compl;
-  if ( Abc_BddBvarIsConst( a ) || Abc_BddMarkOfBvar( p, a ) )
+  int i, VarBvar, ThenBvar, ElseBvar, compl;
+  if ( Abc_BddBvarIsConst( a ) || Abc_BddMarkOfBvar( p, a ) || Abc_BddBvarIsVar( p, a ) )
     return;
   Abc_BddSetMarkOfBvar( p, a, 1 );
-  VarBvar = Abc_BddBvarIthVar( Abc_BddVarOfBvar( p, a ) );
+  for ( i = 0; i < p->nVars; i++ )
+    if ( Abc_BddVar( p, Abc_BddLitIthVar( i ) ) == Abc_BddVarOfBvar( p, a ) )
+      break;
+  VarBvar = Abc_BddBvarIthVar( i );
   ThenBvar = Abc_BddLit2Bvar( Abc_BddThenOfBvar( p, a ) );
   ElseBvar = Abc_BddLit2Bvar( Abc_BddElseOfBvar( p, a ) );
   compl = Abc_BddLitIsCompl( Abc_BddThenOfBvar( p, a ) );
@@ -619,7 +622,7 @@ Gia_Man_t * Abc_BddGenGia( Abc_BddMan * p, Vec_Int_t * vNodes )
   Values = ABC_CALLOC( int, p->nObjsAlloc );
   Values[Abc_BddLit2Bvar( Abc_BddLitConst0() ) ] = Gia_ManConst0Lit( pGia );
   for ( i = 0; i < p->nVars; i++ )
-    Values[Abc_BddBvarIthVar( Abc_BddVar( p, Abc_BddLitIthVar( i ) ) )] = Gia_ManAppendCi( pGia );
+    Values[Abc_BddBvarIthVar( i )] = Gia_ManAppendCi( pGia );
   Vec_IntForEachEntry( vNodes, x, i )
     {
       a = Abc_BddLit2Bvar( x );
