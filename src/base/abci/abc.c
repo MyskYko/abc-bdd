@@ -46020,7 +46020,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     int fExdc = 0;
     int fSpec = 0;
     int fDcPropagate = 0;
-    int fVerify = 1;
+    int fVerify = 0;
     int fReo = 0;
     int fRep = 0;
     int fRm = 0;
@@ -46243,7 +46243,7 @@ int Abc_CommandAbc9CspfCudd( Abc_Frame_t * pAbc, int argc, char ** argv )
     int nVerbose = 0;
     int nType = 0;
     int fReo = 0;
-    int fRep = 1;
+    int fRep = 0;
     extern void Abc_DdNandGiaTest( Gia_Man_t * pGia, int nType, int fReo, int fRep, int nVerbose );
     Extra_UtilGetoptReset();
     while ( ( c = Extra_UtilGetopt( argc, argv, "GVprh" ) ) != EOF )

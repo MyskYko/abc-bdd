@@ -1494,7 +1494,7 @@ static inline void Abc_BddNandG1( Abc_NandMan * p, int fWeak, int fHalf )
       if ( Abc_BddNandObjIsEmptyOrDead( p, id ) )
 	continue;
       if ( p->nVerbose >= 3 )
-	printf( "G1 for %d in %d gates\n", i, Vec_IntSize(targets) );
+	printf( "G1(2) for %d in %d gates\n", i, Vec_IntSize(targets) );
       Abc_BddNandMarkClear( p );
       p->pMark[id] = 1;
       Abc_BddNandMarkDescendant_rec( p, p->pvFanouts, id );
@@ -1926,7 +1926,7 @@ static inline void Abc_BddNandPrintStats( Abc_NandMan * p, char * prefix, abctim
 }
 Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType, int fRm, int fRep, int fDc, int fSpec, int nWindowSize,int fDcPropagate, int nMspf, int nVerbose )
 {
-  int i, j, id, nPos;
+  int i, j, k, id, nPos;
   int * pPos;
   Abc_NandMan * p;
   Gia_Obj_t * pObj;
@@ -1988,9 +1988,9 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType,
       if ( fReo )
 	{
 	  vFuncs = Vec_IntAlloc( 1 );
-	  Vec_IntForEachEntry( p->vObjs, id, i )
+	  Vec_IntForEachEntry( p->vObjs, id, k )
 	    Vec_IntPush( vFuncs, p->pBddFuncs[id] );
-	  Vec_IntForEachEntry( p->vPos, id, i )
+	  Vec_IntForEachEntry( p->vPos, id, k )
 	    Vec_IntPush( vFuncs, p->pGFuncs[id] );
 	  Abc_BddGiaRefreshConfig( p->pBdd, 1, 1, 10 );
 	  Abc_BddReorder( p->pBdd, vFuncs );
@@ -1998,9 +1998,10 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType,
 	  p->vOrdering = Vec_IntAlloc( 1 );
 	  for ( j = 0; j < p->pBdd->nVars; j++ )
 	    {
-	      for ( i = 0; i < p->pBdd->nVars; i++ )
-		if ( Abc_BddVar( p->pBdd, Abc_BddLitIthVar( j ) ) == i ) break;
-	      Vec_IntPush( p->vOrdering, i );
+	      for ( k = 0; k < p->pBdd->nVars; k++ )
+		if ( Abc_BddVar( p->pBdd, Abc_BddLitIthVar( j ) ) == k )
+		  break;
+	      Vec_IntPush( p->vOrdering, k );
 	    }
 	  Vec_IntFree( vFuncs );
 	}
@@ -2023,15 +2024,15 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType,
 	    break;
 	  case 1:
 	    Abc_BddNandG1( p, 0, fSpec );
-	    if ( nVerbose ) Abc_BddNandPrintStats( p, "g1", clk0 );
+	    if ( nVerbose ) Abc_BddNandPrintStats( p, "G1", clk0 );
 	    break;
 	  case 2:
 	    Abc_BddNandG1( p, 1, fSpec );
-	    if ( nVerbose ) Abc_BddNandPrintStats( p, "g1-weak", clk0 );
+	    if ( nVerbose ) Abc_BddNandPrintStats( p, "G2", clk0 );
 	    break;
 	  case 3:
 	    Abc_BddNandG3( p );
-	    if ( nVerbose ) Abc_BddNandPrintStats( p, "g3", clk0 );
+	    if ( nVerbose ) Abc_BddNandPrintStats( p, "G3", clk0 );
 	    break;
 	  default:
 	    printf( "Error: Invalid optimization type %d\n", nType );
