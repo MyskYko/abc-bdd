@@ -882,6 +882,8 @@ static inline int Abc_BddNandDc( Abc_NandMan * p )
 	  x = Abc_BddAnd( p->pBdd, x, pObj->Value );
 	  if ( Abc_BddLitIsInvalid( x ) )
 	    return -1;
+	  if ( Abc_BddLitIsConst0( x ) )
+	    break;
 	}
       p->pGFuncs[Vec_IntEntry( p->vPos, i )] = x;
     }
@@ -1278,9 +1280,7 @@ static inline int Abc_BddNandTryConnect( Abc_NandMan * p, int fanin, int fanout 
 ***********************************************************************/
 static inline void Abc_BddNandRefresh( Abc_NandMan * p )
 {
-  unsigned hash;
-  int i, a, Var, out;
-  int * q, * next;
+  int out;
   abctime clk0;
   if ( p->nVerbose >= 2 )
     {
@@ -1727,10 +1727,8 @@ static inline Gia_Man_t * Abc_BddNandNets2Gia( Vec_Ptr_t * vNets, Vec_Int_t * vP
   int i, j, k, id, idj, id0, id1, Value, cond, nPos;
   int * Values, * pPos;
   int ** vvPoValues;
-  Vec_Ptr_t * vDcGias;
   Gia_Obj_t * pObj;
   Gia_Man_t * pNew, * pTmp, * pDc;
-  Gia_Man_t ** pDcGias;
   Abc_NandMan * p;
   vvPoValues = ABC_CALLOC( int *, Vec_PtrSize( vNets ) + 1 );
   pNew = Gia_ManStart( pOld->nObjs );
@@ -1813,9 +1811,9 @@ static inline Gia_Man_t * Abc_BddNandNets2Gia( Vec_Ptr_t * vNets, Vec_Int_t * vP
   SeeAlso     []
 
 ***********************************************************************/
-static inline void Abc_BddNandPropagateDc( Vec_Ptr_t * vNets, int from, Gia_Man_t * pGlobal )
+static inline void Abc_BddNandPropagateDc( Vec_Ptr_t * vNets, int from, Gia_Man_t * pGlobal, int nDcPropagate )
 {
-  int i, j, k, id, idj, pi, index, nPos;
+  int i, j, k, l, id, idj, pi, index, nPos, flag, count;
   int * pPos;
   unsigned x, y;
   Vec_Int_t * vVars, * vNodes;
@@ -1825,7 +1823,6 @@ static inline void Abc_BddNandPropagateDc( Vec_Ptr_t * vNets, int from, Gia_Man_
   vVars = Vec_IntAlloc( 1 );
   vNodes = Vec_IntAlloc( 1 );
   pFrom = Vec_PtrEntry( vNets, from );
-
   pvPis = ABC_CALLOC( Vec_Int_t *, Vec_PtrSize( vNets ) );
   for ( i = 0; i < Vec_PtrSize( vNets ); i++ )
     pvPis[i] = Vec_IntAlloc( 1 );
@@ -1873,7 +1870,58 @@ static inline void Abc_BddNandPropagateDc( Vec_Ptr_t * vNets, int from, Gia_Man_
 	  Vec_IntClear( vNodes );
 	  Vec_IntPush( vNodes, x );
 	  pDc = Abc_BddGenGia( pFrom->pBdd, vNodes );
-	  
+	  if ( nDcPropagate == 1 )
+	    {
+	      // Universally quantify unused inputs
+	      Vec_IntClear( vVars );
+	      for ( pi = 0; pi < Vec_IntSize( pFrom->vPis ); pi++ )	
+		if ( Vec_IntFind( pvPis[k], pi ) == -1 )
+		  {
+		    pTmp = pDc;
+		    pDc = Gia_ManDupUniv( pDc, pi );
+		    Gia_ManStop( pTmp );
+		    Vec_IntPush( vVars, pi );
+		  }
+	      // Add inputs to match the number of inputs
+	      while( Gia_ManCiNum( pDc ) < Vec_IntSize( pTo->vPos ) )
+		{
+		  Vec_IntPush( vVars, Gia_ManCiNum( pDc ) );
+		  Gia_ManAppendCi( pDc );
+		}
+	      // Permitate inputs to match them with the outputs of the next partition
+	      Vec_IntClear( vNodes );
+	      count = 0;
+	      for ( j = 0; j < Gia_ManCiNum( pDc ); j++ )
+		{
+		  flag = 0;
+		  Vec_IntForEachEntry( pvPis[k], pi, l )
+		    if ( j == Vec_IntEntry( pFrom->vPiIdxs, pi ) )
+		      {
+			Vec_IntPush( vNodes, pi );
+			flag = 1;
+			break;
+		      }
+		  if ( flag )
+		    continue;
+		  Vec_IntPush( vNodes, Vec_IntEntry( vVars, count ) );
+		  count++;
+		}
+	      pTmp = pDc;
+	      pDc = Gia_ManDupPerm( pDc, vNodes );
+	      Gia_ManStop( pTmp );
+	      // remove unused inputs
+	      pTmp = pDc;
+	      pDc = Gia_ManDupRemovePis( pDc, Gia_ManCiNum( pDc ) - Vec_IntSize( pTo->vPos ) );
+	      Gia_ManStop( pTmp );
+	      // Place it on top of the next partition
+	      pTmp = pDc;
+	      pDc = Gia_ManDupOntop( pTo->pGia, pDc );
+	      Gia_ManStop( pTmp );
+	      Vec_PtrPush( Vec_PtrEntry( pTo->vvDcGias, Vec_IntEntry( pFrom->vPiIdxs, pi ) ), pDc );
+	      continue;
+	    }
+	  // if nDcPropagate >= 2
+	  // create a circuit with inputs of the next circuit and outputs of the previous circuit
 	  pBase = Abc_BddNandGiaExpand( pGlobal, pTo->vOrgPis, pFrom->vOrgPis );
 	  nPos = Vec_IntSize( pFrom->vOrgPis );
 	  pPos = ABC_CALLOC( int, nPos );
@@ -1883,20 +1931,22 @@ static inline void Abc_BddNandPropagateDc( Vec_Ptr_t * vNets, int from, Gia_Man_
 	  pBase = Gia_ManDupCones( pBase, pPos, nPos, 0 );
 	  Gia_ManStop( pTmp );
 	  ABC_FREE( pPos );
-	  
+	  // create a DC circuit in terms of inputs of the next circuit
 	  pTmp = pDc;
 	  pDc = Gia_ManDupOntop( pBase, pDc );
 	  Gia_ManStop( pBase );
 	  Gia_ManStop( pTmp );
+	  // remove unnecessary inputs by universing it
 	  for ( j = 0; j < Gia_ManCiNum( pGlobal ); j++ )
 	    {
 	      pTmp = pDc;
 	      pDc = Gia_ManDupUniv( pDc, j );
 	      Gia_ManStop( pTmp );
-	    }
+           }
 	  pTmp = pDc;
 	  pDc = Gia_ManDupLastPis( pDc, Vec_IntSize( pTo->vOrgPis ) );
 	  Gia_ManStop( pTmp );
+	  
 	  // push it to dc list
 	  Vec_PtrPush( Vec_PtrEntry( pTo->vvDcGias, Vec_IntEntry( pFrom->vPiIdxs, pi ) ), pDc );
 	}
@@ -1924,7 +1974,7 @@ static inline void Abc_BddNandPrintStats( Abc_NandMan * p, char * prefix, abctim
   printf( "\r%-10s: gates = %5d, wires = %5d, AIG node = %5d", prefix, Vec_IntSize( p->vObjs ), Abc_BddNandCountWire( p ), Abc_BddNandCountWire( p ) - Vec_IntSize( p->vObjs ) );
   ABC_PRT( ", time ", Abc_Clock() - clk0 );
 }
-Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType, int fRm, int fRep, int fDc, int fSpec, int nWindowSize,int fDcPropagate, int nMspf, int nVerbose )
+Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType, int fRm, int fRep, int fDc, int fSpec, int nWindowSize,int nDcPropagate, int nMspf, int nVerbose )
 {
   int i, j, k, id, nPos;
   int * pPos;
@@ -2045,8 +2095,11 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType,
 	  if ( !fRep )
 	    break;
 	}
-      if ( nWindowSize && fDcPropagate )
-	Abc_BddNandPropagateDc( vNets, i, pGia );
+      if ( nWindowSize && nDcPropagate )
+	{
+	  Abc_BddNandCspfEager( p );
+	  Abc_BddNandPropagateDc( vNets, i, pGia, nDcPropagate );
+	}
     }
   if ( nVerbose )
     ABC_PRT( "total ", Abc_Clock() - clk0 );

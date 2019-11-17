@@ -46019,7 +46019,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     int nMem = 21;
     int fExdc = 0;
     int fSpec = 0;
-    int fDcPropagate = 0;
+    int nDcPropagate = 0;
     int fVerify = 0;
     int fReo = 0;
     int fRep = 0;
@@ -46027,9 +46027,9 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     int nWindowSize = 0;
     int nMspf = 0;
     Gia_Man_t * pNew = NULL, * pMiter;
-    extern Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType, int fRm, int fRep, int fExdc, int fSpec, int nWindowSize, int fDcPropagate, int nMspf, int nVerbose );
+    extern Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType, int fRm, int fRep, int fExdc, int fSpec, int nWindowSize, int nDcPropagate, int nMspf, int nVerbose );
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "GMHPVemprxyzh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "GMHPVZemprxyh" ) ) != EOF )
     {
         switch ( c )
         {
@@ -46050,9 +46050,6 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
             break;
 	case 'y':
             fSpec ^= 1;
-            break;
-	case 'z':
-            fDcPropagate ^= 1;
             break;
         case 'G':
             if ( globalUtilOptind >= argc )
@@ -46109,6 +46106,16 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
             if ( nVerbose < 0 )
                 goto usage;
             break;
+	case 'Z':
+	    if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-V\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nDcPropagate = atoi(argv[globalUtilOptind]);
+            if ( nDcPropagate < 0 )
+                goto usage;
+            break;
         case 'h':
             goto usage;
         default:
@@ -46120,7 +46127,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
         Abc_Print( -1, "Abc_CommandAbc9Cspf(): There is no AIG.\n" );
         return 1;
     }
-    if ( !nWindowSize && fDcPropagate )
+    if ( !nWindowSize && nDcPropagate )
     {
         Abc_Print( -1, "Abc_CommandAbc9Cspf(): DC propagation can be used only for partitioned circuits\n" );
 	return 1;
@@ -46151,7 +46158,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
 	return 1;
     }
     
-    pNew = Abc_BddNandGiaTest( pAbc->pGia, nMem, fReo, nType, fRm, fRep, fExdc, fSpec, nWindowSize, fDcPropagate, nMspf, nVerbose );
+    pNew = Abc_BddNandGiaTest( pAbc->pGia, nMem, fReo, nType, fRm, fRep, fExdc, fSpec, nWindowSize, nDcPropagate, nMspf, nVerbose );
     if ( fVerify )
       {
 	if ( fExdc )
@@ -46208,7 +46215,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
     return 0;
     
 usage:
-    Abc_Print( -2, "usage: &cspf [-GMHPV num] [-emprxyzh]\n" );
+    Abc_Print( -2, "usage: &cspf [-GMHPVZ num] [-emprxyh]\n" );
     Abc_Print( -2, "\t        circuit minimization with permissible function using simple bdd\n" );
     Abc_Print( -2, "\t-e    : toggle verification [default = %s]\n", fVerify? "yes": "no" );
     Abc_Print( -2, "\t-m    : toggle removing redundancy definitely during CSPF [default = %s]\n", fRm? "yes": "no" );
@@ -46216,7 +46223,6 @@ usage:
     Abc_Print( -2, "\t-r    : toggle dynamic variable reoredering [default = %s]\n", fReo? "yes": "no" );
     Abc_Print( -2, "\t-x    : toggle using the later half outputs as external don't cares of the first half outputs [default = %s]\n", fExdc? "yes": "no" );
     Abc_Print( -2, "\t-y    : toggle using the later half outputs as input candidates of the first half outputs for G1,2 [default = %s]\n", fSpec? "yes": "no" );
-    Abc_Print( -2, "\t-z    : toggle propagating don't cares in partitioned circuits [default = %s]\n", fDcPropagate? "yes": "no" );
     Abc_Print( -2, "\t-G num: optimization heuristic type [default = %d]\n", nType );
     Abc_Print( -2, "\t\t0: calculate permissible functions while removing apparent redundancy\n" );
     Abc_Print( -2, "\t\t1: transduction method of gate substitution (eager)\n" );
@@ -46233,6 +46239,10 @@ usage:
     Abc_Print( -2, "\t\t1: Results for each optimization\n" );
     Abc_Print( -2, "\t\t2: Refresh procedures\n" );
     Abc_Print( -2, "\t\t3: Optimization procedures\n" );
+    Abc_Print( -2, "\t-Z num: toggle propagating don't cares among partitioned circuits [default = %s]\n", nDcPropagate );
+    Abc_Print( -2, "\t\t0: No propagation\n" );
+    Abc_Print( -2, "\t\t1: Propagate don't cares in terms of connections between partitions\n" );
+    Abc_Print( -2, "\t\t2: Propagate don't cares in terms of PIs\n" );
     Abc_Print( -2, "\t-h    : print the command usage\n");
     return 1;
 }

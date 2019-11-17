@@ -856,7 +856,7 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
 ***********************************************************************/
 unsigned Abc_BddUnivAbstract_rec( Abc_BddMan * p, unsigned x, Vec_Int_t * vVars )
 {
-  int Var;
+  int i, iVar, Var;
   unsigned Then, Else;
   if ( Abc_BddLitIsConst( x ) )
     return x;
@@ -867,8 +867,9 @@ unsigned Abc_BddUnivAbstract_rec( Abc_BddMan * p, unsigned x, Vec_Int_t * vVars 
   if ( Abc_BddLitIsInvalid( Else ) )
     return Else;
   Var = Abc_BddVar( p, x );
-  if ( Vec_IntFind( vVars, Var ) != -1 )
-    return Abc_BddAnd_rec( p, Then, Else );
+  Vec_IntForEachEntry( vVars, iVar, i )
+    if ( Abc_BddVar( p, Abc_BddLitIthVar( iVar ) ) == Var )
+      return Abc_BddAnd_rec( p, Then, Else );
   return Abc_BddUniqueCreate( p, Var, Then, Else );
 }
 // univ abstract var in vars
