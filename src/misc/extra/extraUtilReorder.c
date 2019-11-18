@@ -128,17 +128,12 @@ static inline void Abc_BddCountEdgeAndBvar( Abc_BddMan * p, Vec_Int_t * pFunctio
    SeeAlso     []
 
 ***********************************************************************/
-static inline void Abc_BddPrintOrdering( Abc_BddMan * p )
+static inline void Abc_BddPrintOrdering( Abc_BddMan * p, int * new2old )
 {
-  int i, j;
+  int i;
   printf( "Ordering :\n" );
   for ( i = 0; i < p->nVars; i++ )
-    {
-      for ( j = 0; j < p->nVars; j++ )
-	if ( Abc_BddVar( p, Abc_BddLitIthVar( j ) ) == i )
-	  break;
-      printf( "%d,", j );
-    }
+    printf( "%d,", Vec_IntEntry( p->vOrdering, new2old[i] ) );
   printf( "\n" );
   printf( "----------\n" );
 }
@@ -455,7 +450,7 @@ static inline void Abc_BddShift( Abc_BddMan * p, int * pos, int * nNodes, int nS
       if ( p->nVerbose >= 2 )
 	{
 	  printf( "pos : %d\nnNode : %d\n", *pos, *nNodes );
-          Abc_BddPrintOrdering( p );
+          Abc_BddPrintOrdering( p, new2old );
 	}
     }
 }
@@ -475,6 +470,7 @@ void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions )
 {
   int i, j, k, best_i, pos, nNodes, nSwap, fUp, bestPos, nBestNodes, nLimit;
   int * new2old, * descendingOrder;
+  Vec_Int_t * vNew;
   if ( p->nVerbose )
     printf( "\tReordering\n" );
   // initialize
@@ -505,7 +501,7 @@ void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions )
       for ( i = 0; i < p->nVars; i++ )
 	printf( "(%d),", Vec_IntSize( p->liveBvars[i] ) );
       printf( "\n" );
-      Abc_BddPrintOrdering( p );
+      Abc_BddPrintOrdering( p, new2old );
     }
   // shift
   for ( i = 0; i < p->nVars; i++ )
@@ -522,12 +518,7 @@ void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions )
       bestPos = pos;
       nBestNodes = nNodes;
       if ( p->nVerbose >= 2 )
-	{
-	  for ( k = 0; k < p->nVars; k++ )
-	    if ( Abc_BddVar( p, Abc_BddLitIthVar( k ) ) == j )
-	      break;
-	  printf( "\tBegin shift %d (%d/%d)\n", k, i + 1, p->nVars );
-	}
+	printf( "\tBegin shift %d (%d/%d)\n", Vec_IntEntry( p->vOrdering, new2old[j] ), i + 1, p->nVars );
       if( pos < p->nVars >> 1 )
 	{
 	  fUp ^= 1;
@@ -552,10 +543,52 @@ void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions )
       Abc_BddShift( p, &pos, &nNodes, nSwap, fUp, &bestPos, &nBestNodes, new2old, pFunctions, nLimit );
     }
   // finish
+  vNew = Vec_IntAlloc( p->nVars );
+  for ( i = 0; i < p->nVars; i++ )
+    Vec_IntPush( vNew, Vec_IntEntry( p->vOrdering, new2old[i] ) );
+  Vec_IntFree( p->vOrdering );
+  p->vOrdering = vNew;
   Abc_BddUncountEdge( p, pFunctions );
   ABC_FREE( new2old );
   ABC_FREE( descendingOrder );
   Abc_BddCacheRemove( p );
+}
+
+/**Function*************************************************************
+   
+   Synopsis    []
+
+   Description []
+               
+   SideEffects []
+
+   SeeAlso     []
+
+***********************************************************************/
+void Abc_BddReorderConfig( Abc_BddMan * p, int nReoThold )
+{
+  int i;
+  p->ReoThold = 0.01 * nReoThold;
+  if ( p->pEdges )
+    ABC_FREE( p->pEdges );
+  if ( p->liveBvars )
+    {
+      for ( i = 0; i < p->nVars + 2; i++ )
+	Vec_IntFree( p->liveBvars[i] );
+      ABC_FREE( p->liveBvars );
+    }
+  if ( p->ReoThold )
+    {
+      p->pEdges = ABC_CALLOC( unsigned, p->nObjsAlloc );
+      if ( !p->pEdges )
+	{
+	  printf( "Error: Allocation failed\n" );
+	  abort();
+	}
+      p->liveBvars = ABC_ALLOC( Vec_Int_t *, p->nVars + 2 );
+      for ( i = 0; i < p->nVars + 2; i++ )
+	p->liveBvars[i] = Vec_IntAlloc( 1 );
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////

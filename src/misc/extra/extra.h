@@ -420,23 +420,23 @@ struct Abc_BddMan_
   int *              pUnique;       // unique table for nodes
   int *              pNexts;        // next pointer for nodes
   unsigned *         pCache;        // array of triples <arg0, arg1, AND(arg0, arg1)>
-  unsigned *         pObjs;         // array of pairs cof0 for each node
-  unsigned char *    pVars;         // array of variables for each node
-  unsigned char *    pMarks;        // array of marks for each BDD node
+  unsigned *         pObjs;         // array of pairs cof0 for nodes
+  unsigned char *    pVars;         // array of variables for nodes
+  unsigned short *   pSVars;        // array of variables for nodes when more than 255 vars
+  unsigned char *    pMarks;        // array of marks for nodes
   unsigned           nUniqueMask;   // selection mask for unique table
   unsigned           nCacheMask;    // selection mask for computed table
   int                nMinRemoved;   // the minimum int of removed nodes
   int                nVerbose;      // the level of verbosing information
 
-  unsigned short *   pSVars;        // array of variables for each node for more than 255 variables
-  
-  int                fGC;           // flag to garbage collect
-  int                fRealloc;      // flag to reallocate
+  int                fGC;           // flag of garbage collection
+  int                fRealloc;      // flag of reallocation
   Vec_Int_t *        pFrontiers;    // vector of frontier nodes
   
-  float              ReoThold;      // threshold to terminate reordering. 0=off.
-  unsigned *         pEdges;        // array of number of incoming edges for each BDD node. used for reordering
-  Vec_Int_t **       liveBvars;     // array of live bvars for each layer. used for reordering
+  Vec_Int_t *        vOrdering;     // variable ordering : new 2 old
+  float              ReoThold;      // threshold to terminate reordering. 0=off
+  unsigned *         pEdges;        // array of number of incoming edges for nodes
+  Vec_Int_t **       liveBvars;     // array of live Bvars for each layer
 };
 
 // Var = Variable, Lit = Literal, Bvar = BddVariable = Lit >> 1 
@@ -506,26 +506,29 @@ static inline void     Abc_BddDecEdgeNonConst( Abc_BddMan * p, unsigned x) { if 
 
 static inline int      Abc_BddIsLimit( Abc_BddMan * p ) { return (unsigned)p->nObjs == p->nObjsAlloc || p->nObjs == Abc_BddBvarInvalid(); }
 
-extern unsigned        Abc_BddUniqueCreate( Abc_BddMan * p, int Var, unsigned Then, unsigned Else );
 extern Abc_BddMan *    Abc_BddManAlloc( int nVars, unsigned nObjs, int fDynAlloc, Vec_Int_t * vOrdering, int fVerbose );
-extern void            Abc_BddCacheRemove( Abc_BddMan * p );
-extern void            Abc_BddManRealloc( Abc_BddMan * p );
 extern void            Abc_BddManFree( Abc_BddMan * p );
+extern void            Abc_BddManRealloc( Abc_BddMan * p );
+extern void            Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFunctions );
+extern void            Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts );
+extern void            Abc_BddCacheRemove( Abc_BddMan * p );
+
+extern unsigned        Abc_BddUniqueCreate( Abc_BddMan * p, int Var, unsigned Then, unsigned Else );
+extern void            Abc_BddRemoveNodeByBvar( Abc_BddMan * p, int a );
+
 extern unsigned        Abc_BddAnd( Abc_BddMan * p, unsigned x, unsigned y );
 extern unsigned        Abc_BddOr( Abc_BddMan * p, unsigned x, unsigned y );
 extern unsigned        Abc_BddXnor( Abc_BddMan * p, unsigned x, unsigned y );
+extern unsigned        Abc_BddUnivAbstract( Abc_BddMan * p, unsigned x, Vec_Int_t * vVars );
+
 extern void            Abc_BddUnmark_rec( Abc_BddMan * p, unsigned x );
 extern int             Abc_BddCountNodesArrayShared( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern int             Abc_BddCountNodesArrayIndependent( Abc_BddMan * p, Vec_Int_t * vNodes );
-extern void            Abc_BddRemoveNodeByBvar( Abc_BddMan * p, int a );
-extern void            Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFrontiers );
-extern void            Abc_BddGiaCountFanout( Gia_Man_t * pGia, int * pFanouts );
-extern void            Abc_BddGiaRefreshConfig( Abc_BddMan * p, int fRealloc, int fGC, int nReorderThreshold );
-extern int             Abc_BddGiaRefresh( Abc_BddMan * p, int * nRefresh );
-extern int             Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p );
 extern Gia_Man_t *     Abc_BddGenGia( Abc_BddMan * p, Vec_Int_t * vNodes );
 extern void            Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName, int fName );  
-extern unsigned        Abc_BddUnivAbstract( Abc_BddMan * p, unsigned x, Vec_Int_t * vVars );
+
+extern void            Abc_BddGiaRefreshConfig( Abc_BddMan * p, int fRealloc, int fGC, int nReoThold );
+extern int             Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p );
 
 /*=== extraUtilReorder.c ================================================================*/
 

@@ -45896,10 +45896,10 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
     int fRealloc = 1;
     int fGC = 1;
     int fSort = 0;
-    int nReorderThreshold = 0;
-    int nFinalReorder = 0;
+    int nReoThold = 0;
+    int nFinalReo = 0;
     char * pFileName = NULL;
-    extern void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fSort, int fRealloc, int fGC, int nReorderThreshold, int nFinalReorder );
+    extern void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fSort, int fRealloc, int fGC, int nReoThold, int nFinalReo );
     Extra_UtilGetoptReset();
     while ( ( c = Extra_UtilGetopt( argc, argv, "FMRVWagnh" ) ) != EOF )
     {
@@ -45920,9 +45920,9 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
 	        Abc_Print( -1, "Command line switch \"-F\" should be followed by an integer.\n" );
                 goto usage;
             }
-  	    nFinalReorder = atoi(argv[globalUtilOptind]);
+  	    nFinalReo = atoi(argv[globalUtilOptind]);
             globalUtilOptind++;
-	    if ( nFinalReorder < 0 )
+	    if ( nFinalReo < 0 )
 	      goto usage;
             break;
         case 'M':
@@ -45942,9 +45942,9 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
 	        Abc_Print( -1, "Command line switch \"-R\" should be followed by an integer.\n" );
                 goto usage;
             }
-	    nReorderThreshold = atoi(argv[globalUtilOptind]);
+	    nReoThold = atoi(argv[globalUtilOptind]);
             globalUtilOptind++;
-            if ( nReorderThreshold < 0 )
+            if ( nReoThold < 0 )
                 goto usage;
             break;
         case 'V':
@@ -45978,7 +45978,7 @@ int Abc_CommandAbc9Bdd( Abc_Frame_t * pAbc, int argc, char ** argv )
         Abc_Print( -1, "Abc_CommandAbc9Bdd(): There is no AIG.\n" );
         return 1;
     }
-    Abc_BddGiaTest( pAbc->pGia, nVerbose, nMem, pFileName, fSort, fRealloc, fGC, nReorderThreshold, nFinalReorder );
+    Abc_BddGiaTest( pAbc->pGia, nVerbose, nMem, pFileName, fSort, fRealloc, fGC, nReoThold, nFinalReo );
     return 0;
     
 usage:
@@ -45987,9 +45987,9 @@ usage:
     Abc_Print( -2, "\t-a    : toggle reallocating by double when nodes reach the limit (after garbage collection) [default = %s]\n", fRealloc? "yes": "no" );
     Abc_Print( -2, "\t-g    : toggle garbage collecting when nodes reach the limit [default = %s]\n", fGC? "yes": "no" );
     Abc_Print( -2, "\t-n    : toggle sorting the inputs of the written blif according to the ordering [default = %s]\n", fSort? "yes": "no" );
-    Abc_Print( -2, "\t-F num: threshold to terminate reordering after building BDDs. (num)%% more nodes than before reordering. 0=off. [default = %d]\n", nFinalReorder );
+    Abc_Print( -2, "\t-F num: threshold to terminate reordering after building BDDs. (num)%% more nodes than before reordering. 0=off. [default = %d]\n", nFinalReo );
     Abc_Print( -2, "\t-M num: memory size to allocate (2^(num) nodes) [default = %d]\n", nMem );
-    Abc_Print( -2, "\t-R num: threshold to terminate reordering while building BDDs. (num)%% more nodes than before reordering. 0=off. [default = %d]\n", nReorderThreshold );
+    Abc_Print( -2, "\t-R num: threshold to terminate reordering while building BDDs. (num)%% more nodes than before reordering. 0=off. [default = %d]\n", nReoThold );
     Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
     Abc_Print( -2, "\t\t0: Only results\n" );
     Abc_Print( -2, "\t\t1: Refresh procedures\n" );

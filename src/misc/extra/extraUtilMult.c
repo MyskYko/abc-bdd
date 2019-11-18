@@ -208,11 +208,17 @@ Abc_BddMan * Abc_BddManAlloc( int nVars, unsigned nObjs, int fDynAlloc, Vec_Int_
     }
   Abc_BddSetVarOfBvar( p, Abc_BddBvarConst(), Abc_BddVarConst( p ) );
   p->nObjs = 1;
+  if ( vOrdering )
+    p->vOrdering = Vec_IntDup( vOrdering );
+  else
+    p->vOrdering = Vec_IntStartNatural( p->nVars );
+  if ( Vec_IntCountDuplicates( p->vOrdering ) || Vec_IntFindMax( p->vOrdering ) >= p->nVars || Vec_IntFindMin( p->vOrdering ) < 0 )
+    {
+      printf( "Error: Invalid ordering\n" );
+      abort();
+    }
   for ( i = 0; i < nVars; i++ )
-    if ( vOrdering )
-      Abc_BddUniqueCreate( p, Vec_IntEntry( vOrdering, i ), Abc_BddLitConst1(), Abc_BddLitConst0() );
-    else
-      Abc_BddUniqueCreate( p, i, Abc_BddLitConst1(), Abc_BddLitConst0() );
+    Abc_BddUniqueCreate( p, Vec_IntFind( p->vOrdering, i ), Abc_BddLitConst1(), Abc_BddLitConst0() );
   return p;
 }
 void Abc_BddManFree( Abc_BddMan * p )
@@ -230,6 +236,8 @@ void Abc_BddManFree( Abc_BddMan * p )
     ABC_FREE( p->pSVars );
   if ( p->pFrontiers )
     Vec_IntFree( p->pFrontiers );
+  if ( p->vOrdering )
+    Vec_IntFree( p->vOrdering );
   if ( p->pEdges )
     ABC_FREE( p->pEdges );
   if ( p->liveBvars )
@@ -511,17 +519,12 @@ void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName, int
   fprintf( f, ".inputs" );
   if ( fSort )
     for ( i = 0; i < p->nVars; i++ )
-      {
-	for ( j = 0; j < p->nVars; j++ )
-	  if ( Abc_BddVar( p, Abc_BddLitIthVar( j ) ) == i )
-	    break;
-	if ( p->nVars <= 10 )
-	  fprintf( f, " pi%d", j );
-	else if ( p->nVars <= 100 )
-	  fprintf( f, " pi%02d", j );
-	else
-	  fprintf( f, " pi%03d", j );
-      }
+      if ( p->nVars <= 10 )
+	fprintf( f, " pi%d", Vec_IntEntry( p->vOrdering, i ) );
+      else if ( p->nVars <= 100 )
+	fprintf( f, " pi%02d", Vec_IntEntry( p->vOrdering, i ) );
+      else
+	fprintf( f, " pi%03d", Vec_IntEntry( p->vOrdering, i ) );
   else
     for ( i = 0; i < p->nVars; i++ )
       if ( p->nVars <= 10 )
@@ -551,7 +554,7 @@ void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName, int
 	fprintf( f, " pi%02d ", i );
       else
 	fprintf( f, " pi%03d ", i );
-      fprintf( f, " v%d", Abc_BddVar( p, Abc_BddLitIthVar( i ) ) );
+      fprintf( f, " v%d", Vec_IntFind( p->vOrdering, i ) );
       fprintf( f, "\n1 1\n" );      
     }
   Vec_IntForEachEntry( vNodes, x, i )
@@ -596,14 +599,11 @@ void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName, int
 ***********************************************************************/
 void Abc_BddGenGiaNode_rec( Abc_BddMan * p, int a, int * Values, Gia_Man_t * pGia )
 {
-  int i, VarBvar, ThenBvar, ElseBvar, compl;
+  int VarBvar, ThenBvar, ElseBvar, compl;
   if ( Abc_BddBvarIsConst( a ) || Abc_BddMarkOfBvar( p, a ) || Abc_BddBvarIsVar( p, a ) )
     return;
   Abc_BddSetMarkOfBvar( p, a, 1 );
-  for ( i = 0; i < p->nVars; i++ )
-    if ( Abc_BddVar( p, Abc_BddLitIthVar( i ) ) == Abc_BddVarOfBvar( p, a ) )
-      break;
-  VarBvar = Abc_BddBvarIthVar( i );
+  VarBvar = Abc_BddBvarIthVar( Vec_IntEntry( p->vOrdering, Abc_BddVarOfBvar( p, a ) ) );
   ThenBvar = Abc_BddLit2Bvar( Abc_BddThenOfBvar( p, a ) );
   ElseBvar = Abc_BddLit2Bvar( Abc_BddElseOfBvar( p, a ) );
   compl = Abc_BddLitIsCompl( Abc_BddThenOfBvar( p, a ) );
@@ -661,18 +661,18 @@ void Abc_BddRemoveNodeByBvar( Abc_BddMan * p, int a )
   if ( p->nMinRemoved > a )
     p->nMinRemoved = a;
 }
-void Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFrontiers )
+void Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFunctions )
 {
   int i;
   unsigned x;
   if ( p->nVerbose )
     printf( "\tGarbage collect\n" );
-  Vec_IntForEachEntry( pFrontiers, x, i )
+  Vec_IntForEachEntry( pFunctions, x, i )
     Abc_BddMark_rec( p, x );
   for ( i = p->nVars + 1; i < p->nObjs; i++ )
     if ( !Abc_BddMarkOfBvar( p, i ) && !Abc_BddBvarIsRemoved( p, i ) )
       Abc_BddRemoveNodeByBvar( p, i );
-  Vec_IntForEachEntry( pFrontiers, x, i )
+  Vec_IntForEachEntry( pFunctions, x, i )
     Abc_BddUnmark_rec( p, x );
   Abc_BddCacheRemove( p );
 }
@@ -688,33 +688,17 @@ void Abc_BddGarbageCollect( Abc_BddMan * p, Vec_Int_t * pFrontiers )
    SeeAlso     []
 
 ***********************************************************************/
-void Abc_BddGiaRefreshConfig( Abc_BddMan * p,  int fRealloc, int fGC, int nReorderThreshold )
+void Abc_BddGiaRefreshConfig( Abc_BddMan * p,  int fRealloc, int fGC, int nReoThold )
 {
-  int i;
   p->fRealloc = fRealloc;
   p->fGC = fGC;
-  p->ReoThold = 0.01 * nReorderThreshold;
-  if ( fGC || p->ReoThold )
-    if ( !p->pFrontiers )
-      p->pFrontiers = Vec_IntAlloc( 1 );
-  if ( p->ReoThold )
-    {
-      if ( !p->pEdges )
-	p->pEdges = ABC_CALLOC( unsigned, p->nObjsAlloc );
-      if ( !p->pEdges )
-	{
-	  printf( "Error: Allocation failed\n" );
-	  abort();
-	}
-      if ( !p->liveBvars )
-	{
-	  p->liveBvars = ABC_ALLOC( Vec_Int_t *, p->nVars + 2 );
-	  for ( i = 0; i < p->nVars + 2; i++ )
-	    p->liveBvars[i] = Vec_IntAlloc( 1 );
-	}
-    }
+  if ( p->pFrontiers )
+    ABC_FREE( p->pFrontiers );
+  if ( fGC || nReoThold )
+    p->pFrontiers = Vec_IntAlloc( 1 );
+  Abc_BddReorderConfig( p, nReoThold );
 }
-int Abc_BddGiaRefresh( Abc_BddMan * p, int * nRefresh )
+static inline int Abc_BddGiaRefresh( Abc_BddMan * p, int * nRefresh )
 {
   *nRefresh += 1;
   if ( p->nVerbose )
@@ -724,7 +708,7 @@ int Abc_BddGiaRefresh( Abc_BddMan * p, int * nRefresh )
       Abc_BddGarbageCollect( p, p->pFrontiers );
       return 0;
     }
-  if ( *nRefresh <= 2 && p->ReoThold != 0 && p->nObjsAlloc > 4000 )
+  if ( *nRefresh <= 2 && p->ReoThold && p->nObjsAlloc > 4000 )
     {
       Abc_BddReorder( p, p->pFrontiers );
       Abc_BddGarbageCollect( p, p->pFrontiers );
@@ -747,12 +731,17 @@ int Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p )
   if ( p->pFrontiers )
     {
       pFanouts = ABC_CALLOC( int, pGia->nObjs );
-      if ( !pFanouts ) abort();
+      if ( !pFanouts )
+	{
+	  printf( "Error: Allocation failed\n" );
+	  abort();
+	}
       Abc_BddGiaCountFanout( pGia, pFanouts );
     }
   Gia_ManFillValue( pGia );
   Gia_ManConst0( pGia )->Value = Abc_BddLitConst0();
-  Gia_ManForEachCi( pGia, pObj, i ) pObj->Value = Abc_BddLitIthVar( i );
+  Gia_ManForEachCi( pGia, pObj, i )
+    pObj->Value = Abc_BddLitIthVar( i );
   Gia_ManForEachAnd( pGia, pObj, i )
     {
       pObj0 = Gia_ObjFanin0( pObj );
@@ -764,7 +753,7 @@ int Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p )
 	{
 	  if ( Abc_BddGiaRefresh( p, &nRefresh ) )
 	    {
-	      if ( p->pFrontiers )
+	      if ( pFanouts )
 		ABC_FREE( pFanouts );
 	      return -1;
 	    }
@@ -785,58 +774,56 @@ int Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p )
     }
   Gia_ManForEachCo( pGia, pObj, i )
     pObj->Value = Abc_BddLitNotCond( Gia_ObjFanin0( pObj )->Value, Gia_ObjFaninC0( pObj ) );
-  if ( p->pFrontiers )
+  if ( pFanouts )
     ABC_FREE( pFanouts );
   return 0;
 }
-static inline void Abc_BddGiaTestPrint( Abc_BddMan * p, Vec_Int_t * vNodes, abctime time )
-{
-  printf( "Shared BDD size = %6d nodes.", Abc_BddCountNodesArrayShared( p, vNodes ) );
-  ABC_PRT( "  BDD construction time", time );
-  printf( "Sum of BDD nodes for each BDD = %d", Abc_BddCountNodesArrayIndependent( p, vNodes ) );
-  printf( "  Used nodes = %d  Allocated nodes = %u\n", p->nObjs, ( p->nObjsAlloc == 1 << 31 ) ? p->nObjsAlloc - 1 : p->nObjsAlloc );
-}
-void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fSort, int fRealloc, int fGC, int nReorderThreshold, int nFinalReorder )
+void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName, int fSort, int fRealloc, int fGC, int nReoThold, int nFinalReo )
 {
   int i, j;
   Gia_Obj_t * pObj;
   Abc_BddMan * p;
   Vec_Int_t * vNodes;
-  abctime clk, clk2, time;
+  abctime clk, time;
   clk = Abc_Clock();
   p = Abc_BddManAlloc( Gia_ManCiNum( pGia ), 1 << nMem, fRealloc, NULL, nVerbose );
-  Abc_BddGiaRefreshConfig( p, fRealloc, fGC, nReorderThreshold );
-  assert( !Abc_BddGia( pGia, p ) );
-  clk2 = Abc_Clock();
+  Abc_BddGiaRefreshConfig( p, fRealloc, fGC, nReoThold );
+  if ( Abc_BddGia( pGia, p ) )
+    {
+      printf( "Error: BDD construction failed\n" );
+      Abc_BddManFree( p );
+      return;
+    }
+  time = Abc_Clock() - clk;
   vNodes = Vec_IntAlloc( Gia_ManCoNum( pGia ) );
   Gia_ManForEachCo( pGia, pObj, i )
     Vec_IntPush( vNodes, pObj->Value );
-  time = clk2 - clk;
-  if ( nFinalReorder )
+  if ( nFinalReo )
     {
-      Abc_BddGiaRefreshConfig( p, fRealloc, fGC, nFinalReorder );
       i = Abc_BddCountNodesArrayShared( p, vNodes );
       clk = Abc_Clock();
+      Abc_BddReorderConfig( p, nFinalReo );
       Abc_BddReorder( p, vNodes );
-      clk2 = Abc_Clock();
+      time += Abc_Clock() - clk;
       j = Abc_BddCountNodesArrayShared( p, vNodes );
       printf( "Final Reorder Gain %d -> %d (%d)\n", i, j, j - i );
-      time += clk2 - clk;
     }
-  Abc_BddGiaTestPrint( p, vNodes, time );
   if ( p->ReoThold )
     {
       printf( "Ordering:\n" );
       for ( i = 0; i < p->nVars; i++ )
-	{
-	  for ( j = 0; j < p->nVars; j++ )
-	    if ( Abc_BddVar( p, Abc_BddLitIthVar( j ) ) == i ) break;
-	  if ( p->nVars <= 10 ) printf( "pi%d ", j );
-	  else if ( p->nVars <= 100 ) printf( "pi%02d ", j );
-	  else printf( "pi%03d ", j );
-	}
+	if ( p->nVars <= 10 )
+	  printf( "pi%d ", Vec_IntEntry( p->vOrdering, i ) );
+	else if ( p->nVars <= 100 )
+	  printf( "pi%02d ", Vec_IntEntry( p->vOrdering, i ) );
+	else
+	  printf( "pi%03d ", Vec_IntEntry( p->vOrdering, i ) );
       printf( "\n" );
     }
+  printf( "Shared BDD size = %6d nodes.", Abc_BddCountNodesArrayShared( p, vNodes ) );
+  ABC_PRT( "  BDD construction time", time );
+  printf( "Sum of BDD nodes for each BDD = %d", Abc_BddCountNodesArrayIndependent( p, vNodes ) );
+  printf( "  Used nodes = %d  Allocated nodes = %u\n", p->nObjs, ( p->nObjsAlloc == 1 << 31 ) ? p->nObjsAlloc - 1 : p->nObjsAlloc );
   if ( pFileName )
     Abc_BddWriteBlif( p, vNodes, pFileName, fSort );
   Vec_IntFree( vNodes );

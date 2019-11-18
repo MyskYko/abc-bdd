@@ -2042,18 +2042,16 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType,
 	    Vec_IntPush( vFuncs, p->pBddFuncs[id] );
 	  Vec_IntForEachEntry( p->vPos, id, k )
 	    Vec_IntPush( vFuncs, p->pGFuncs[id] );
-	  Abc_BddGiaRefreshConfig( p->pBdd, 1, 1, 10 );
+	  Abc_BddReorderConfig( p->pBdd, 10 );
+	  p->pBdd->fGC = 1;
+	  p->pBdd->fRealloc = 1;
 	  Abc_BddReorder( p->pBdd, vFuncs );
-	  Abc_BddGiaRefreshConfig( p->pBdd, 0, 0, 0 );
-	  p->vOrdering = Vec_IntAlloc( 1 );
-	  for ( j = 0; j < p->pBdd->nVars; j++ )
-	    {
-	      for ( k = 0; k < p->pBdd->nVars; k++ )
-		if ( Abc_BddVar( p->pBdd, Abc_BddLitIthVar( j ) ) == k )
-		  break;
-	      Vec_IntPush( p->vOrdering, k );
-	    }
+	  Abc_BddReorderConfig( p->pBdd, 0 );
+	  p->pBdd->fGC = 0;
+	  p->pBdd->fRealloc = 0;
+	  p->vOrdering = Vec_IntDup( p->pBdd->vOrdering );
 	  Vec_IntFree( vFuncs );
+	  p->nMem = Abc_Base2Log( p->pBdd->nObjsAlloc );
 	}
       if ( nVerbose >= 2 )
 	printf( "Allocated by 2^%d\n", p->nMem );
