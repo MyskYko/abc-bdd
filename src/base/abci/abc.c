@@ -45991,10 +45991,10 @@ usage:
     Abc_Print( -2, "\t-M num: memory size to allocate (2^(num) nodes) [default = %d]\n", nMem );
     Abc_Print( -2, "\t-R num: threshold to terminate reordering while building BDDs. (num)%% more nodes than before reordering. 0=off. [default = %d]\n", nReoThold );
     Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
-    Abc_Print( -2, "\t\t0: Only results\n" );
-    Abc_Print( -2, "\t\t1: Refresh procedures\n" );
-    Abc_Print( -2, "\t\t2: Reordering procedures\n" );
-    Abc_Print( -2, "\t\t3: Each node entry\n" );
+    Abc_Print( -2, "\t\t0: Results\n" );
+    Abc_Print( -2, "\t\t1: + Refresh procedures\n" );
+    Abc_Print( -2, "\t\t2: + Reordering procedures\n" );
+    Abc_Print( -2, "\t\t3: + Each node entry\n" );
     Abc_Print( -2, "\t-W <file>: file to write blif of constructed BDDs\n" );
     Abc_Print( -2, "\t-h    : print the command usage\n");
     return 1;
@@ -46173,7 +46173,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
 	      {
 		vDcPos[i] = nDcPos + nDcPos + i;
 		if ( Gia_ObjChild0( Gia_ManCo( p00, i ) ) == Gia_Not( Gia_ObjChild0( Gia_ManCo( p00, i + nDcPos ) ) ) )
-		  v = Gia_ObjChild0( Gia_ManCo( p00, i ) );
+		  v = Gia_ObjFaninLit0p( p00, Gia_ManCo( p00, i ) );
 		else if ( Gia_ObjFanin0( Gia_ManCo( p00, i ) ) == Gia_ObjFanin0( Gia_ManCo( p00, i + nDcPos ) ) )
 		  v = Gia_ManConst0Lit( p00 );
 		else
@@ -46182,7 +46182,7 @@ int Abc_CommandAbc9Cspf( Abc_Frame_t * pAbc, int argc, char ** argv )
 					Abc_LitNot( Gia_Obj2Lit( p00, Gia_ObjChild0( Gia_ManCo( p00, i + nDcPos ) ) ) ) );
 		Gia_ManAppendCo( p00, v );
 		if ( Gia_ObjChild0( Gia_ManCo( p10, i ) ) == Gia_Not( Gia_ObjChild0( Gia_ManCo( p10, i + nDcPos ) ) ) )
-		  v = Gia_ObjChild0( Gia_ManCo( p10, i ) );
+		  v = Gia_ObjFaninLit0p( p10, Gia_ManCo( p10, i ) );
 		else if ( Gia_ObjFanin0( Gia_ManCo( p10, i ) ) == Gia_ObjFanin0( Gia_ManCo( p10, i + nDcPos ) ) )
 		  v = Gia_ManConst0Lit( p10 );
 		else
@@ -46224,10 +46224,10 @@ usage:
     Abc_Print( -2, "\t-x    : toggle using the later half outputs as external don't cares of the first half outputs [default = %s]\n", fExdc? "yes": "no" );
     Abc_Print( -2, "\t-y    : toggle using the later half outputs as input candidates of the first half outputs for G1,2 [default = %s]\n", fSpec? "yes": "no" );
     Abc_Print( -2, "\t-G num: optimization heuristic type [default = %d]\n", nType );
-    Abc_Print( -2, "\t\t0: calculate permissible functions while removing apparent redundancy\n" );
-    Abc_Print( -2, "\t\t1: transduction method of gate substitution (eager)\n" );
-    Abc_Print( -2, "\t\t2: transduction method of gate substitution (weak)\n" );
-    Abc_Print( -2, "\t\t3: transduction method of gate merging\n" );
+    Abc_Print( -2, "\t\t0: just calculate permissible functions\n" );
+    Abc_Print( -2, "\t\t1: eager gate substitution\n" );
+    Abc_Print( -2, "\t\t2: weak  gate substitution\n" );
+    Abc_Print( -2, "\t\t3: gate marging\n" );
     Abc_Print( -2, "\t-H num: MSPF instead of CSPF [default = %d]\n", nMspf );
     Abc_Print( -2, "\t\t0: none\n" );
     Abc_Print( -2, "\t\t1: replace eager-CSPF by MSPF\n" );
@@ -46236,9 +46236,9 @@ usage:
     Abc_Print( -2, "\t-P num: number of AIG nodes in each window (0 means no limit) [default = %d]\n", nWindowSize );
     Abc_Print( -2, "\t-V num: level of printing verbose information [default = %d]\n", nVerbose );
     Abc_Print( -2, "\t\t0: Nothing\n" );
-    Abc_Print( -2, "\t\t1: Results for each optimization\n" );
-    Abc_Print( -2, "\t\t2: Refresh procedures\n" );
-    Abc_Print( -2, "\t\t3: Optimization procedures\n" );
+    Abc_Print( -2, "\t\t1: + Results of each optimization\n" );
+    Abc_Print( -2, "\t\t2: + Refresh procedures\n" );
+    Abc_Print( -2, "\t\t3: + Optimization procedures\n" );
     Abc_Print( -2, "\t-Z num: toggle propagating don't cares among partitioned circuits [default = %s]\n", nDcPropagate );
     Abc_Print( -2, "\t\t0: No propagation\n" );
     Abc_Print( -2, "\t\t1: Propagate don't cares in terms of connections between partitions\n" );

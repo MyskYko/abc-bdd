@@ -532,6 +532,7 @@ extern int             Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p );
 
 /*=== extraUtilReorder.c ================================================================*/
 
+extern void            Abc_BddReorderConfig( Abc_BddMan * p, int nReoThold );
 extern void            Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions );
 
 /*=== extraUtilVc.c ================================================================*/

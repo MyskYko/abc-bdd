@@ -512,7 +512,7 @@ void Abc_BddWriteBlifNode_rec( Abc_BddMan * p, int a, FILE * f )
 }
 void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName, int fSort )
 {
-  int i, j;
+  int i;
   unsigned x;
   FILE * f = fopen( pFileName, "w" );
   fprintf( f, ".model top\n" );
@@ -724,7 +724,7 @@ static inline int Abc_BddGiaRefresh( Abc_BddMan * p, int * nRefresh )
 int Abc_BddGia( Gia_Man_t * pGia, Abc_BddMan * p )
 {
   int i, nRefresh;
-  int * pFanouts;
+  int * pFanouts = NULL;
   unsigned Cof0, Cof1;
   Gia_Obj_t * pObj, * pObj0, *pObj1;
   nRefresh = 0;

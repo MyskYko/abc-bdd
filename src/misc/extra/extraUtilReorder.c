@@ -468,7 +468,7 @@ static inline void Abc_BddShift( Abc_BddMan * p, int * pos, int * nNodes, int nS
 ***********************************************************************/
 void Abc_BddReorder( Abc_BddMan * p, Vec_Int_t * pFunctions )
 {
-  int i, j, k, best_i, pos, nNodes, nSwap, fUp, bestPos, nBestNodes, nLimit;
+  int i, j, best_i, pos, nNodes, nSwap, fUp, bestPos, nBestNodes, nLimit;
   int * new2old, * descendingOrder;
   Vec_Int_t * vNew;
   if ( p->nVerbose )

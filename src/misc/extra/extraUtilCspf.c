@@ -1281,7 +1281,7 @@ static inline int Abc_BddNandTryConnect( Abc_NandMan * p, int fanin, int fanout 
 static inline void Abc_BddNandRefresh( Abc_NandMan * p )
 {
   int out;
-  abctime clk0;
+  abctime clk0 = 0;
   if ( p->nVerbose >= 2 )
     {
       printf( "Refresh\n" );
@@ -1305,7 +1305,7 @@ static inline void Abc_BddNandRefresh( Abc_NandMan * p )
 	break;
       Abc_BddNandMemIncrease( p );
     }
-  if ( p->pBdd->nObjs > 1 << (p->nMem - 1) )
+  while ( p->pBdd->nObjs > 1 << (p->nMem - 1) )
     {
       Abc_BddNandMemIncrease( p );
       Abc_BddManRealloc( p->pBdd );
@@ -1369,7 +1369,7 @@ static inline int Abc_BddNandTryConnect_Refresh( Abc_NandMan * p, int fanin, int
 static inline void Abc_BddNandMspf_Refresh( Abc_NandMan * p )
 {
   int out;
-  abctime clk0;
+  abctime clk0 = 0;
   if ( p->nVerbose >= 2 )
     {
       printf( "Refresh mspf\n" );
@@ -1390,7 +1390,7 @@ static inline void Abc_BddNandMspf_Refresh( Abc_NandMan * p )
 	break;
       Abc_BddNandMemIncrease( p );
     }
-  if ( p->pBdd->nObjs > 1 << (p->nMem - 1) )
+  while ( p->pBdd->nObjs > 1 << (p->nMem - 1) )
     {
       Abc_BddNandMemIncrease( p );
       Abc_BddManRealloc( p->pBdd );
@@ -1563,6 +1563,7 @@ static inline void Abc_BddNandG3( Abc_NandMan * p )
   int i, j, k, id, idj, idk, c, wire, new_id;
   unsigned fi, fj, f1, f0, gi, gj, x, y;
   Vec_Int_t * targets;
+  c = 0; // for compile warning
   new_id = Vec_IntSize( p->vPis ) + 1;
   while ( !Abc_BddNandObjIsEmpty( p, new_id ) )
     {
@@ -1976,7 +1977,7 @@ static inline void Abc_BddNandPrintStats( Abc_NandMan * p, char * prefix, abctim
 }
 Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType, int fRm, int fRep, int fDc, int fSpec, int nWindowSize,int nDcPropagate, int nMspf, int nVerbose )
 {
-  int i, j, k, id, nPos;
+  int i, k, id, nPos;
   int * pPos;
   Abc_NandMan * p;
   Gia_Obj_t * pObj;
@@ -1987,6 +1988,7 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType,
   vPoCkts = Vec_IntAlloc( 1 );
   vPoIdxs = Vec_IntAlloc( 1 );
   vExternalCs = Vec_IntAlloc( 1 );
+  nPos = Gia_ManCoNum( pGia ); // for compile warning
   if ( !nWindowSize )
     {
       if ( fDc )
@@ -2052,6 +2054,11 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType,
 	  p->vOrdering = Vec_IntDup( p->pBdd->vOrdering );
 	  Vec_IntFree( vFuncs );
 	  p->nMem = Abc_Base2Log( p->pBdd->nObjsAlloc );
+	}
+      while ( p->pBdd->nObjs > 1 << (p->nMem - 1) )
+	{
+	  Abc_BddNandMemIncrease( p );
+	  Abc_BddManRealloc( p->pBdd );
 	}
       if ( nVerbose >= 2 )
 	printf( "Allocated by 2^%d\n", p->nMem );
