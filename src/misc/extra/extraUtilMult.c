@@ -523,24 +523,30 @@ void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName, int
 	fprintf( f, " pi%d", Vec_IntEntry( p->vOrdering, i ) );
       else if ( p->nVars <= 100 )
 	fprintf( f, " pi%02d", Vec_IntEntry( p->vOrdering, i ) );
-      else
+      else if ( p->nVars <= 1000 )
 	fprintf( f, " pi%03d", Vec_IntEntry( p->vOrdering, i ) );
+      else
+	fprintf( f, " pi%04d", Vec_IntEntry( p->vOrdering, i ) );
   else
     for ( i = 0; i < p->nVars; i++ )
       if ( p->nVars <= 10 )
 	fprintf( f, " pi%d ", i );
       else if ( p->nVars <= 100 )
 	fprintf( f, " pi%02d ", i );
-      else
+      else if ( p->nVars <= 1000 )
 	fprintf( f, " pi%03d ", i );
+      else
+	fprintf( f, " pi%04d ", i );
   fprintf( f, "\n.outputs" );
   for ( i = 0; i < Vec_IntSize( vNodes ); i++ )
-    if ( p->nVars <= 10 )
+    if ( Vec_IntSize( vNodes ) <= 10 )
       fprintf( f, " po%d ", i );
-    else if ( p->nVars <= 100 )
+    else if ( Vec_IntSize( vNodes ) <= 100 )
       fprintf( f, " po%02d ", i );
-    else
+    else if ( Vec_IntSize( vNodes ) <= 1000 )
       fprintf( f, " po%03d ", i );
+    else
+      fprintf( f, " po%04d ", i );
   fprintf( f, "\n" );
   fprintf( f, ".names zero\n" );
   fprintf( f, ".names one\n1\n" );
@@ -552,8 +558,10 @@ void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName, int
 	fprintf( f, " pi%d ", i );
       else if ( p->nVars <= 100 )
 	fprintf( f, " pi%02d ", i );
-      else
+      else if ( p->nVars <= 1000 )
 	fprintf( f, " pi%03d ", i );
+      else
+	fprintf( f, " pi%04d ", i );
       fprintf( f, " v%d", Vec_IntFind( p->vOrdering, i ) );
       fprintf( f, "\n1 1\n" );      
     }
@@ -561,12 +569,14 @@ void Abc_BddWriteBlif( Abc_BddMan * p, Vec_Int_t * vNodes, char * pFileName, int
     {
       fprintf( f, ".names" );
       fprintf( f, " n%d", Abc_BddLit2Bvar( x ) );
-      if ( p->nVars <= 10 )
+      if ( Vec_IntSize( vNodes ) <= 10 )
 	fprintf( f, " po%d ", i );
-      else if ( p->nVars <= 100 )
+      else if ( Vec_IntSize( vNodes ) <= 100 )
 	fprintf( f, " po%02d ", i );
-      else
+      else if ( Vec_IntSize( vNodes ) <= 1000 )
 	fprintf( f, " po%03d ", i );
+      else
+	fprintf( f, " po%04d ", i );
       if ( Abc_BddLitIsCompl( x ) )
 	fprintf( f, "\n0 1\n" );
       else
@@ -816,8 +826,10 @@ void Abc_BddGiaTest( Gia_Man_t * pGia, int nVerbose, int nMem, char * pFileName,
 	  printf( "pi%d ", Vec_IntEntry( p->vOrdering, i ) );
 	else if ( p->nVars <= 100 )
 	  printf( "pi%02d ", Vec_IntEntry( p->vOrdering, i ) );
-	else
+	else if ( p->nVars <= 1000 )
 	  printf( "pi%03d ", Vec_IntEntry( p->vOrdering, i ) );
+	else
+	  printf( "pi%04d ", Vec_IntEntry( p->vOrdering, i ) );
       printf( "\n" );
     }
   printf( "Shared BDD size = %6d nodes.", Abc_BddCountNodesArrayShared( p, vNodes ) );

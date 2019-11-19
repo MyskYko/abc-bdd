@@ -545,12 +545,13 @@ static inline void Abc_BddNandSetPoInfo( Gia_Man_t * pGia, Vec_Ptr_t * vNets, Ve
       k = Vec_IntFind( vId, id );
       Vec_IntPush( vPoCkts, Vec_IntEntry( vCkts, k ) );
       Vec_IntPush( vPoIdxs, Vec_IntEntry( vIdxs, k ) );
-      // set external don't care to be 0
       if ( Vec_IntEntry( vCkts, k ) < 0 )
 	continue;
+      // set external don't care
       p = Vec_PtrEntry( vNets, Vec_IntEntry( vCkts, k ) );
       if ( fDc )
 	{
+	  // from latter half outputs 
 	  pDc = Abc_BddNandGiaExpand( pGia, p->vOrgPis, NULL );
 	  j = i + Vec_IntSize( vExternalPos );
 	  pTmp = pDc;
@@ -568,6 +569,7 @@ static inline void Abc_BddNandSetPoInfo( Gia_Man_t * pGia, Vec_Ptr_t * vNets, Ve
 	}
       else
 	{
+	  // const-0
 	  pDc = Gia_ManStart( Vec_IntSize( p->vPis ) );
 	  Vec_IntForEachEntry( p->vPis, id, j )
 	    Gia_ManAppendCi( pDc );
@@ -2037,6 +2039,11 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType,
 	  Abc_BddManFree( p->pBdd );
 	  p->pBdd = Abc_BddManAlloc( Vec_IntSize( p->vPis ), 1 << p->nMem, 0, NULL, 0 );
 	}
+      while ( p->pBdd->nObjs > 1 << (p->nMem - 1) )
+	{
+	  Abc_BddNandMemIncrease( p );
+	  Abc_BddManRealloc( p->pBdd );
+	}
       if ( fReo )
 	{
 	  vFuncs = Vec_IntAlloc( 1 );
@@ -2054,11 +2061,6 @@ Gia_Man_t * Abc_BddNandGiaTest( Gia_Man_t * pGia, int nMem, int fReo, int nType,
 	  p->vOrdering = Vec_IntDup( p->pBdd->vOrdering );
 	  Vec_IntFree( vFuncs );
 	  p->nMem = Abc_Base2Log( p->pBdd->nObjsAlloc );
-	}
-      while ( p->pBdd->nObjs > 1 << (p->nMem - 1) )
-	{
-	  Abc_BddNandMemIncrease( p );
-	  Abc_BddManRealloc( p->pBdd );
 	}
       if ( nVerbose >= 2 )
 	printf( "Allocated by 2^%d\n", p->nMem );
