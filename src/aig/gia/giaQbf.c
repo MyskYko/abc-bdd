@@ -692,6 +692,127 @@ int Gia_QbfSolve( Gia_Man_t * pGia, int nPars, int nIterLimit, int nConfLimit, i
     return RetValue;
 }
 
+/**Function*************************************************************
+
+  Synopsis    [Performs QBF solving (synthesis modulo theories at CAV2018).]
+
+  Description []
+               
+  SideEffects []
+
+  SeeAlso     []
+
+***********************************************************************/
+Gia_Man_t * Gia_QbfFixSome( Gia_Man_t * p, int nPars, Vec_Int_t * vValues )
+{
+    Gia_Man_t * pNew, * pTemp;
+    Gia_Obj_t * pObj; int i;
+    assert( nPars <= Vec_IntSize(vValues) );
+    pNew = Gia_ManStart( Gia_ManObjNum(p) );
+    pNew->pName = Abc_UtilStrsav( p->pName );
+    Gia_ManHashAlloc( pNew );
+    Gia_ManConst0(p)->Value = 0;
+    Gia_ManForEachPi( p, pObj, i )
+        if ( i < nPars )
+	    pObj->Value = Vec_IntEntry(vValues, i);
+	else
+	    pObj->Value = Gia_ManAppendCi(pNew);
+    Gia_ManForEachAnd( p, pObj, i )
+        pObj->Value = Gia_ManHashAnd( pNew, Gia_ObjFanin0Copy(pObj), Gia_ObjFanin1Copy(pObj) );
+    Gia_ManForEachCo( p, pObj, i )
+        pObj->Value = Gia_ManAppendCo( pNew, Gia_ObjFanin0Copy(pObj) );
+    pNew = Gia_ManCleanup( pTemp = pNew );
+    Gia_ManStop( pTemp );
+    assert( Gia_ManPiNum(pNew) == Gia_ManPiNum(p) - nPars );
+    return pNew;
+}
+int Gia_QbfSolve2( Gia_Man_t * pGia, int nPars, int nPars2, int nIterLimit, int nConfLimit, int nTimeOut, int fGlucose, int fVerbose )
+{
+    Qbf_Man_t * p = Gia_QbfAlloc( pGia, nPars + nPars2, fGlucose, fVerbose );
+    Gia_Man_t * pCof, * pInter;
+    int i, j, status, RetValue = 0;
+    abctime clk;
+//    Gia_QbfAddSpecialConstr( p );
+    if ( fVerbose )
+        printf( "Solving QBF for \"%s\" with %d parameters, %d variables and %d AIG nodes.\n", 
+            Gia_ManName(pGia), p->nPars, p->nVars, Gia_ManAndNum(pGia) );
+    assert( Gia_ManRegNum(pGia) == 0 );
+    Vec_IntFill( p->vValues, nPars + nPars2, 0 );
+    for ( i = 0; Gia_QbfVerify(p, p->vValues); i++ )
+    {
+        // generate next constraint
+        assert( Vec_IntSize(p->vValues) == p->nVars );
+        pCof = Gia_QbfCofactor( pGia, nPars + nPars2, p->vValues, p->vParMap );
+        status = p->pSatSynG ? Gia_QbfAddCofactorG( p, pCof ) : Gia_QbfAddCofactor( p, pCof );
+        Gia_ManStop( pCof );
+        if ( status == 0 )       { RetValue =  1; break; }
+        // synthesize next assignment
+        clk = Abc_Clock();
+        if ( p->pSatSynG )
+            status = bmcg_sat_solver_solve( p->pSatSynG, NULL, 0 );
+        else
+            status = sat_solver_solve( p->pSatSyn, NULL, NULL, (ABC_INT64_T)nConfLimit, 0, 0, 0 );
+        p->clkSat += Abc_Clock() - clk;
+        if ( fVerbose )
+            Gia_QbfPrint( p, p->vValues, i );
+        if ( status == l_False ) { RetValue =  1; break; }
+        if ( status == l_Undef ) { RetValue = -1; break; }
+        // extract SAT assignment
+        Gia_QbfOnePattern( p, p->vValues );
+        assert( Vec_IntSize(p->vValues) == p->nPars );
+        // examine variables
+//        Gia_QbfLearnConstraint( p, p->vValues );
+//        Vec_IntPrintBinary( p->vValues ); printf( "\n" );
+        if ( nIterLimit && i+1 == nIterLimit ) { RetValue = -1; break; }
+        if ( nTimeOut && (Abc_Clock() - p->clkStart)/CLOCKS_PER_SEC >= nTimeOut ) { RetValue = -1; break; }
+	// solve internal loop
+	printf( "Parameters: " );
+	Vec_IntPrintBinary( p->vValues );
+	printf( "\n" );
+	pInter = Gia_QbfFixSome( pGia, nPars, p->vValues );
+	RetValue = Gia_QbfSolve( pInter, nPars2, nIterLimit, nConfLimit, nTimeOut, fGlucose, fVerbose );
+	Gia_ManStop( pInter );
+	if ( RetValue == 0 ) return RetValue;
+	for ( j = 0; j < nPars; j++ )
+	    Vec_IntAddToEntry( p->vValues, j, j * 2 );
+	if ( p->pSatSynG )
+	    bmcg_sat_solver_addclause( p->pSatSynG, Vec_IntArray( p->vValues ), nPars );
+	else
+	    sat_solver_addclause( p->pSatSyn, Vec_IntArray( p->vValues ), Vec_IntArray( p->vValues ) + nPars );
+	for ( j = 0; j < nPars; j++ )
+	    Vec_IntAddToEntry( p->vValues, j, - j * 2 );
+    }
+    if ( RetValue == 0 )
+    {
+        int nZeros = Vec_IntCountZero( p->vValues );
+        printf( "Parameters: " );
+        assert( Vec_IntSize(p->vValues) == nPars );
+        Vec_IntPrintBinary( p->vValues );
+        printf( "  Statistics: 0=%d 1=%d\n", nZeros, Vec_IntSize(p->vValues) - nZeros );
+    }
+    if ( RetValue == -1 && nTimeOut && (Abc_Clock() - p->clkStart)/CLOCKS_PER_SEC >= nTimeOut )
+        printf( "The problem timed out after %d sec.  ", nTimeOut );
+    else if ( RetValue == -1 && nConfLimit )
+        printf( "The problem aborted after %d conflicts.  ", nConfLimit );
+    else if ( RetValue == -1 && nIterLimit )
+        printf( "The problem aborted after %d iterations.  ", nIterLimit );
+    else if ( RetValue == 1 )
+        printf( "The problem is UNSAT after %d iterations.  ", i );
+    else 
+        printf( "The problem is SAT after %d iterations.  ", i );
+    if ( fVerbose )
+    {
+        printf( "\n" );
+        Abc_PrintTime( 1, "SAT  ", p->clkSat );
+        Abc_PrintTime( 1, "Other", Abc_Clock() - p->clkStart - p->clkSat );
+        Abc_PrintTime( 1, "TOTAL", Abc_Clock() - p->clkStart );
+    }
+    else
+        Abc_PrintTime( 1, "Time", Abc_Clock() - p->clkStart );
+    Gia_QbfFree( p );
+    return RetValue;
+}
+
 ////////////////////////////////////////////////////////////////////////
 ///                       END OF FILE                                ///
 ////////////////////////////////////////////////////////////////////////

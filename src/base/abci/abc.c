@@ -42248,7 +42248,9 @@ int Abc_CommandAbc9Qbf( Abc_Frame_t * pAbc, int argc, char ** argv )
 {
     extern void Gia_QbfDumpFile( Gia_Man_t * pGia, int nPars );
     extern int Gia_QbfSolve( Gia_Man_t * pGia, int nPars, int nIterLimit, int nConfLimit, int nTimeOut, int fGlucose, int fVerbose );
+    extern int Gia_QbfSolve2( Gia_Man_t * pGia, int nPars, int nPars2, int nIterLimit, int nConfLimit, int nTimeOut, int fGlucose, int fVerbose );
     int c, nPars   = -1;
+    int nPars2     = -1;
     int nIterLimit =  0;
     int nConfLimit =  0;
     int nTimeOut   =  0;
@@ -42256,7 +42258,7 @@ int Abc_CommandAbc9Qbf( Abc_Frame_t * pAbc, int argc, char ** argv )
     int fGlucose   =  0;
     int fVerbose   =  0;
     Extra_UtilGetoptReset();
-    while ( ( c = Extra_UtilGetopt( argc, argv, "PICTdgvh" ) ) != EOF )
+    while ( ( c = Extra_UtilGetopt( argc, argv, "PQICTdgvh" ) ) != EOF )
     {
         switch ( c )
         {
@@ -42269,6 +42271,17 @@ int Abc_CommandAbc9Qbf( Abc_Frame_t * pAbc, int argc, char ** argv )
             nPars = atoi(argv[globalUtilOptind]);
             globalUtilOptind++;
             if ( nPars < 0 )
+                goto usage;
+            break;
+        case 'Q':
+            if ( globalUtilOptind >= argc )
+            {
+                Abc_Print( -1, "Command line switch \"-Q\" should be followed by an integer.\n" );
+                goto usage;
+            }
+            nPars2 = atoi(argv[globalUtilOptind]);
+            globalUtilOptind++;
+            if ( nPars2 < 0 )
                 goto usage;
             break;
         case 'I':
@@ -42341,7 +42354,9 @@ int Abc_CommandAbc9Qbf( Abc_Frame_t * pAbc, int argc, char ** argv )
     }
     if ( fDumpCnf )
         Gia_QbfDumpFile( pAbc->pGia, nPars );
-    else
+    else if( nPars2 > 0 )
+        Gia_QbfSolve2( pAbc->pGia, nPars, nPars2, nIterLimit, nConfLimit, nTimeOut, fGlucose, fVerbose );
+    else 
         Gia_QbfSolve( pAbc->pGia, nPars, nIterLimit, nConfLimit, nTimeOut, fGlucose, fVerbose );
     return 0;
 
