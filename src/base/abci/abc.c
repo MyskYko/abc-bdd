@@ -42361,9 +42361,10 @@ int Abc_CommandAbc9Qbf( Abc_Frame_t * pAbc, int argc, char ** argv )
     return 0;
 
 usage:
-    Abc_Print( -2, "usage: &qbf [-PICT num] [-dgvh]\n" );
+    Abc_Print( -2, "usage: &qbf [-PQICT num] [-dgvh]\n" );
     Abc_Print( -2, "\t         solves QBF problem EpVxM(p,x)\n" );
     Abc_Print( -2, "\t-P num : number of parameters p (should be the first PIs) [default = %d]\n", nPars );
+    Abc_Print( -2, "\t-Q num : number of parameters q and solve EpqVxM(p, q, x) by synthesis modulo theories [default = %d]\n", nPars );
     Abc_Print( -2, "\t-I num : quit after the given iteration even if unsolved [default = %d]\n", nIterLimit );
     Abc_Print( -2, "\t-C num : conflict limit per problem [default = %d]\n", nConfLimit );
     Abc_Print( -2, "\t-T num : global timeout [default = %d]\n", nTimeOut );

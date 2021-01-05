@@ -625,7 +625,8 @@ int Gia_QbfSolve( Gia_Man_t * pGia, int nPars, int nIterLimit, int nConfLimit, i
 {
     Qbf_Man_t * p = Gia_QbfAlloc( pGia, nPars, fGlucose, fVerbose );
     Gia_Man_t * pCof;
-    int i, status, RetValue = 0;
+    Gia_Obj_t * pObj;
+    int i, j, status, RetValue = 0;
     abctime clk;
 //    Gia_QbfAddSpecialConstr( p );
     if ( fVerbose )
@@ -668,6 +669,11 @@ int Gia_QbfSolve( Gia_Man_t * pGia, int nPars, int nIterLimit, int nConfLimit, i
         assert( Vec_IntSize(p->vValues) == nPars );
         Vec_IntPrintBinary( p->vValues );
         printf( "  Statistics: 0=%d 1=%d\n", nZeros, Vec_IntSize(p->vValues) - nZeros );
+	Gia_ManForEachCi( pGia, pObj, j )
+	    if ( j < nPars )
+	        Gia_ObjSetValue( pObj, Vec_IntEntry( p->vValues, j ) );
+	    else
+	        break;
     }
     if ( RetValue == -1 && nTimeOut && (Abc_Clock() - p->clkStart)/CLOCKS_PER_SEC >= nTimeOut )
         printf( "The problem timed out after %d sec.  ", nTimeOut );
@@ -730,6 +736,7 @@ int Gia_QbfSolve2( Gia_Man_t * pGia, int nPars, int nPars2, int nIterLimit, int 
 {
     Qbf_Man_t * p = Gia_QbfAlloc( pGia, nPars + nPars2, fGlucose, fVerbose );
     Gia_Man_t * pCof, * pInter;
+    Gia_Obj_t * pObj;
     int i, j, status, RetValue = 0;
     abctime clk;
 //    Gia_QbfAddSpecialConstr( p );
@@ -766,13 +773,26 @@ int Gia_QbfSolve2( Gia_Man_t * pGia, int nPars, int nPars2, int nIterLimit, int 
         if ( nIterLimit && i+1 == nIterLimit ) { RetValue = -1; break; }
         if ( nTimeOut && (Abc_Clock() - p->clkStart)/CLOCKS_PER_SEC >= nTimeOut ) { RetValue = -1; break; }
 	// solve internal loop
-	printf( "Parameters: " );
-	Vec_IntPrintBinary( p->vValues );
+	printf( "First parameters: " );
+	for ( j = 0; j < nPars; j++ )
+	  printf("%d", Vec_IntEntry( p->vValues, j ));
 	printf( "\n" );
 	pInter = Gia_QbfFixSome( pGia, nPars, p->vValues );
+	printf("\n### Begin internal loop to determine the remaining parameters\n");
 	RetValue = Gia_QbfSolve( pInter, nPars2, nIterLimit, nConfLimit, nTimeOut, fGlucose, fVerbose );
+	printf("### End internal loop\n\n");
+	if ( RetValue == 0 )
+	{
+	    Gia_ManForEachCi( pInter, pObj, j )
+	        if ( j < nPars2 )
+		    Vec_IntWriteEntry( p->vValues, nPars + j, Gia_ObjValue( pObj ) );
+		else
+		    break;
+	    Gia_ManStop( pInter );
+	    i++;
+	    break;
+	}
 	Gia_ManStop( pInter );
-	if ( RetValue == 0 ) return RetValue;
 	for ( j = 0; j < nPars; j++ )
 	    Vec_IntAddToEntry( p->vValues, j, j * 2 );
 	if ( p->pSatSynG )
@@ -785,8 +805,8 @@ int Gia_QbfSolve2( Gia_Man_t * pGia, int nPars, int nPars2, int nIterLimit, int 
     if ( RetValue == 0 )
     {
         int nZeros = Vec_IntCountZero( p->vValues );
-        printf( "Parameters: " );
-        assert( Vec_IntSize(p->vValues) == nPars );
+        printf( "Final parameters: " );
+        assert( Vec_IntSize(p->vValues) == nPars + nPars2 );
         Vec_IntPrintBinary( p->vValues );
         printf( "  Statistics: 0=%d 1=%d\n", nZeros, Vec_IntSize(p->vValues) - nZeros );
     }
